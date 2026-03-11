@@ -1,0 +1,170 @@
+@model dynamic
+@{
+    ViewData["Title"] = "ملخص مالي للمرشحين";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    int    page       = ViewBag.Page;
+    int    totalPages = ViewBag.TotalPages;
+    int    total      = ViewBag.Total;
+    string q          = ViewBag.Q ?? "";
+
+    string[] stages = { "", "توثيق", "تجهيز", "طبي", "تأشيرة", "تذاكر", "سفر", "مكتمل" };
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);">👥</div>
+        <div>
+            <h1 class="page-title">ملخص مالي للمرشحين</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@total مرشح إجمالاً</p>
+        </div>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success mb-4" data-auto-dismiss="4000">✅ @TempData["Success"]</div>
+}
+
+<div class="card">
+    <div class="filter-bar">
+        <div class="filter-group" style="flex:1;min-width:220px;">
+            <label>بحث</label>
+            <div class="input-group-icon">
+                <i class="bi bi-search input-icon"></i>
+                <input type="text" id="searchInput" class="form-control search-input"
+                       placeholder="الاسم، الهاتف، أو الرقم القومي..."
+                       value="@q" autocomplete="off" />
+            </div>
+        </div>
+    </div>
+
+    @if (((IEnumerable<dynamic>)Model).Any())
+    {
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>المرشح</th>
+                        <th>باقة العمل</th>
+                        <th>سعر الباقة</th>
+                        <th>المحصّل (معتمد)</th>
+                        <th>في انتظار الاعتماد</th>
+                        <th>المتبقي</th>
+                        <th>المرحلة</th>
+                        <th>مسؤول المبيعات</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Model)
+                    {
+                        decimal paid    = (decimal)c.TotalPaidEgp;
+                        decimal price   = (decimal)c.PriceEgp;
+                        decimal pending = (decimal)c.PendingAmount;
+                        decimal remaining = Math.Max(0, price - paid);
+                        int pct = price > 0 ? (int)Math.Min(100, paid / price * 100) : 0;
+
+                        <tr class="table-row-link" data-href="/Accountant/CandidateFinancials/@c.Id">
+                            <td>
+                                <div style="font-weight:700;">@c.FullName</div>
+                                <div style="font-size:.75rem;color:var(--text-faint);">@c.Phone</div>
+                            </td>
+                            <td style="font-size:.82rem;">@c.JobPackageName</td>
+                            <td style="font-weight:700;">@price.ToString("N0") ج.م</td>
+                            <td>
+                                <span style="color:#16a34a;font-weight:800;">@paid.ToString("N0") ج.م</span>
+                                <div style="margin-top:4px;">
+                                    <div style="height:4px;background:#e2e8f0;border-radius:99px;overflow:hidden;width:80px;">
+                                        <div style="height:100%;width:@pct%;background:#16a34a;border-radius:99px;"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                @if (pending > 0)
+                                {
+                                    <span style="color:#b45309;font-weight:700;">@pending.ToString("N0") ج.م</span>
+                                    <span class="badge-pill ms-1" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a;font-size:.65rem;">⏳</span>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-faint);">—</span>
+                                }
+                            </td>
+                            <td>
+                                @if (remaining > 0)
+                                {
+                                    <span style="color:#dc2626;font-weight:700;">@remaining.ToString("N0") ج.م</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-pill" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;">مسدد بالكامل ✅</span>
+                                }
+                            </td>
+                            <td>
+                                @{
+                                    int st = (int)c.CurrentStage;
+                                    string stageLabel = st >= 1 && st <= 7 ? stages[st] : st.ToString();
+                                }
+                                <span class="badge-pill stage-badge stage-@st">@stageLabel</span>
+                            </td>
+                            <td style="font-size:.82rem;">@(c.AssignedSalesName ?? "—")</td>
+                            <td class="no-nav">
+                                <a href="/Accountant/CandidateFinancials/@c.Id" class="btn btn-ghost btn-icon sm">
+                                    <i class="bi bi-eye" style="font-size:13px;"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (totalPages > 1)
+        {
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <div style="font-size:.8rem;color:var(--text-muted);">@total مرشح</div>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        @if (page > 1)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="?page=@(page-1)&q=@q"><i class="bi bi-chevron-right"></i></a>
+                            </li>
+                        }
+                        @for (int p2 = Math.Max(1, page - 2); p2 <= Math.Min(totalPages, page + 2); p2++)
+                        {
+                            <li class="page-item @(p2 == page ? "active" : "")">
+                                <a class="page-link" href="?page=@p2&q=@q">@p2</a>
+                            </li>
+                        }
+                        @if (page < totalPages)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="?page=@(page+1)&q=@q"><i class="bi bi-chevron-left"></i></a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">👥</div>
+            <div class="empty-state-title">لا يوجد مرشحون</div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script>
+const searchInput = document.getElementById('searchInput');
+searchInput?.addEventListener('input', CRM.debounce(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('q', searchInput.value.trim());
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}, 450));
+</script>
+}

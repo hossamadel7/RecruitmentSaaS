@@ -118,8 +118,12 @@
             </div>
             <div class="card-body p-0">
                 <div style="padding:14px 20px;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;align-items:center">
-                    <span style="font-size:13px;color:var(--text-muted)">إجمالي المدفوع</span>
-                    <span style="font-size:15px;font-weight:800;color:var(--success)">@Model.TotalPaidEGP.ToString("N0") ج.م</span>
+                    <span style="font-size:13px;color:var(--text-muted)">إجمالي المدفوع (معتمد)</span>
+                    <span style="font-size:15px;font-weight:800;color:var(--success)">@payments.Where(p => p.Status == 2).Sum(p => p.TransactionType == 2 ? -p.AmountEGP : p.AmountEGP).ToString("N0") ج.م</span>
+                </div>
+                <div style="padding:8px 20px;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;align-items:center">
+                    <span style="font-size:12px;color:#D97706">في انتظار الاعتماد</span>
+                    <span style="font-size:13px;font-weight:700;color:#D97706">@payments.Where(p => p.Status == 1).Sum(p => p.AmountEGP).ToString("N0") ج.م</span>
                 </div>
                 @if (!payments.Any())
                 {
@@ -130,15 +134,41 @@
                     @foreach (var p in payments.Take(4))
                     {
                         var methodName = p.PaymentMethod switch { 1 => "كاش", 2 => "تحويل", 3 => "بطاقة", _ => "—" };
-                        var typeColor = p.TransactionType == 2 ? "#E11D48" : "#059669";
-                        <div style="padding:9px 20px;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;align-items:center">
-                            <div>
-                                <div style="font-size:13px;font-weight:700;color:@typeColor">
-                                    @(p.TransactionType == 2 ? "-" : "+")@p.AmountEGP.ToString("N0") ج.م
+                        // Color based on STATUS first, then transaction type
+                        var amountColor = p.Status switch
+                        {
+                            1 => "#D97706",   // pending → orange
+                            2 => p.TransactionType == 2 ? "#E11D48" : "#059669",  // approved → green/red
+                            3 => "#94A3B8",   // rejected → gray
+                            _ => "#059669"
+                        };
+                        var statusBadge = p.Status switch
+                        {
+                            1 => "<span style=\"font-size:10px;background:#FFFBEB;color:#D97706;padding:2px 7px;border-radius:5px;font-weight:600\">⏳ معلق</span>",
+                            2 => "<span style=\"font-size:10px;background:#ECFDF5;color:#059669;padding:2px 7px;border-radius:5px;font-weight:600\">✓ معتمد</span>",
+                            3 => "<span style=\"font-size:10px;background:#F1F5F9;color:#94A3B8;padding:2px 7px;border-radius:5px;font-weight:600\">✕ مرفوض</span>",
+                            _ => ""
+                        };
+                        <div style="padding:9px 20px;border-bottom:1px solid #F1F5F9;@(p.Status == 3 ? "opacity:0.6" : "")">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div>
+                                    <div style="display:flex;align-items:center;gap:6px">
+                                        <span style="font-size:13px;font-weight:700;color:@amountColor">
+                                            @(p.TransactionType == 2 ? "-" : "+")@p.AmountEGP.ToString("N0") ج.م
+                                        </span>
+                                        @Html.Raw(statusBadge)
+                                    </div>
+                                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+                                        @p.PaymentDate.ToString("dd/MM/yyyy") · @methodName · @p.RecordedByName
+                                    </div>
+                                    @if (p.Status == 3 && !string.IsNullOrEmpty(p.RejectionReason))
+                                    {
+                                        <div style="font-size:11px;color:#E11D48;margin-top:2px">
+                                            سبب الرفض: @p.RejectionReason
+                                        </div>
+                                    }
                                 </div>
-                                <div style="font-size:11px;color:var(--text-muted)">@p.PaymentDate.ToString("dd/MM/yyyy") · @methodName</div>
                             </div>
-                            <span style="font-size:10px;background:#F1F5F9;padding:2px 7px;border-radius:5px;color:var(--text-muted)">@p.RecordedByName</span>
                         </div>
                     }
                     @if (payments.Count > 4)

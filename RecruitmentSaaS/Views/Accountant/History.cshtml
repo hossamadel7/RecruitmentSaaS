@@ -1,0 +1,133 @@
+@model List<RecruitmentSaaS.Models.DTOs.AccountantPaymentDto>
+@{
+    ViewData["Title"] = "سجل المدفوعات";
+    ViewData["Subtitle"] = "المدفوعات المعتمدة والمرفوضة";
+    var page       = (int)(ViewBag.Page ?? 1);
+    var totalPages = (int)(ViewBag.TotalPages ?? 1);
+    var total      = (int)(ViewBag.Total ?? 0);
+    var status     = ViewBag.Status as byte?;
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-header-title">سجل المدفوعات</h1>
+        <div class="page-header-sub">@total سجل</div>
+    </div>
+    <a href="/Accountant/Pending" class="btn" style="border:1px solid var(--border);font-size:13px">
+        <i class="bi bi-clock-history"></i> الدفعات المعلقة
+    </a>
+</div>
+
+<!-- Filter Tabs -->
+<div style="display:flex;gap:8px;margin-bottom:16px">
+    <a href="/Accountant/History"
+       style="padding:7px 16px;border-radius:8px;font-size:13px;text-decoration:none;font-weight:600;
+              background:@(status == null ? "var(--primary)" : "#F8FAFC");
+              color:@(status == null ? "white" : "var(--text-muted)");
+              border:1px solid @(status == null ? "var(--primary)" : "var(--border)")">
+        الكل (@total)
+    </a>
+    <a href="/Accountant/History?status=2"
+       style="padding:7px 16px;border-radius:8px;font-size:13px;text-decoration:none;font-weight:600;
+              background:@(status == 2 ? "#059669" : "#F8FAFC");
+              color:@(status == 2 ? "white" : "var(--text-muted)");
+              border:1px solid @(status == 2 ? "#059669" : "var(--border)")">
+        <i class="bi bi-check-circle-fill"></i> معتمد
+    </a>
+    <a href="/Accountant/History?status=3"
+       style="padding:7px 16px;border-radius:8px;font-size:13px;text-decoration:none;font-weight:600;
+              background:@(status == 3 ? "#E11D48" : "#F8FAFC");
+              color:@(status == 3 ? "white" : "var(--text-muted)");
+              border:1px solid @(status == 3 ? "#E11D48" : "var(--border)")">
+        <i class="bi bi-x-circle-fill"></i> مرفوض
+    </a>
+</div>
+
+<div class="card">
+    @if (!Model.Any())
+    {
+        <div style="padding:48px;text-align:center;color:var(--text-muted)">
+            <i class="bi bi-journal" style="font-size:40px;display:block;margin-bottom:10px"></i>
+            لا توجد سجلات
+        </div>
+    }
+    else
+    {
+        <div class="card-body p-0">
+            @foreach (var p in Model)
+            {
+                var methodName = p.PaymentMethod switch { 1=>"كاش", 2=>"تحويل", 3=>"بطاقة", _=>"—" };
+                var typeColor  = p.TransactionType == 2 ? "#E11D48" : "#059669";
+                var statusBg   = p.Status == 2 ? "#ECFDF5" : "#FFF0F3";
+                var statusColor = p.Status == 2 ? "#059669" : "#E11D48";
+                var statusText  = p.Status == 2 ? "معتمد" : "مرفوض";
+                var statusIcon  = p.Status == 2 ? "bi-check-circle-fill" : "bi-x-circle-fill";
+
+                <div style="padding:14px 20px;border-bottom:1px solid #F1F5F9">
+                    <div class="row align-items-center g-2">
+
+                        <div class="col-md-4">
+                            <div style="display:flex;align-items:center;gap:10px">
+                                <div style="width:36px;height:36px;border-radius:50%;background:@statusBg;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                    <i class="bi @statusIcon" style="color:@statusColor"></i>
+                                </div>
+                                <div>
+                                    <a href="/Accountant/CandidateFinancials/@p.CandidateId"
+                                       style="font-size:13px;font-weight:700;color:var(--text-primary);text-decoration:none">
+                                        @p.CandidateFullName
+                                    </a>
+                                    <div style="font-size:11px;color:var(--text-muted)">@p.JobPackageName</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div style="font-size:15px;font-weight:800;color:@typeColor">
+                                @(p.TransactionType == 2 ? "-" : "+")@p.AmountEGP.ToString("N0") ج.م
+                            </div>
+                            <div style="font-size:11px;color:var(--text-muted)">
+                                @p.PaymentDate.ToString("dd/MM/yyyy") · @methodName · @p.RecordedByName
+                            </div>
+                            @if (p.Status == 3 && !string.IsNullOrEmpty(p.RejectionReason))
+                            {
+                                <div style="font-size:11px;color:#E11D48;margin-top:2px">
+                                    سبب الرفض: @p.RejectionReason
+                                </div>
+                            }
+                        </div>
+
+                        <div class="col-md-4" style="text-align:left">
+                            <span style="font-size:12px;font-weight:600;background:@statusBg;color:@statusColor;padding:4px 10px;border-radius:6px">
+                                <i class="bi @statusIcon"></i> @statusText
+                            </span>
+                            @if (p.ApprovedAt.HasValue)
+                            {
+                                <div style="font-size:10px;color:var(--text-muted);margin-top:4px">
+                                    @p.ApprovedByName · @p.ApprovedAt.Value.ToString("dd/MM HH:mm")
+                                </div>
+                            }
+                        </div>
+
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- Pagination -->
+@if (totalPages > 1)
+{
+    <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
+        @for (int i = 1; i <= totalPages; i++)
+        {
+            <a href="/Accountant/History?status=@(status?.ToString() ?? "")&page=@i"
+               style="padding:6px 12px;border-radius:6px;font-size:13px;text-decoration:none;
+                      background:@(i == page ? "var(--primary)" : "#F8FAFC");
+                      color:@(i == page ? "white" : "var(--text-primary)");
+                      border:1px solid @(i == page ? "var(--primary)" : "var(--border)")">
+                @i
+            </a>
+        }
+    </div>
+}

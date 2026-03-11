@@ -1,0 +1,274 @@
+@{
+    ViewData["Title"] = "التقارير المالية";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    int month = ViewBag.Month;
+    int year = ViewBag.Year;
+    decimal totalCollected = ViewBag.TotalCollected;
+    decimal refundsThisMonth = ViewBag.RefundsThisMonth;
+    decimal commissionsThisMonth = ViewBag.CommissionsThisMonth;
+    int candidatesThisMonth = ViewBag.CandidatesThisMonth;
+    int completedThisMonth = ViewBag.CompletedThisMonth;
+
+    var paymentsByMethod = (IEnumerable<dynamic>)ViewBag.PaymentsThisMonth;
+    var bySales = (IEnumerable<dynamic>)ViewBag.BySales;
+
+    string[] months = { "", "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                         "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر" };
+    string[] payMethods = { "", "كاش", "تحويل بنكي", "بطاقة", "شيك" };
+
+    decimal netRevenue = totalCollected - refundsThisMonth - commissionsThisMonth;
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);">📊</div>
+        <div>
+            <h1 class="page-title">التقارير المالية</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">
+                @months[month] @year
+            </p>
+        </div>
+    </div>
+    @* Month selector *@
+    <form method="get" class="d-flex gap-2 align-items-center">
+        <select name="month" class="form-select form-select-sm" style="width:120px;">
+            @for (int m = 1; m <= 12; m++)
+            {
+                if (m == month)
+                {
+                    <option value="@m" selected="selected">@months[m]</option>
+                }
+                else
+                {
+                    <option value="@m">@months[m]</option>
+                }
+            }
+        </select>
+        <select name="year" class="form-select form-select-sm" style="width:90px;">
+            @for (int y = DateTime.UtcNow.Year; y >= DateTime.UtcNow.Year - 3; y--)
+            {
+                if (y == year)
+                {
+                    <option value="@y" selected="selected">@y</option>
+                }
+                else
+                {
+                    <option value="@y">@y</option>
+                }
+            }
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">عرض</button>
+    </form>
+</div>
+
+@* Summary stat cards *@
+<div class="row g-3 mb-4">
+    <div class="col-md-4 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#f0fdf4;color:#16a34a;">💰</div>
+            <div>
+                <div class="stat-value" style="color:#16a34a;">@totalCollected.ToString("N0")</div>
+                <div class="stat-label">إجمالي المحصّل (ج.م)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#fef2f2;color:#dc2626;">↩️</div>
+            <div>
+                <div class="stat-value" style="color:#dc2626;">@refundsThisMonth.ToString("N0")</div>
+                <div class="stat-label">مردودات منفّذة (ج.م)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#fffbeb;color:#b45309;">🏆</div>
+            <div>
+                <div class="stat-value" style="color:#b45309;">@commissionsThisMonth.ToString("N0")</div>
+                <div class="stat-label">عمولات مصروفة (ج.م)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:@(netRevenue >= 0 ? "#f0fdf4" : "#fef2f2");color:@(netRevenue >= 0 ? "#16a34a" : "#dc2626");">📈</div>
+            <div>
+                <div class="stat-value" style="color:@(netRevenue >= 0 ? "#16a34a" : "#dc2626");">@netRevenue.ToString("N0")</div>
+                <div class="stat-label">صافي الإيراد (ج.م)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#eff6ff;color:#2563eb;">👤</div>
+            <div>
+                <div class="stat-value">@candidatesThisMonth</div>
+                <div class="stat-label">مرشحون جدد</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#f5f3ff;color:#7c3aed;">✈️</div>
+            <div>
+                <div class="stat-value">@completedThisMonth</div>
+                <div class="stat-label">رحلات مكتملة</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    @* Payments by method *@
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">💳 المدفوعات حسب طريقة السداد</span>
+            </div>
+            <div class="card-body p-0">
+                @if (paymentsByMethod.Any())
+                {
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>طريقة الدفع</th>
+                                <th>عدد الدفعات</th>
+                                <th>الإجمالي</th>
+                                <th>النسبة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in paymentsByMethod)
+                            {
+                                int method = (int)row.Method;
+                                decimal rowTotal = (decimal)row.Total;
+                                int count = (int)row.Count;
+                                int pct = totalCollected > 0 ? (int)(rowTotal / totalCollected * 100) : 0;
+                                string methodName = method >= 1 && method < payMethods.Length ? payMethods[method] : "أخرى";
+
+                                <tr>
+                                    <td style="font-weight:600;">@methodName</td>
+                                    <td style="text-align:center;">@count</td>
+                                    <td style="font-weight:700;color:#16a34a;">@rowTotal.ToString("N0") ج.م</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div style="flex:1;height:6px;background:#e2e8f0;border-radius:99px;">
+                                                <div style="width:@pct%;height:100%;background:#2563eb;border-radius:99px;"></div>
+                                            </div>
+                                            <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">@pct%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:#f8fafc;font-weight:800;">
+                                <td>الإجمالي</td>
+                                <td style="text-align:center;">@paymentsByMethod.Sum(r => (int)r.Count)</td>
+                                <td style="color:#16a34a;">@totalCollected.ToString("N0") ج.م</td>
+                                <td>100%</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                }
+                else
+                {
+                    <div class="empty-state" style="padding:32px;">
+                        <div class="empty-state-icon" style="font-size:2rem;">💳</div>
+                        <div class="empty-state-title">لا توجد مدفوعات هذا الشهر</div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* By sales user *@
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🏅 أداء المبيعات المكتبية</span>
+            </div>
+            <div class="card-body p-0">
+                @if (bySales.Any())
+                {
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>الموظف</th>
+                                <th>الصفقات</th>
+                                <th>الإيراد</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{
+                                int rank = 1;
+                                string[] medals = { "🥇", "🥈", "🥉" };
+                            }
+                            @foreach (var row in bySales)
+                            {
+                                string medal = rank <= 3 ? medals[rank - 1] : $"#{rank}";
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span style="font-size:16px;">@medal</span>
+                                            <span style="font-weight:600;">@row.SalesName</span>
+                                        </div>
+                                    </td>
+                                    <td style="text-align:center;font-weight:700;">@row.Count</td>
+                                    <td style="font-weight:800;color:#2563eb;">@((decimal)row.Total).ToString("N0") ج.م</td>
+                                </tr>
+                                rank++;
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="empty-state" style="padding:32px;">
+                        <div class="empty-state-icon" style="font-size:2rem;">🏅</div>
+                        <div class="empty-state-title">لا توجد بيانات مبيعات</div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* Financial summary card *@
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">📋 ملخص مالي — @months[month] @year</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div style="background:#f0fdf4;border-radius:var(--r-md);padding:16px;text-align:center;">
+                            <div style="font-size:1.4rem;font-weight:800;color:#16a34a;">@totalCollected.ToString("N0")</div>
+                            <div style="font-size:.75rem;color:#15803d;margin-top:4px;">إجمالي الإيرادات (ج.م)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div style="background:#fef2f2;border-radius:var(--r-md);padding:16px;text-align:center;">
+                            <div style="font-size:1.4rem;font-weight:800;color:#dc2626;">- @refundsThisMonth.ToString("N0")</div>
+                            <div style="font-size:.75rem;color:#dc2626;margin-top:4px;">المردودات المنفّذة (ج.م)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div style="background:#fffbeb;border-radius:var(--r-md);padding:16px;text-align:center;">
+                            <div style="font-size:1.4rem;font-weight:800;color:#b45309;">- @commissionsThisMonth.ToString("N0")</div>
+                            <div style="font-size:.75rem;color:#b45309;margin-top:4px;">العمولات المصروفة (ج.م)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div style="background:@(netRevenue >= 0 ? "#eff6ff" : "#fef2f2");border-radius:var(--r-md);padding:16px;text-align:center;border:2px solid @(netRevenue >= 0 ? "#2563eb" : "#dc2626");">
+                            <div style="font-size:1.4rem;font-weight:800;color:@(netRevenue >= 0 ? "#2563eb" : "#dc2626");">@netRevenue.ToString("N0")</div>
+                            <div style="font-size:.75rem;color:@(netRevenue >= 0 ? "#1d4ed8" : "#dc2626");margin-top:4px;">صافي الإيراد (ج.م)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -325,11 +325,14 @@ namespace RecruitmentSaaS.Models.DTOs
         public DateOnly PaymentDate { get; set; }
         public byte PaymentMethod { get; set; }
         public byte TransactionType { get; set; }
+        public byte Status { get; set; }          // 1=Pending, 2=Approved, 3=Rejected
         public string? Notes { get; set; }
         public string? RecordedByName { get; set; }
+        public string? ApprovedByName { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public string? RejectionReason { get; set; }
         public DateTime CreatedAt { get; set; }
     }
-
     public class RecordPaymentDto
     {
         [Required]
@@ -584,6 +587,26 @@ namespace RecruitmentSaaS.Models.DTOs
         public string ReceptionUserName { get; set; } = string.Empty;
         public string? Notes { get; set; }         // Reception note
         public string? AssignedSalesName { get; set; }
+    }
+
+    public class AccountantPaymentDto
+    {
+        public Guid Id { get; set; }
+        public Guid CandidateId { get; set; }
+        public string CandidateFullName { get; set; } = string.Empty;
+        public string CandidatePhone { get; set; } = string.Empty;
+        public string JobPackageName { get; set; } = string.Empty;
+        public decimal AmountEGP { get; set; }
+        public DateOnly PaymentDate { get; set; }
+        public byte PaymentMethod { get; set; }
+        public byte TransactionType { get; set; }
+        public byte Status { get; set; }
+        public string? Notes { get; set; }
+        public string? RecordedByName { get; set; }
+        public string? ApprovedByName { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public string? RejectionReason { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
 

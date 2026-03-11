@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Models.Entities;
 
-namespace RecruitmentCrmContext;
+namespace RecruitmentSaaS.Data;
 
 public partial class RecruitmentCrmContext : DbContext
 {
