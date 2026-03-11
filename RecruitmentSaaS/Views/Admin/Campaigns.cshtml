@@ -1,0 +1,161 @@
+@using RecruitmentSaaS.Models.Entities
+@model IEnumerable<Campaign>
+@{
+    ViewData["Title"] = "الحملات الإعلانية";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    int page = ViewBag.Page;
+    int total = ViewBag.Total;
+    int totalPages = ViewBag.TotalPages;
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#faf5ff,#ede9fe);">📣</div>
+        <div>
+            <h1 class="page-title">الحملات الإعلانية</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@total حملة</p>
+        </div>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success mb-4" data-auto-dismiss="4000">✅ @TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger mb-4" data-auto-dismiss="4000">❌ @TempData["Error"]</div>
+}
+
+<div class="card">
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="empty-state" style="padding:48px;">
+                <div class="empty-state-icon">📣</div>
+                <div class="empty-state-title">لا توجد حملات</div>
+            </div>
+        }
+        else
+        {
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>اسم الحملة</th>
+                        <th>المصدر</th>
+                        <th>الميزانية</th>
+                        <th>الإنفاق</th>
+                        <th>الحالة</th>
+                        <th>تاريخ الإنشاء</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Model)
+                    {
+                        bool active = c.Status == 1;
+
+                        <tr>
+                            <td style="font-weight:600;">@c.Name</td>
+                            <td style="font-size:.82rem;color:var(--text-muted);">
+                                @(c.Source == 1 ? "فيسبوك" : c.Source == 2 ? "إنستغرام" : c.Source == 3 ? "جوجل" : c.Source == 4 ? "يدوي" : $"مصدر {c.Source}")
+                            </td>
+                            <td style="font-size:.82rem;">
+                                @if (c.BudgetEgp.HasValue)
+                                {
+                                    @c.BudgetEgp.Value.ToString("N0")
+                        
+                                    <text> ج.م</text>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-faint);">—</span>
+                                }
+                            </td>
+                            <td style="font-size:.82rem;">
+                                @if (c.SpendEgp.HasValue)
+                                {
+                                    @c.SpendEgp.Value.ToString("N0")
+                        
+                                    <text> ج.م</text>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-faint);">—</span>
+                                }
+                            </td>
+                            <td>
+                                @if (active)
+                                {
+                                    <span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">نشطة</span>
+                                }
+                                else
+                                {
+                                    <span style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">متوقفة</span>
+                                }
+                            </td>
+                            <td style="font-size:.78rem;color:var(--text-muted);">
+                                @c.CreatedAt.ToString("dd/MM/yyyy")
+                            </td>
+                            <td>
+                                <form method="post" action="/Admin/ToggleCampaign" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="campaignId" value="@c.Id" />
+                                    <button type="submit" class="btn btn-ghost btn-sm"
+                                            data-confirm
+                                            data-confirm-title="@(active ? "إيقاف الحملة" : "تفعيل الحملة")"
+                                            data-confirm-message="@(active ? "إيقاف حملة " + c.Name + "؟" : "تفعيل حملة " + c.Name + "؟")"
+                                            data-confirm-ok="نعم"
+                                            data-confirm-class="@(active ? "btn-danger" : "btn-success")">
+                                        @if (active)
+                                        {
+                                            <i class="bi bi-pause-circle"></i>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-play-circle"></i>
+                                        }
+                                        @(active ? "إيقاف" : "تفعيل")
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            @if (totalPages > 1)
+            {
+                <div class="card-footer d-flex justify-content-center">
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            @if (page > 1)
+                            {
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=@(page - 1)">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                </li>
+                            }
+                            @for (int p = Math.Max(1, page - 2); p <= Math.Min(totalPages, page + 2); p++)
+                            {
+                                <li class="page-item @(p == page ? "active" : "")">
+                                    <a class="page-link" href="?page=@p">@p</a>
+                                </li>
+                            }
+                            @if (page < totalPages)
+                            {
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=@(page + 1)">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </a>
+                                </li>
+                            }
+                        </ul>
+                    </nav>
+                </div>
+            }
+        }
+    </div>
+</div>

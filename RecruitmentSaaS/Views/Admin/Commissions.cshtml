@@ -1,0 +1,263 @@
+@using RecruitmentSaaS.Models.Entities
+@model List<Commission>
+@{
+    ViewData["Title"] = "العمولات";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    int  page         = ViewBag.Page;
+    int  totalPages   = ViewBag.TotalPages;
+    int  total        = ViewBag.Total;
+    byte statusFilter = ViewBag.StatusFilter;
+
+    string[] statusLabels = { "", "انتظار الإدارة", "معتمدة — جاهزة للصرف", "مصروفة", "مُعكوسة" };
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#fffbeb,#fde68a);">🏆</div>
+        <div>
+            <h1 class="page-title">العمولات</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@total عمولة</p>
+        </div>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success mb-4" data-auto-dismiss="4000">✅ @TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger mb-4" data-auto-dismiss="4000">❌ @TempData["Error"]</div>
+}
+
+@* Status tabs *@
+<div class="d-flex gap-2 mb-4 flex-wrap">
+    @{
+        var tabs = new[] {
+            ("في انتظار موافقتي", (byte)1, "#3b82f6"),
+            ("معتمدة — إحالة للمحاسب", (byte)2, "#f59e0b"),
+            ("مصروفة", (byte)3, "#16a34a"),
+            ("مُعكوسة", (byte)4, "#dc2626"),
+        };
+    }
+    @foreach (var (label, val, color) in tabs)
+    {
+        bool active = statusFilter == val;
+        <a href="?status=@val" style="padding:7px 16px;border-radius:99px;font-size:.8rem;font-weight:700;
+               text-decoration:none;transition:all .15s;
+               background:@(active ? color : "var(--card-bg)");
+               color:@(active ? "#fff" : "var(--text-muted)");
+               border:1.5px solid @(active ? color : "var(--border)");">
+            @label
+        </a>
+    }
+</div>
+
+<div class="card">
+    @if (!Model.Any())
+    {
+        <div class="empty-state" style="padding:48px;">
+            <div class="empty-state-icon">🏆</div>
+            <div class="empty-state-title">
+                @if (statusFilter == 1)
+                {
+                    <text>لا توجد عمولات معلقة ✅</text>
+                }
+                else
+                {
+                    <text>لا توجد عمولات بهذه الحالة</text>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        @if (statusFilter == 1)
+        {
+            <div style="padding:12px 20px;background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:.82rem;color:#1e40af;font-weight:600;">
+                ⚡ هذه العمولات تحتاج مراجعتك واعتمادها حتى يتمكن المحاسب من صرفها
+            </div>
+        }
+
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>موظف المبيعات</th>
+                        <th>المرشح / الصفقة</th>
+                        <th>شهر العمولة</th>
+                        <th>عدد الصفقات</th>
+                        <th>مبلغ العمولة</th>
+                        <th>الحالة</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="avatar avatar-sm" style="background:#f5f3ff;color:#7c3aed;border:1.5px solid #e9d5ff;">
+                                        @(c.SalesUser?.FullName?.FirstOrDefault() ?? '؟')
+                                    </div>
+                                    <div style="font-weight:700;">@c.SalesUser?.FullName</div>
+                                </div>
+                            </td>
+                            <td style="font-size:.82rem;">
+                                <div style="font-weight:600;">@c.Candidate?.FullName</div>
+                                <div style="color:var(--text-faint);">@c.Candidate?.JobPackage?.Name</div>
+                            </td>
+                            <td style="font-size:.82rem;white-space:nowrap;">
+                                @c.CommissionMonth.ToString("MM/yyyy")
+                            </td>
+                            <td style="text-align:center;font-weight:700;">@c.DealsThisMonth</td>
+                            <td>
+                                <span style="font-weight:800;color:#b45309;font-size:.95rem;">
+                                    @c.AmountEgp.ToString("N0") ج.م
+                                </span>
+                            </td>
+                            <td>
+                                @{
+                                    var (bg, col, border) = c.Status switch {
+                                        1 => ("#eff6ff", "#2563eb", "#bfdbfe"),
+                                        2 => ("#fffbeb", "#b45309", "#fde68a"),
+                                        3 => ("#f0fdf4", "#16a34a", "#bbf7d0"),
+                                        4 => ("#fef2f2", "#dc2626", "#fecaca"),
+                                        _ => ("#f1f5f9", "#64748b", "#e2e8f0")
+                                    };
+                                }
+                                <span class="badge-pill" style="background:@bg;color:@col;border:1px solid @border;">
+                                    @(c.Status < statusLabels.Length ? statusLabels[c.Status] : "—")
+                                </span>
+                            </td>
+                            <td>
+                                @if (c.Status == 1)
+                                {
+                                    <div class="d-flex gap-1 flex-wrap">
+                                        @* Approve *@
+                                        <form method="post" action="/Admin/ApproveCommission" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="commissionId" value="@c.Id" />
+                                            <button type="submit" class="btn btn-sm"
+                                                    style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;"
+                                                    data-confirm
+                                                    data-confirm-title="اعتماد العمولة"
+                                                    data-confirm-message="اعتماد عمولة @c.AmountEgp.ToString("N0") ج.م لـ @c.SalesUser?.FullName؟"
+                                                    data-confirm-ok="اعتماد"
+                                                    data-confirm-class="btn-success"
+                                                    data-confirm-icon="✅">
+                                                اعتماد
+                                            </button>
+                                        </form>
+
+                                        @* Reject *@
+                                        <button class="btn btn-sm"
+                                                style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;"
+                                                onclick="openRejectCommission('@c.Id', '@c.AmountEgp.ToString("N0")', '@(c.SalesUser?.FullName ?? "")')">
+                                            رفض
+                                        </button>
+                                    </div>
+                                }
+                                else if (c.Status == 2)
+                                {
+                                    <span style="font-size:.78rem;color:var(--text-faint);">بانتظار المحاسب</span>
+                                }
+                                else if (c.Status == 3)
+                                {
+                                    <span style="font-size:.78rem;color:var(--text-faint);">
+                                        صُرفت @c.PaidAt?.ToString("dd/MM")
+                                    </span>
+                                }
+                                else if (c.Status == 4)
+                                {
+                                    <span style="font-size:.78rem;color:#dc2626;">@c.ReversedReason</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (statusFilter == 1 && Model.Any())
+        {
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <div style="font-weight:700;color:#b45309;">
+                    إجمالي العمولات المعلقة:
+                    @Model.Sum(c => c.AmountEgp).ToString("N0") ج.م
+                </div>
+                <div style="font-size:.8rem;color:var(--text-muted);">@total عمولة</div>
+            </div>
+        }
+
+        @if (totalPages > 1)
+        {
+            <div class="card-footer d-flex justify-content-center">
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        @if (page > 1)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="?status=@statusFilter&page=@(page-1)">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        }
+                        @for (int p = Math.Max(1, page - 2); p <= Math.Min(totalPages, page + 2); p++)
+                        {
+                            <li class="page-item @(p == page ? "active" : "")">
+                                <a class="page-link" href="?status=@statusFilter&page=@p">@p</a>
+                            </li>
+                        }
+                        @if (page < totalPages)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="?status=@statusFilter&page=@(page+1)">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+            </div>
+        }
+    }
+</div>
+
+@* Reject commission modal *@
+<div id="rejectCommissionModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
+    <div class="modal-card" style="width:400px;max-width:95vw;">
+        <div class="modal-header">
+            <h5 class="modal-title">رفض العمولة</h5>
+            <button class="btn-close" onclick="document.getElementById('rejectCommissionModal').style.display='none'"></button>
+        </div>
+        <form method="post" action="/Admin/RejectCommission">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="commissionId" id="rejectCommId" />
+            <div class="modal-body">
+                <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;">
+                    رفض عمولة <strong id="rejectCommAmount"></strong> ج.م لـ <strong id="rejectCommSales"></strong>
+                </p>
+                <div class="mb-3">
+                    <label class="form-label">سبب الرفض</label>
+                    <textarea name="reversedReason" class="form-control" rows="3" required placeholder="اذكر سبب رفض العمولة..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('rejectCommissionModal').style.display='none'">إلغاء</button>
+                <button type="submit" class="btn btn-danger">رفض العمولة</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openRejectCommission(id, amount, salesName) {
+    document.getElementById('rejectCommId').value = id;
+    document.getElementById('rejectCommAmount').textContent = amount;
+    document.getElementById('rejectCommSales').textContent = salesName;
+    document.getElementById('rejectCommissionModal').style.display = 'flex';
+}
+</script>

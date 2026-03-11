@@ -1,0 +1,70 @@
+@using RecruitmentSaaS.Models.Entities
+@model IEnumerable<Branch>
+@{
+    ViewData["Title"] = "الفروع";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);">🏢</div>
+        <div>
+            <h1 class="page-title">الفروع</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@Model.Count() فرع</p>
+        </div>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success mb-4" data-auto-dismiss="4000">✅ @TempData["Success"]</div>
+}
+
+<div class="card">
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="empty-state" style="padding:48px;">
+                <div class="empty-state-icon">🏢</div>
+                <div class="empty-state-title">لا يوجد فروع</div>
+            </div>
+        }
+        else
+        {
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>اسم الفرع</th>
+                        <th>المدينة</th>
+                        <th>العنوان</th>
+                        <th>الحالة</th>
+                        <th>تاريخ الإنشاء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var b in Model)
+                    {
+                        <tr>
+                            <td style="font-weight:600;">@b.Name</td>
+                            <td style="font-size:.82rem;color:var(--text-muted);">@(b.City ?? "—")</td>
+                            <td style="font-size:.82rem;color:var(--text-muted);">@(b.Address ?? "—")</td>
+                            <td>
+                                @if (b.IsActive)
+                                {
+                                    <span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">نشط</span>
+                                }
+                                else
+                                {
+                                    <span style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">متوقف</span>
+                                }
+                            </td>
+                            <td style="font-size:.78rem;color:var(--text-muted);">
+                                @b.CreatedAt.ToString("dd/MM/yyyy")
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>

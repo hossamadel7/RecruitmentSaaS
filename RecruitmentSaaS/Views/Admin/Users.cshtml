@@ -1,0 +1,239 @@
+@using RecruitmentSaaS.Models.Entities
+@model IEnumerable<User>
+@{
+    ViewData["Title"] = "المستخدمون";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    string? q = ViewBag.Q;
+    int? role = ViewBag.Role;
+
+    string[] roleNames = { "", "مدير", "استقبال", "تيلي سيلز", "محاسب", "عمليات", "مبيعات مكتبية" };
+    string[] roleColors = { "", "#dc2626", "#0ea5e9", "#8b5cf6", "#16a34a", "#f59e0b", "#6366f1" };
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);">👤</div>
+        <div>
+            <h1 class="page-title">المستخدمون</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@Model.Count() مستخدم</p>
+        </div>
+    </div>
+    <button class="btn btn-primary" onclick="document.getElementById('createUserModal').style.display='flex'">
+        <i class="bi bi-plus-lg me-1"></i> مستخدم جديد
+    </button>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success mb-4" data-auto-dismiss="4000">✅ @TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger mb-4" data-auto-dismiss="4000">❌ @TempData["Error"]</div>
+}
+
+@* Filters *@
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" action="/Admin/Users" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label form-label-sm">بحث</label>
+                <input name="q" value="@q" class="form-control form-control-sm" placeholder="اسم أو بريد إلكتروني..." />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label form-label-sm">الدور</label>
+                <select name="role" class="form-select form-select-sm">
+                    <option value="">كل الأدوار</option>
+                    @for (int i = 1; i < roleNames.Length; i++)
+                    {
+                        if (i == (role ?? 0))
+                        {
+                            <option value="@i" selected="selected">@roleNames[i]</option>
+                        }
+                        else
+                        {
+                            <option value="@i">@roleNames[i]</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100">بحث</button>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(q) || role.HasValue)
+            {
+                <div class="col-md-2">
+                    <a href="/Admin/Users" class="btn btn-ghost btn-sm w-100">مسح</a>
+                </div>
+            }
+        </form>
+    </div>
+</div>
+
+@* Users table *@
+<div class="card">
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="empty-state" style="padding:48px;">
+                <div class="empty-state-icon">👤</div>
+                <div class="empty-state-title">لا يوجد مستخدمون</div>
+            </div>
+        }
+        else
+        {
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>المستخدم</th>
+                        <th>البريد الإلكتروني</th>
+                        <th>الدور</th>
+                        <th>الحالة</th>
+                        <th>تاريخ الإنشاء</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in Model)
+                    {
+                        int r = u.Role;
+                        string rName = r >= 1 && r < roleNames.Length ? roleNames[r] : $"دور {r}";
+                        string rColor = r >= 1 && r < roleColors.Length ? roleColors[r] : "#64748b";
+                        string rColorBg = rColor + "20";
+                        string rColorBorder = rColor + "40";
+
+                        <tr style="@(!u.IsActive ? "opacity:.5;" : "")">
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="avatar avatar-sm" style="background:@rColorBg;color:@rColor;border:1.5px solid @rColorBorder;">
+                                        @(u.FullName.FirstOrDefault())
+                                    </div>
+                                    <div style="font-weight:600;">@u.FullName</div>
+                                </div>
+                            </td>
+                            <td style="font-family:monospace;font-size:.82rem;">@u.Email</td>
+                            <td>
+                                <span style="background:@rColorBg;color:@rColor;border:1px solid @rColorBorder;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">
+                                    @rName
+                                </span>
+                            </td>
+                            <td>
+                                @if (u.IsActive)
+                                {
+                                    <span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">نشط</span>
+                                }
+                                else
+                                {
+                                    <span style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">معطّل</span>
+                                }
+                            </td>
+                            <td style="font-size:.78rem;color:var(--text-muted);">
+                                @u.CreatedAt.ToString("dd/MM/yyyy")
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    @* Toggle active *@
+                                    <form method="post" action="/Admin/ToggleUser" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="userId" value="@u.Id" />
+                                        <button type="submit" class="btn btn-ghost btn-sm"
+                                                title="@(u.IsActive ? "تعطيل" : "تفعيل")"
+                                                data-confirm
+                                                data-confirm-title="@(u.IsActive ? "تعطيل المستخدم" : "تفعيل المستخدم")"
+                                                data-confirm-message="هل أنت متأكد؟"
+                                                data-confirm-ok="نعم"
+                                                data-confirm-class="@(u.IsActive ? "btn-danger" : "btn-success")">
+                                            <i class="bi @(u.IsActive ? "bi-person-slash" : "bi-person-check")"></i>
+                                        </button>
+                                    </form>
+
+                                    @* Reset password *@
+                                    <button class="btn btn-ghost btn-sm" title="تغيير كلمة المرور"
+                                            onclick="openResetPwd('@u.Id', '@u.FullName')">
+                                        <i class="bi bi-key"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@* ── CREATE USER MODAL ──────────────────────────────────────────── *@
+<div id="createUserModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
+    <div class="modal-card" style="width:460px;max-width:95vw;">
+        <div class="modal-header">
+            <h5 class="modal-title">مستخدم جديد</h5>
+            <button class="btn-close" onclick="document.getElementById('createUserModal').style.display='none'"></button>
+        </div>
+        <form method="post" action="/Admin/CreateUser">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">الاسم الكامل</label>
+                    <input name="fullName" class="form-control" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">البريد الإلكتروني</label>
+                    <input name="email" type="email" class="form-control" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">كلمة المرور</label>
+                    <input name="password" type="password" class="form-control" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">الدور</label>
+                    <select name="role" class="form-select" required>
+                        @for (int i = 1; i < roleNames.Length; i++)
+                        {
+                            <option value="@i">@roleNames[i]</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('createUserModal').style.display='none'">إلغاء</button>
+                <button type="submit" class="btn btn-primary">إنشاء المستخدم</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@* ── RESET PASSWORD MODAL ──────────────────────────────────────── *@
+<div id="resetPwdModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
+    <div class="modal-card" style="width:380px;max-width:95vw;">
+        <div class="modal-header">
+            <h5 class="modal-title">تغيير كلمة المرور</h5>
+            <button class="btn-close" onclick="document.getElementById('resetPwdModal').style.display='none'"></button>
+        </div>
+        <form method="post" action="/Admin/ResetPassword">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="userId" id="resetUserId" />
+            <div class="modal-body">
+                <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;">
+                    تغيير كلمة المرور لـ <strong id="resetUserName"></strong>
+                </p>
+                <div class="mb-3">
+                    <label class="form-label">كلمة المرور الجديدة</label>
+                    <input name="newPassword" type="password" class="form-control" required minlength="6" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('resetPwdModal').style.display='none'">إلغاء</button>
+                <button type="submit" class="btn btn-primary">تغيير</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openResetPwd(userId, userName) {
+        document.getElementById('resetUserId').value = userId;
+        document.getElementById('resetUserName').textContent = userName;
+        document.getElementById('resetPwdModal').style.display = 'flex';
+    }
+</script>
