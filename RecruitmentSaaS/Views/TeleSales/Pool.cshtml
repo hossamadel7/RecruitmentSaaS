@@ -1,0 +1,119 @@
+@model List<RecruitmentSaaS.Models.DTOs.LeadListItemDto>
+@{
+    ViewData["Title"] = "بنك العملاء";
+    var campaigns = ViewBag.Campaigns as List<RecruitmentSaaS.Models.DTOs.CampaignListItemDto>;
+    var currentCampaignId = ViewBag.CurrentCampaignId as Guid?;
+    var currentPage = (int)(ViewBag.CurrentPage ?? 1);
+    var totalCount = (int)(ViewBag.TotalCount ?? 0);
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-header-title">بنك العملاء</h1>
+        <div class="page-header-sub">@totalCount عميل غير مُعيّن</div>
+    </div>
+</div>
+
+<!-- Campaign Filter -->
+<div class="card mb-3">
+    <div class="card-body py-3">
+        <div class="filter-bar">
+            <a href="/TeleSales/Pool" class="filter-btn @(currentCampaignId == null ? "active" : "")">كل الحملات</a>
+            @if (campaigns != null)
+            {
+                @foreach (var c in campaigns)
+                {
+                    <a href="/TeleSales/Pool?campaignId=@c.Id"
+                       class="filter-btn @(currentCampaignId == c.Id ? "active" : "")">@c.Name</a>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <p>لا يوجد عملاء غير مُعيّنين في هذه الحملة</p>
+        </div>
+    }
+    else
+    {
+        <div style="overflow-x:auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>الكود</th>
+                        <th>الاسم</th>
+                        <th>الهاتف</th>
+                        <th>الحملة</th>
+                        <th>تاريخ الإضافة</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var lead in Model)
+                    {
+                        <tr>
+                            <td>
+                                <span style="font-size:11px;font-weight:700;color:var(--text-muted);background:#F1F5F9;padding:3px 8px;border-radius:6px">
+                                    @lead.LeadCode
+                                </span>
+                            </td>
+                            <td style="font-weight:600">@lead.FullName</td>
+                            <td style="color:var(--text-muted);font-size:13px;direction:ltr;text-align:right">@lead.Phone</td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(lead.CampaignName))
+                                {
+                                    <span style="font-size:12px;background:#EEF2FF;color:var(--primary);padding:3px 8px;border-radius:5px;font-weight:600">
+                                        @lead.CampaignName
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-muted);font-size:12px">—</span>
+                                }
+                            </td>
+                            <td style="color:var(--text-muted);font-size:12.5px">@lead.CreatedAt.ToString("dd/MM/yyyy")</td>
+                            <td>
+                                <div class="d-flex gap-2">
+                                    <!-- Assign to me -->
+                                    <form asp-action="AssignToMe" asp-controller="TeleSales" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="leadId" value="@lead.Id" />
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <i class="bi bi-person-check-fill"></i> تعيين لي
+                                        </button>
+                                    </form>
+                                    <a href="/TeleSales/LeadDetail/@lead.Id"
+                                       style="font-size:12px;font-weight:600;color:var(--text-muted);text-decoration:none;padding:5px 12px;border:1px solid var(--border);border-radius:6px">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (totalCount > 20)
+        {
+            <div class="d-flex justify-content-center gap-2 p-3">
+                @if (currentPage > 1)
+                {
+                    <a href="/TeleSales/Pool?page=@(currentPage-1)@(currentCampaignId.HasValue ? $"&campaignId={currentCampaignId}" : "")"
+                       class="btn btn-sm" style="border:1px solid var(--border)">السابق</a>
+                }
+                <span class="btn btn-sm btn-primary">@currentPage</span>
+                @if (Model.Count == 20)
+                {
+                    <a href="/TeleSales/Pool?page=@(currentPage+1)@(currentCampaignId.HasValue ? $"&campaignId={currentCampaignId}" : "")"
+                       class="btn btn-sm" style="border:1px solid var(--border)">التالي</a>
+                }
+            </div>
+        }
+    }
+</div>

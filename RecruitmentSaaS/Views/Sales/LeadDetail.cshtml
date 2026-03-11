@@ -1,0 +1,241 @@
+@model RecruitmentSaaS.Models.DTOs.LeadDetailDto
+@{
+    ViewData["Title"] = Model.FullName;
+    ViewData["Subtitle"] = Model.LeadCode;
+    var statusName = Model.Status switch {
+        1 => "جديد", 2 => "تم التواصل", 3 => "استجاب",
+        4 => "مهتم", 5 => "موعد مجدول", 6 => "زار المكتب",
+        7 => "تم التحويل", 8 => "خسارة", _ => "غير معروف"
+    };
+    var jobPackages = ViewBag.JobPackages as List<RecruitmentSaaS.Models.DTOs.JobPackageListItemDto>
+                     ?? new List<RecruitmentSaaS.Models.DTOs.JobPackageListItemDto>();
+    bool canConvert = Model.Status == 6 && !Model.IsConverted;
+}
+
+<div class="page-header">
+    <div class="d-flex align-items-center gap-3">
+        <a href="/Sales/Index" style="color:var(--text-muted);text-decoration:none;font-size:20px">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+        <div>
+            <h1 class="page-header-title">@Model.FullName</h1>
+            <div class="page-header-sub">
+                <span style="font-size:11px;font-weight:700;background:#F1F5F9;padding:2px 8px;border-radius:5px;color:var(--text-muted)">@Model.LeadCode</span>
+                &nbsp;
+                <span class="badge badge-status-@Model.Status">@statusName</span>
+                @if (Model.IsConverted)
+                {
+                    <span class="badge ms-1" style="background:#ECFDF5;color:#065F46">
+                        <i class="bi bi-check-circle-fill"></i> تم التحويل
+                    </span>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (canConvert)
+    {
+        <button type="button" class="btn btn-primary"
+                data-bs-toggle="modal" data-bs-target="#convertModal"
+                style="display:flex;align-items:center;gap:8px">
+            <i class="bi bi-person-check-fill"></i> تحويل إلى مرشح
+        </button>
+    }
+</div>
+
+<div class="row g-3">
+
+    <!-- Left Column -->
+    <div class="col-lg-4">
+
+        <!-- Info Card -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="header-icon" style="background:#EEF2FF;color:var(--primary)"><i class="bi bi-person-fill"></i></div>
+                معلومات العميل
+            </div>
+            <div class="card-body p-0">
+                @{
+                    var infoRows = new[] {
+                        ("bi-telephone-fill", "الهاتف",           Model.Phone),
+                        ("bi-briefcase-fill", "الوظيفة المطلوبة", Model.InterestedJobTitle ?? "—"),
+                        ("bi-geo-alt-fill",   "الدولة المطلوبة",  Model.InterestedCountry ?? "—"),
+                        ("bi-person-fill",    "تيلي سيلز",        Model.AssignedSalesName ?? "—"),
+                        ("bi-megaphone-fill", "الحملة",           Model.CampaignName ?? "—"),
+                        ("bi-calendar3",      "تاريخ الإضافة",    Model.CreatedAt.ToString("dd/MM/yyyy")),
+                    };
+                }
+                @foreach (var (icon, label, value) in infoRows)
+                {
+                    <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #F1F5F9">
+                        <div style="width:32px;height:32px;border-radius:8px;background:#F8FAFC;display:flex;align-items:center;justify-content:center;color:var(--text-muted);flex-shrink:0">
+                            <i class="bi @icon" style="font-size:13px"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:11px;color:var(--text-muted);font-weight:600">@label</div>
+                            <div style="font-size:13.5px;font-weight:600;color:var(--text-primary)">@value</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (Model.IsConverted)
+        {
+            <div class="card">
+                <div class="card-body text-center" style="padding:32px">
+                    <div style="width:56px;height:56px;border-radius:50%;background:#ECFDF5;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:24px;color:#059669">
+                        <i class="bi bi-check-circle-fill"></i>
+                    </div>
+                    <div style="font-weight:700;font-size:15px;margin-bottom:6px">تم التحويل</div>
+                    @if (Model.ConvertedAt.HasValue)
+                    {
+                        <div style="color:var(--text-muted);font-size:13px;margin-bottom:16px">
+                            بتاريخ @Model.ConvertedAt.Value.ToString("dd/MM/yyyy")
+                        </div>
+                    }
+                    @if (Model.ConvertedCandidateId.HasValue)
+                    {
+                        <a href="/Sales/CandidateDetail/@Model.ConvertedCandidateId"
+                           class="btn btn-sm btn-primary w-100">
+                            <i class="bi bi-person-fill"></i> عرض ملف المرشح
+                        </a>
+                    }
+                </div>
+            </div>
+        }
+        else if (canConvert)
+        {
+            <div class="card">
+                <div class="card-body text-center" style="padding:24px">
+                    <div style="width:48px;height:48px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:20px;color:var(--primary)">
+                        <i class="bi bi-person-check-fill"></i>
+                    </div>
+                    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+                        العميل في المكتب وجاهز للتحويل
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm w-100"
+                            data-bs-toggle="modal" data-bs-target="#convertModal">
+                        <i class="bi bi-person-check-fill"></i> تحويل إلى مرشح
+                    </button>
+                </div>
+            </div>
+        }
+
+    </div>
+
+    <!-- Right Column: Timeline -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <div class="header-icon" style="background:#F5F3FF;color:#7C3AED"><i class="bi bi-clock-history"></i></div>
+                سجل النشاط
+                <span style="font-size:12px;color:var(--text-muted);margin-right:auto">@Model.Activities.Count نشاط</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.Activities.Any())
+                {
+                    <div class="empty-state">
+                        <i class="bi bi-clock-history"></i>
+                        <p>لا يوجد نشاط بعد</p>
+                    </div>
+                }
+                else
+                {
+                    <div style="padding:8px 20px">
+                        @foreach (var a in Model.Activities)
+                        {
+                            var (dotClass, dotIcon) = a.ActivityType switch {
+                                1 => ("type-1", "bi-pencil-fill"),
+                                2 => ("type-2", "bi-building"),
+                                3 => ("type-3", "bi-check-circle-fill"),
+                                4 => ("type-4", "bi-arrow-left-right"),
+                                5 => ("type-5", "bi-alarm-fill"),
+                                6 => ("type-6", "bi-telephone-fill"),
+                                7 => ("type-7", "bi-person-check-fill"),
+                                8 => ("type-8", "bi-person-fill"),
+                                _ => ("type-1", "bi-dot")
+                            };
+                            var typeLabel = a.ActivityType switch {
+                                1 => "ملاحظة", 2 => "زيارة", 3 => "مهمة",
+                                4 => "تغيير حالة", 5 => "تذكير", 6 => "مكالمة",
+                                7 => "تحويل", 8 => "تعيين", _ => "نشاط"
+                            };
+                            <div class="timeline-item">
+                                <div class="timeline-dot @dotClass">
+                                    <i class="bi @dotIcon"></i>
+                                </div>
+                                <div class="timeline-content">
+                                    <div class="timeline-desc">@a.Description</div>
+                                    <div class="timeline-meta">
+                                        <span class="badge" style="background:#F1F5F9;color:var(--text-muted);font-size:10px">@typeLabel</span>
+                                        &nbsp;
+                                        @if (!string.IsNullOrEmpty(a.CreatedByName))
+                                        {
+                                            <span>@a.CreatedByName</span>
+                                            <span style="margin:0 4px">·</span>
+                                        }
+                                        <span>@a.CreatedAt.ToString("dd/MM/yyyy — HH:mm")</span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@* Convert Modal *@
+@if (canConvert)
+{
+    <div class="modal fade" id="convertModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content" style="border-radius:var(--radius);border:none">
+                <div class="modal-header" style="border-bottom:1px solid var(--border);padding:20px 24px">
+                    <h5 class="modal-title" style="font-weight:700;font-size:15px">
+                        <i class="bi bi-person-check-fill" style="color:var(--primary);margin-left:8px"></i>
+                        تحويل إلى مرشح
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form asp-action="ConvertToCandidate" asp-controller="Sales" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="leadId" value="@Model.Id" />
+                    <div class="modal-body" style="padding:24px">
+                        <div class="mb-3">
+                            <label class="form-label">اختر الباقة الوظيفية <span style="color:var(--danger)">*</span></label>
+                            @if (!jobPackages.Any())
+                            {
+                                <div class="alert alert-warning" style="font-size:13px">لا توجد باقات متاحة</div>
+                            }
+                            else
+                            {
+                                <select name="jobPackageId" class="form-select" required>
+                                    <option value="">— اختر الباقة —</option>
+                                    @foreach (var jp in jobPackages)
+                                    {
+                                        @Html.Raw($"<option value=\"{jp.Id}\">{jp.Name} — {jp.DestinationCountry} — {jp.PriceEgp:N0} ج.م</option>")
+                                    }
+                                </select>
+                            }
+                        </div>
+                        <div style="background:#FFF7ED;border-radius:8px;padding:12px 16px;font-size:13px;color:#92400E">
+                            <i class="bi bi-exclamation-triangle-fill" style="margin-left:6px"></i>
+                            سيتم تحويل <strong>@Model.FullName</strong> إلى مرشح وتغيير حالة الطلب نهائياً
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="border-top:1px solid var(--border);padding:16px 24px;gap:8px">
+                        <button type="button" class="btn btn-sm" data-bs-dismiss="modal"
+                                style="border:1px solid var(--border)">إلغاء</button>
+                        <button type="submit" class="btn btn-sm btn-primary" @(!jobPackages.Any() ? "disabled" : "")>
+                            <i class="bi bi-check-lg"></i> تأكيد التحويل
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}

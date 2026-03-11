@@ -1,0 +1,49 @@
+@{
+    ViewData["Title"] = "تسجيل زيارة";
+    ViewData["Subtitle"] = "ابحث عن العميل برقم هاتفه";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <div class="header-icon" style="background:#EEF2FF;color:var(--primary)">
+                    <i class="bi bi-search"></i>
+                </div>
+                البحث عن عميل
+            </div>
+            <div class="card-body">
+                <form id="searchForm" asp-action="Search" asp-controller="Reception" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label class="form-label">رقم الهاتف</label>
+                        <input id="phoneInput" type="tel" name="phone" class="form-control"
+                               placeholder="01xxxxxxxxx"
+                               style="font-size:16px;padding:12px 16px;direction:ltr;text-align:right"
+                               autofocus />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100" style="padding:10px">
+                        <i class="bi bi-search"></i> بحث
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="text-center mt-3">
+            <span style="color:var(--text-muted);font-size:13px">لا يوجد رقم هاتف؟</span>
+            <a href="/Reception/NewWalkIn" style="font-size:13px;font-weight:600;color:var(--primary);margin-right:6px">
+                تسجيل عميل جديد
+            </a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const phone = params.get('phone');
+        if (phone) {
+            document.getElementById('phoneInput').value = phone;
+            document.getElementById('searchForm').submit();
+        }
+    </script>
+}

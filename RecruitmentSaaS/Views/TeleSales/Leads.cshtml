@@ -1,0 +1,113 @@
+@model List<RecruitmentSaaS.Models.DTOs.LeadListItemDto>
+@{
+    ViewData["Title"] = "عملائي";
+    var currentStatus = ViewBag.CurrentStatus as byte?;
+    var currentPage = (int)(ViewBag.CurrentPage ?? 1);
+    var totalCount = (int)(ViewBag.TotalCount ?? 0);
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-header-title">عملائي</h1>
+        <div class="page-header-sub">@totalCount عميل مسجل</div>
+    </div>
+    <a href="/TeleSales/Pool" class="btn btn-primary">
+        <i class="bi bi-inbox-fill"></i> بنك العملاء
+    </a>
+</div>
+
+<!-- Status Filter -->
+<div class="card mb-3">
+    <div class="card-body py-3">
+        <div class="filter-bar">
+            <a href="/TeleSales/Leads" class="filter-btn @(currentStatus == null ? "active" : "")">الكل</a>
+            <a href="/TeleSales/Leads?status=1" class="filter-btn @(currentStatus == 1 ? "active" : "")">جديد</a>
+            <a href="/TeleSales/Leads?status=2" class="filter-btn @(currentStatus == 2 ? "active" : "")">تم التواصل</a>
+            <a href="/TeleSales/Leads?status=3" class="filter-btn @(currentStatus == 3 ? "active" : "")">استجاب</a>
+            <a href="/TeleSales/Leads?status=4" class="filter-btn @(currentStatus == 4 ? "active" : "")">مهتم</a>
+            <a href="/TeleSales/Leads?status=5" class="filter-btn @(currentStatus == 5 ? "active" : "")">موعد مجدول</a>
+            <a href="/TeleSales/Leads?status=8" class="filter-btn @(currentStatus == 8 ? "active" : "")">خسارة</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <p>لا يوجد عملاء — <a href="/TeleSales/Pool">تصفح بنك العملاء</a></p>
+        </div>
+    }
+    else
+    {
+        <div style="overflow-x:auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>الكود</th>
+                        <th>الاسم</th>
+                        <th>الهاتف</th>
+                        <th>الحالة</th>
+                        <th>آخر تواصل</th>
+                        <th>تاريخ الإضافة</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var lead in Model)
+                    {
+                        var (stClass, stName) = lead.Status switch {
+                            1 => ("badge-status-1", "جديد"),
+                            2 => ("badge-status-2", "تم التواصل"),
+                            3 => ("badge-status-3", "استجاب"),
+                            4 => ("badge-status-4", "مهتم"),
+                            5 => ("badge-status-5", "موعد مجدول"),
+                            6 => ("badge-status-6", "زار المكتب"),
+                            7 => ("badge-status-7", "تم التحويل"),
+                            8 => ("badge-status-8", "خسارة"),
+                            _ => ("badge-status-1", "غير معروف")
+                        };
+                        <tr>
+                            <td>
+                                <span style="font-size:11px;font-weight:700;color:var(--text-muted);background:#F1F5F9;padding:3px 8px;border-radius:6px">
+                                    @lead.LeadCode
+                                </span>
+                            </td>
+                            <td style="font-weight:600">@lead.FullName</td>
+                            <td style="color:var(--text-muted);font-size:13px;direction:ltr;text-align:right">@lead.Phone</td>
+                            <td><span class="badge @stClass">@stName</span></td>
+                            <td style="color:var(--text-muted);font-size:12.5px">
+                                @(lead.LastContactedAt.HasValue ? lead.LastContactedAt.Value.ToString("dd/MM/yyyy") : "—")
+                            </td>
+                            <td style="color:var(--text-muted);font-size:12.5px">@lead.CreatedAt.ToString("dd/MM/yyyy")</td>
+                            <td>
+                                <a href="/TeleSales/LeadDetail/@lead.Id"
+                                   style="font-size:12px;font-weight:600;color:var(--primary);text-decoration:none;padding:5px 12px;border:1px solid var(--primary);border-radius:6px">
+                                    <i class="bi bi-eye"></i> تفاصيل
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (totalCount > 20)
+        {
+            <div class="d-flex justify-content-center gap-2 p-3">
+                @if (currentPage > 1)
+                {
+                    <a href="/TeleSales/Leads?page=@(currentPage-1)@(currentStatus.HasValue ? $"&status={currentStatus}" : "")"
+                       class="btn btn-sm" style="border:1px solid var(--border)">السابق</a>
+                }
+                <span class="btn btn-sm btn-primary">@currentPage</span>
+                @if (Model.Count == 20)
+                {
+                    <a href="/TeleSales/Leads?page=@(currentPage+1)@(currentStatus.HasValue ? $"&status={currentStatus}" : "")"
+                       class="btn btn-sm" style="border:1px solid var(--border)">التالي</a>
+                }
+            </div>
+        }
+    }
+</div>

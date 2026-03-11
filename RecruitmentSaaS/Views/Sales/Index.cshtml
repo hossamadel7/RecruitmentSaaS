@@ -1,0 +1,103 @@
+@model RecruitmentSaaS.Models.DTOs.SalesDashboardDto
+@{
+    ViewData["Title"] = "لوحة المبيعات المكتبية";
+    ViewData["Subtitle"] = "العملاء في انتظار المقابلة";
+}
+
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card blue">
+            <div class="stat-icon"><i class="bi bi-person-lines-fill"></i></div>
+            <div class="stat-value">@Model.MyLeadsTotal</div>
+            <div class="stat-label">إجمالي العملاء المعيّنين لي</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card amber">
+            <div class="stat-icon"><i class="bi bi-hourglass-split"></i></div>
+            <div class="stat-value">@Model.MyLeadsNew</div>
+            <div class="stat-label">في انتظار المقابلة الآن</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card green">
+            <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="stat-value">@Model.MyCandidatesTotal</div>
+            <div class="stat-label">المرشحين النشطين</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card red">
+            <div class="stat-icon"><i class="bi bi-trophy-fill"></i></div>
+            <div class="stat-value">@Model.DealsThisMonth</div>
+            <div class="stat-label">صفقات مكتملة هذا الشهر</div>
+        </div>
+    </div>
+</div>
+
+<!-- Waiting Clients -->
+<div class="card">
+    <div class="card-header">
+        <div class="header-icon" style="background:#F5F3FF;color:#7C3AED">
+            <i class="bi bi-hourglass-split"></i>
+        </div>
+        العملاء في انتظار المقابلة
+        @if (Model.RecentLeads.Any())
+        {
+            <span class="badge ms-auto" style="background:#7C3AED;color:#fff">@Model.RecentLeads.Count</span>
+        }
+        <a href="/Sales/Candidates" class="btn btn-sm btn-primary @(Model.RecentLeads.Any() ? "" : "ms-auto")">
+            <i class="bi bi-people-fill"></i> المرشحين
+        </a>
+    </div>
+
+    @if (!Model.RecentLeads.Any())
+    {
+        <div class="empty-state">
+            <i class="bi bi-hourglass"></i>
+            <p>لا يوجد عملاء في الانتظار حالياً</p>
+        </div>
+    }
+    else
+    {
+        <div style="overflow-x:auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>الكود</th>
+                        <th>الاسم</th>
+                        <th>الهاتف</th>
+                        <th>الوظيفة المطلوبة</th>
+                        <th>وقت الوصول</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var lead in Model.RecentLeads)
+                    {
+                        <tr>
+                            <td>
+                                <span style="font-size:11px;font-weight:700;color:var(--text-muted);background:#F1F5F9;padding:3px 8px;border-radius:6px">
+                                    @lead.LeadCode
+                                </span>
+                            </td>
+                            <td style="font-weight:600">@lead.FullName</td>
+                            <td style="color:var(--text-muted);font-size:13px;direction:ltr;text-align:right">@lead.Phone</td>
+                            <td style="color:var(--text-muted);font-size:13px">—</td>
+                            <td style="color:var(--text-muted);font-size:12.5px">
+                                @(lead.LastContactedAt.HasValue ? lead.LastContactedAt.Value.ToString("dd/MM/yyyy — HH:mm") : lead.CreatedAt.ToString("dd/MM/yyyy"))
+                            </td>
+                            <td>
+                                <a href="/Sales/LeadDetail/@lead.Id"
+                                   class="btn btn-sm btn-primary">
+                                    <i class="bi bi-person-check-fill"></i> بدء المقابلة
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

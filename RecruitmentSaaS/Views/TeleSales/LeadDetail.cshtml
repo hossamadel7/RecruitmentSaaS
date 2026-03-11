@@ -1,0 +1,311 @@
+@model RecruitmentSaaS.Models.DTOs.LeadDetailDto
+@{
+    ViewData["Title"] = Model.FullName;
+    ViewData["Subtitle"] = Model.LeadCode;
+    var statusName = Model.Status switch {
+        1 => "جديد", 2 => "تم التواصل", 3 => "استجاب",
+        4 => "مهتم", 5 => "موعد مجدول", 6 => "زار المكتب",
+        7 => "تم التحويل", 8 => "خسارة", _ => "غير معروف"
+    };
+    bool isAssignedToMe = ViewBag.IsAssignedToMe == true;
+}
+
+<div class="page-header">
+    <div class="d-flex align-items-center gap-3">
+        <a href="/TeleSales/Leads" style="color:var(--text-muted);text-decoration:none;font-size:20px">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+        <div>
+            <h1 class="page-header-title">@Model.FullName</h1>
+            <div class="page-header-sub">
+                <span style="font-size:11px;font-weight:700;background:#F1F5F9;padding:2px 8px;border-radius:5px;color:var(--text-muted)">@Model.LeadCode</span>
+                &nbsp;
+                <span class="badge badge-status-@Model.Status">@statusName</span>
+                @if (Model.IsConverted)
+                {
+                    <span class="badge" style="background:#ECFDF5;color:#065F46;margin-right:4px">
+                        <i class="bi bi-check-circle-fill"></i> تم التحويل
+                    </span>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (!isAssignedToMe && !Model.IsConverted)
+    {
+        <form asp-action="AssignToMe" asp-controller="TeleSales" method="post" class="d-inline">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="leadId" value="@Model.Id" />
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-person-check-fill"></i> تعيين لي
+            </button>
+        </form>
+    }
+</div>
+
+<div class="row g-3">
+
+    <!-- Left Column -->
+    <div class="col-lg-4">
+
+        <!-- Info Card -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="header-icon" style="background:#EEF2FF;color:var(--primary)"><i class="bi bi-person-fill"></i></div>
+                معلومات العميل
+            </div>
+            <div class="card-body p-0">
+                @{
+                    var infoRows = new[] {
+                        ("bi-telephone-fill", "الهاتف",           Model.Phone),
+                        ("bi-briefcase-fill", "الوظيفة المطلوبة", Model.InterestedJobTitle ?? "—"),
+                        ("bi-geo-alt-fill",   "الدولة المطلوبة",  Model.InterestedCountry ?? "—"),
+                        ("bi-person-fill",    "مسجل بواسطة",      Model.RegisteredByName ?? "—"),
+                        ("bi-megaphone-fill", "الحملة",           Model.CampaignName ?? "—"),
+                        ("bi-calendar3",      "تاريخ الإضافة",    Model.CreatedAt.ToString("dd/MM/yyyy")),
+                    };
+                }
+                @foreach (var (icon, label, value) in infoRows)
+                {
+                    <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #F1F5F9">
+                        <div style="width:32px;height:32px;border-radius:8px;background:#F8FAFC;display:flex;align-items:center;justify-content:center;color:var(--text-muted);flex-shrink:0">
+                            <i class="bi @icon" style="font-size:13px"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:11px;color:var(--text-muted);font-weight:600">@label</div>
+                            <div style="font-size:13.5px;font-weight:600;color:var(--text-primary)">@value</div>
+                        </div>
+                    </div>
+                }
+                @if (Model.ReferredByName != null)
+                {
+                    <div style="display:flex;align-items:center;gap:12px;padding:12px 20px">
+                        <div style="width:32px;height:32px;border-radius:8px;background:#F5F3FF;display:flex;align-items:center;justify-content:center;color:#7C3AED;flex-shrink:0">
+                            <i class="bi bi-people-fill" style="font-size:13px"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:11px;color:var(--text-muted);font-weight:600">محال من</div>
+                            <div style="font-size:13.5px;font-weight:600;color:var(--text-primary)">@Model.ReferredByName (@Model.ReferredByPhone)</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (isAssignedToMe && !Model.IsConverted)
+        {
+            <!-- Update Status -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <div class="header-icon" style="background:#F5F3FF;color:#7C3AED"><i class="bi bi-arrow-repeat"></i></div>
+                    تحديث الحالة
+                </div>
+                <div class="card-body">
+                    <form asp-action="UpdateStatus" asp-controller="TeleSales" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="leadId" value="@Model.Id" />
+                        <div class="mb-3">
+                            <label class="form-label">الحالة الجديدة</label>
+                           <select name="newStatus" class="form-select form-select-sm">
+    @foreach (var opt in new[] {
+        (val: "2", label: "تم التواصل",  st: (byte)2),
+        (val: "3", label: "استجاب",      st: (byte)3),
+        (val: "4", label: "مهتم",        st: (byte)4),
+        (val: "5", label: "موعد مجدول", st: (byte)5),
+        (val: "8", label: "خسارة",       st: (byte)8),
+    })
+    {
+        @Html.Raw($"<option value=\"{opt.val}\"{(Model.Status == opt.st ? " selected" : "")}>{opt.label}</option>")
+    }
+</select>
+                        </div>
+                        <button type="submit" class="btn btn-sm w-100"
+                                style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE;font-weight:600">
+                            <i class="bi bi-arrow-repeat"></i> تحديث الحالة
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Log Call -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <div class="header-icon" style="background:#EFF6FF;color:#2563EB"><i class="bi bi-telephone-fill"></i></div>
+                    تسجيل مكالمة
+                </div>
+                <div class="card-body">
+                    <form asp-action="LogCall" asp-controller="TeleSales" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="LeadId" value="@Model.Id" />
+                        <div class="mb-2">
+                            <label class="form-label">القناة</label>
+                            <select name="Channel" class="form-select form-select-sm">
+                                <option value="1">📞 هاتف</option>
+                                <option value="2">💬 واتساب</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">النتيجة</label>
+                            <select name="Outcome" class="form-select form-select-sm">
+                                <option value="1">لا يرد</option>
+                                <option value="2">أجاب</option>
+                                <option value="3">سيرد لاحقاً</option>
+                                <option value="4">غير مهتم</option>
+                                <option value="5">مهتم</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">ملاحظة</label>
+                            <input type="text" name="Note" class="form-control form-control-sm" placeholder="اختياري..." />
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                            <i class="bi bi-save"></i> حفظ المكالمة
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Add Note -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <div class="header-icon" style="background:#ECFDF5;color:#059669"><i class="bi bi-pencil-fill"></i></div>
+                    إضافة ملاحظة
+                </div>
+                <div class="card-body">
+                    <form asp-action="AddNote" asp-controller="TeleSales" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="LeadId" value="@Model.Id" />
+                        <div class="mb-3">
+                            <textarea name="Description" class="form-control form-control-sm" rows="3"
+                                      placeholder="اكتب ملاحظتك هنا..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-sm w-100"
+                                style="background:#ECFDF5;color:#059669;border:1px solid #D1FAE5;font-weight:600">
+                            <i class="bi bi-plus-circle"></i> إضافة ملاحظة
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Set Reminder -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="header-icon" style="background:#FFFBEB;color:#D97706"><i class="bi bi-alarm-fill"></i></div>
+                    تعيين تذكير
+                </div>
+                <div class="card-body">
+                    <form asp-action="SetReminder" asp-controller="TeleSales" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="LeadId" value="@Model.Id" />
+                        <div class="mb-2">
+                            <label class="form-label">تاريخ التذكير</label>
+                            <input type="date" name="ReminderDate" class="form-control form-control-sm"
+                                   min="@DateTime.Now.ToString("yyyy-MM-dd")" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">ملاحظة</label>
+                            <input type="text" name="Notes" class="form-control form-control-sm" placeholder="موضوع التذكير..." />
+                        </div>
+                        <button type="submit" class="btn btn-sm w-100"
+                                style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;font-weight:600">
+                            <i class="bi bi-alarm"></i> تعيين تذكير
+                        </button>
+                    </form>
+                </div>
+            </div>
+        }
+        else if (!isAssignedToMe)
+        {
+            <div class="card">
+                <div class="card-body text-center" style="padding:32px">
+                    <div style="width:56px;height:56px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:24px;color:var(--primary)">
+                        <i class="bi bi-inbox-fill"></i>
+                    </div>
+                    <div style="font-weight:700;font-size:15px;margin-bottom:6px">عميل غير مُعيّن</div>
+                    <div style="color:var(--text-muted);font-size:13px;margin-bottom:16px">اضغط "تعيين لي" لبدء المتابعة</div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="card-body text-center" style="padding:32px">
+                    <div style="width:56px;height:56px;border-radius:50%;background:#ECFDF5;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:24px;color:#059669">
+                        <i class="bi bi-check-circle-fill"></i>
+                    </div>
+                    <div style="font-weight:700;font-size:15px;margin-bottom:6px">تم التحويل</div>
+                    <div style="color:var(--text-muted);font-size:13px">
+                        @if (Model.ConvertedAt.HasValue)
+                        {
+                            <span>بتاريخ @Model.ConvertedAt.Value.ToString("dd/MM/yyyy")</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+    </div>
+
+    <!-- Right Column: Timeline -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <div class="header-icon" style="background:#F5F3FF;color:#7C3AED"><i class="bi bi-clock-history"></i></div>
+                سجل النشاط
+                <span style="font-size:12px;color:var(--text-muted);margin-right:auto">@Model.Activities.Count نشاط</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.Activities.Any())
+                {
+                    <div class="empty-state">
+                        <i class="bi bi-clock-history"></i>
+                        <p>لا يوجد نشاط بعد</p>
+                    </div>
+                }
+                else
+                {
+                    <div style="padding:8px 20px">
+                        @foreach (var a in Model.Activities)
+                        {
+                            var (dotClass, dotIcon) = a.ActivityType switch {
+                                1 => ("type-1", "bi-pencil-fill"),
+                                2 => ("type-2", "bi-building"),
+                                3 => ("type-3", "bi-check-circle-fill"),
+                                4 => ("type-4", "bi-arrow-left-right"),
+                                5 => ("type-5", "bi-alarm-fill"),
+                                6 => ("type-6", "bi-telephone-fill"),
+                                7 => ("type-7", "bi-person-check-fill"),
+                                8 => ("type-8", "bi-person-fill"),
+                                _ => ("type-1", "bi-dot")
+                            };
+                            var typeLabel = a.ActivityType switch {
+                                1 => "ملاحظة", 2 => "زيارة", 3 => "مهمة",
+                                4 => "تغيير حالة", 5 => "تذكير", 6 => "مكالمة",
+                                7 => "تحويل", 8 => "تعيين", _ => "نشاط"
+                            };
+                            <div class="timeline-item">
+                                <div class="timeline-dot @dotClass">
+                                    <i class="bi @dotIcon"></i>
+                                </div>
+                                <div class="timeline-content">
+                                    <div class="timeline-desc">@a.Description</div>
+                                    <div class="timeline-meta">
+                                        <span class="badge" style="background:#F1F5F9;color:var(--text-muted);font-size:10px">@typeLabel</span>
+                                        &nbsp;
+                                        @if (!string.IsNullOrEmpty(a.CreatedByName))
+                                        {
+                                            <span>@a.CreatedByName</span>
+                                            <span style="margin:0 4px">·</span>
+                                        }
+                                        <span>@a.CreatedAt.ToString("dd/MM/yyyy — HH:mm")</span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+</div>

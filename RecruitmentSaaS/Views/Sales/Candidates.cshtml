@@ -1,0 +1,98 @@
+@model List<RecruitmentSaaS.Models.DTOs.CandidateListItemDto>
+@{
+    ViewData["Title"] = "المرشحين";
+    var currentStage = ViewBag.CurrentStage as byte?;
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-header-title">المرشحين</h1>
+        <div class="page-header-sub">@Model.Count مرشح</div>
+    </div>
+</div>
+
+<!-- Stage Filter -->
+<div class="card mb-3">
+    <div class="card-body py-3">
+        <div class="filter-bar">
+            <a href="/Sales/Candidates" class="filter-btn @(currentStage == null ? "active" : "")">الكل</a>
+            <a href="/Sales/Candidates?stage=1"  class="filter-btn @(currentStage == 1  ? "active" : "")">تسجيل</a>
+            <a href="/Sales/Candidates?stage=2"  class="filter-btn @(currentStage == 2  ? "active" : "")">استيفاء ملف</a>
+            <a href="/Sales/Candidates?stage=3"  class="filter-btn @(currentStage == 3  ? "active" : "")">طبي</a>
+            <a href="/Sales/Candidates?stage=4"  class="filter-btn @(currentStage == 4  ? "active" : "")">تأشيرة</a>
+            <a href="/Sales/Candidates?stage=5"  class="filter-btn @(currentStage == 5  ? "active" : "")">عقد</a>
+            <a href="/Sales/Candidates?stage=6"  class="filter-btn @(currentStage == 6  ? "active" : "")">تذكرة</a>
+            <a href="/Sales/Candidates?stage=7"  class="filter-btn @(currentStage == 7  ? "active" : "")">سفر</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <i class="bi bi-people"></i>
+            <p>لا يوجد مرشحين في هذه المرحلة</p>
+        </div>
+    }
+    else
+    {
+        <div style="overflow-x:auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th>الهاتف</th>
+                        <th>الباقة</th>
+                        <th>المرحلة</th>
+                        <th>الملف</th>
+                        <th>المدفوع</th>
+                        <th>تاريخ التسجيل</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Model)
+                    {
+                        var (stageClass, stageName) = c.CurrentStage switch {
+                            1  => ("badge-status-1", "تسجيل"),
+                            2  => ("badge-status-2", "استيفاء ملف"),
+                            3  => ("badge-status-3", "طبي"),
+                            4  => ("badge-status-4", "تأشيرة"),
+                            5  => ("badge-status-5", "عقد"),
+                            6  => ("badge-status-6", "تذكرة"),
+                            7  => ("badge-status-7", "سفر"),
+                            _  => ("badge-status-1", "غير معروف")
+                        };
+                        <tr>
+                            <td style="font-weight:600">@c.FullName</td>
+                            <td style="color:var(--text-muted);font-size:13px;direction:ltr;text-align:right">@c.Phone</td>
+                            <td style="font-size:12.5px;color:var(--text-muted)">@c.JobPackageName</td>
+                            <td><span class="badge @stageClass">@stageName</span></td>
+                            <td>
+                                @if (c.IsProfileComplete)
+                                {
+                                    <span style="color:var(--success);font-size:13px"><i class="bi bi-check-circle-fill"></i> مكتمل</span>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-muted);font-size:13px"><i class="bi bi-circle"></i> ناقص</span>
+                                }
+                            </td>
+                            <td style="font-weight:600;color:var(--text-primary)">
+                                @c.TotalPaidEGP.ToString("N0") <span style="font-size:11px;color:var(--text-muted)">ج.م</span>
+                            </td>
+                            <td style="color:var(--text-muted);font-size:12.5px">@c.CreatedAt.ToString("dd/MM/yyyy")</td>
+                            <td>
+                                <a href="/Sales/CandidateDetail/@c.Id"
+                                   style="font-size:12px;font-weight:600;color:var(--primary);text-decoration:none;padding:5px 12px;border:1px solid var(--primary);border-radius:6px">
+                                    <i class="bi bi-eye"></i> تفاصيل
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
