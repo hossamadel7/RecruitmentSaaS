@@ -1,0 +1,275 @@
+@model List<RecruitmentSaaS.Models.DTOs.AccountantPaymentDto>
+@{
+    ViewData["Title"] = "كل المدفوعات";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    int    page       = ViewBag.Page;
+    int    totalPages = ViewBag.TotalPages;
+    int    total      = ViewBag.Total;
+    string q          = ViewBag.Q ?? "";
+    byte?  sf         = ViewBag.StatusFilter;
+
+    string[] payMethods = { "", "كاش", "تحويل بنكي", "بطاقة", "شيك" };
+    string[] transTypes = { "", "دفعة", "استرداد" };
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);">💰</div>
+        <div>
+            <h1 class="page-title">كل المدفوعات</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@total دفعة إجمالاً</p>
+        </div>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success mb-4" data-auto-dismiss="4000">✅ @TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger mb-4" data-auto-dismiss="4000">❌ @TempData["Error"]</div>
+}
+
+@* Status tabs *@
+<div class="d-flex gap-2 mb-4 flex-wrap">
+    @{
+        var tabs = new[] {
+            ("الكل", (byte?)null, "#64748b"),
+            ("انتظار اعتماد", (byte?)1, "#f59e0b"),
+            ("معتمدة", (byte?)2, "#16a34a"),
+            ("مرفوضة", (byte?)3, "#dc2626"),
+        };
+    }
+    @foreach (var (label, val, color) in tabs)
+    {
+        bool active = sf == val || (val == null && sf == null);
+        string href = val.HasValue ? $"?status={val}&q={q}" : $"?q={q}";
+        <a href="@href" style="padding:7px 16px;border-radius:99px;font-size:.8rem;font-weight:700;
+               text-decoration:none;transition:all .15s;
+               background:@(active ? color : "var(--card-bg)");
+               color:@(active ? "#fff" : "var(--text-muted)");
+               border:1.5px solid @(active ? color : "var(--border)");">
+            @label
+        </a>
+    }
+</div>
+
+<div class="card">
+    <div class="filter-bar">
+        <div class="filter-group" style="flex:1;min-width:220px;">
+            <label>بحث بالمرشح</label>
+            <div class="input-group-icon">
+                <i class="bi bi-search input-icon"></i>
+                <input type="text" id="searchInput" class="form-control search-input"
+                       placeholder="الاسم، الهاتف، أو الرقم القومي..."
+                       value="@q" autocomplete="off" />
+            </div>
+        </div>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>المرشح</th>
+                        <th>باقة العمل</th>
+                        <th>المبلغ</th>
+                        <th>النوع</th>
+                        <th>طريقة الدفع</th>
+                        <th>الحالة</th>
+                        <th>سجّل بواسطة</th>
+                        <th>تاريخ الدفع</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model)
+                    {
+                        <tr class="table-row-link" data-href="/Accountant/CandidateFinancials/@p.CandidateId">
+                            <td>
+                                <div style="font-weight:700;">@p.CandidateFullName</div>
+                                <div style="font-size:.75rem;color:var(--text-faint);">@p.CandidatePhone</div>
+                            </td>
+                            <td style="font-size:.82rem;">@p.JobPackageName</td>
+                            <td>
+                                <span style="font-weight:800;color:@(p.TransactionType==2?"#dc2626":"#16a34a");font-size:.95rem;">
+                                    @(p.TransactionType == 2 ? "-" : "")@p.AmountEGP.ToString("N0") ج.م
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge-pill" style="background:@(p.TransactionType==2?"#fef2f2":"#f0fdf4");
+                                      color:@(p.TransactionType==2?"#dc2626":"#16a34a");
+                                      border:1px solid @(p.TransactionType==2?"#fecaca":"#bbf7d0");">
+                                    @(p.TransactionType < transTypes.Length ? transTypes[p.TransactionType] : "—")
+                                </span>
+                            </td>
+                            <td style="font-size:.82rem;">
+                                @(p.PaymentMethod < payMethods.Length ? payMethods[p.PaymentMethod] : "—")
+                            </td>
+                            <td>
+                                @if (p.Status == 1)
+                                {
+                                    <span class="badge-pill" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a;">⏳ انتظار</span>
+                                }
+                                else if (p.Status == 2)
+                                {
+                                    <span class="badge-pill" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;">✅ معتمدة</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-pill" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;">❌ مرفوضة</span>
+                                }
+                            </td>
+                            <td style="font-size:.82rem;">@p.RecordedByName</td>
+                            <td style="font-size:.78rem;color:var(--text-muted);white-space:nowrap;">
+                                @p.PaymentDate.ToString("dd/MM/yyyy")
+                            </td>
+                            <td class="no-nav">
+                                @if (p.Status == 1)
+                                {
+                                    <div class="d-flex gap-1">
+                                        <button class="btn btn-sm" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;font-size:.75rem;"
+                                                onclick="openApprove('@p.Id')">اعتماد</button>
+                                        <button class="btn btn-sm" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-size:.75rem;"
+                                                onclick="openReject('@p.Id')">رفض</button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <a href="/Accountant/CandidateFinancials/@p.CandidateId" class="btn btn-ghost btn-icon sm">
+                                        <i class="bi bi-eye" style="font-size:13px;"></i>
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+                        @if (p.Status == 3 && !string.IsNullOrEmpty(p.RejectionReason))
+                        {
+                            <tr style="background:#fef2f2;">
+                                <td colspan="9" style="font-size:.78rem;color:#dc2626;padding:6px 16px;">
+                                    ❌ سبب الرفض: @p.RejectionReason
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (totalPages > 1)
+        {
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <div style="font-size:.8rem;color:var(--text-muted);">@total دفعة</div>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        @if (page > 1)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="?page=@(page-1)&q=@q@(sf.HasValue?$"&status={sf}":"")">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        }
+                        @for (int p2 = Math.Max(1, page - 2); p2 <= Math.Min(totalPages, page + 2); p2++)
+                        {
+                            <li class="page-item @(p2 == page ? "active" : "")">
+                                <a class="page-link" href="?page=@p2&q=@q@(sf.HasValue?$"&status={sf}":"")">@p2</a>
+                            </li>
+                        }
+                        @if (page < totalPages)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="?page=@(page+1)&q=@q@(sf.HasValue?$"&status={sf}":"")">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">💳</div>
+            <div class="empty-state-title">لا توجد مدفوعات</div>
+        </div>
+    }
+</div>
+
+@* Approve Modal *@
+<div class="modal fade" id="approveModal" tabindex="-1" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">✅ اعتماد الدفعة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="/Accountant/ApprovePayment">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="paymentId" id="approvePaymentId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">ملاحظة (اختياري)</label>
+                        <input type="text" name="notes" class="form-control" placeholder="ملاحظة إضافية..." />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success">اعتماد</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* Reject Modal *@
+<div class="modal fade" id="rejectModal" tabindex="-1" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">❌ رفض الدفعة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="/Accountant/RejectPayment">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="paymentId" id="rejectPaymentId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">سبب الرفض <span class="text-danger">*</span></label>
+                        <textarea name="rejectionReason" class="form-control" rows="3" required
+                                  placeholder="اذكر سبب رفض الدفعة..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger">رفض الدفعة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const searchInput = document.getElementById('searchInput');
+searchInput?.addEventListener('input', CRM.debounce(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('q', searchInput.value.trim());
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}, 450));
+
+function openApprove(id) {
+    document.getElementById('approvePaymentId').value = id;
+    new bootstrap.Modal(document.getElementById('approveModal')).show();
+}
+function openReject(id) {
+    document.getElementById('rejectPaymentId').value = id;
+    new bootstrap.Modal(document.getElementById('rejectModal')).show();
+}
+</script>
+}

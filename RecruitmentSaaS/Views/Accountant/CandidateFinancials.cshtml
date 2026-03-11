@@ -1,0 +1,178 @@
+@model List<RecruitmentSaaS.Models.DTOs.AccountantPaymentDto>
+@{
+    var candidate     = ViewBag.Candidate as RecruitmentSaaS.Models.Entities.Candidate;
+    var totalApproved = (decimal)(ViewBag.TotalApproved ?? 0m);
+    var totalPending  = (decimal)(ViewBag.TotalPending ?? 0m);
+    ViewData["Title"]    = candidate?.FullName ?? "ملف مالي";
+    ViewData["Subtitle"] = "الملف المالي للمرشح";
+}
+
+<div class="page-header">
+    <div class="d-flex align-items-center gap-3">
+        <a href="/Accountant/History" style="color:var(--text-muted);text-decoration:none;font-size:20px">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+        <div>
+            <h1 class="page-header-title">@candidate?.FullName</h1>
+            <div class="page-header-sub">@candidate?.JobPackage?.Name</div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#ECFDF5;color:#059669"><i class="bi bi-check-circle-fill"></i></div>
+            <div class="stat-value" style="color:#059669">@totalApproved.ToString("N0")</div>
+            <div class="stat-label">إجمالي المعتمد (ج.م)</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#FFFBEB;color:#D97706"><i class="bi bi-clock-history"></i></div>
+            <div class="stat-value" style="color:#D97706">@totalPending.ToString("N0")</div>
+            <div class="stat-label">في انتظار الاعتماد (ج.م)</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#EEF2FF;color:var(--primary)"><i class="bi bi-receipt"></i></div>
+            <div class="stat-value">@Model.Count</div>
+            <div class="stat-label">إجمالي المعاملات</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="header-icon" style="background:#ECFDF5;color:#059669"><i class="bi bi-cash-coin"></i></div>
+        سجل المعاملات المالية
+    </div>
+    @if (!Model.Any())
+    {
+        <div style="padding:32px;text-align:center;color:var(--text-muted);font-size:13px">
+            لا توجد معاملات مالية لهذا المرشح
+        </div>
+    }
+    else
+    {
+        <div class="card-body p-0">
+            @foreach (var p in Model)
+            {
+                var methodName  = p.PaymentMethod switch { 1=>"كاش", 2=>"تحويل", 3=>"بطاقة", _=>"—" };
+                var typeName    = p.TransactionType == 2 ? "استرداد" : "دفعة";
+                var typeColor   = p.TransactionType == 2 ? "#E11D48" : "#059669";
+                var statusBg    = p.Status switch { 1=>"#FFFBEB", 2=>"#ECFDF5", 3=>"#FFF0F3", _=>"#F8FAFC" };
+                var statusColor = p.Status switch { 1=>"#D97706", 2=>"#059669", 3=>"#E11D48", _=>"#64748B" };
+                var statusText  = p.Status switch { 1=>"معلق", 2=>"معتمد", 3=>"مرفوض", _=>"—" };
+                var statusIcon  = p.Status switch { 1=>"bi-clock-history", 2=>"bi-check-circle-fill", 3=>"bi-x-circle-fill", _=>"bi-circle" };
+
+                <div style="display:flex;align-items:center;gap:12px;padding:13px 20px;border-bottom:1px solid #F1F5F9">
+                    <div style="width:36px;height:36px;border-radius:50%;background:@statusBg;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                        <i class="bi @statusIcon" style="color:@statusColor;font-size:14px"></i>
+                    </div>
+                    <div style="flex:1">
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <span style="font-size:14px;font-weight:800;color:@typeColor">
+                                @(p.TransactionType == 2 ? "-" : "+")@p.AmountEGP.ToString("N0") ج.م
+                            </span>
+                            <span style="font-size:10px;background:@statusBg;color:@statusColor;padding:2px 8px;border-radius:5px;font-weight:600">
+                                @statusText
+                            </span>
+                            <span style="font-size:11px;color:var(--text-muted)">(@typeName)</span>
+                        </div>
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+                            @p.PaymentDate.ToString("dd/MM/yyyy") · @methodName · سجّله: <strong>@p.RecordedByName</strong>
+                        </div>
+                        @if (!string.IsNullOrEmpty(p.Notes))
+                        {
+                            <div style="font-size:11px;color:var(--text-muted);font-style:italic">@p.Notes</div>
+                        }
+                        @if (p.Status == 3 && !string.IsNullOrEmpty(p.RejectionReason))
+                        {
+                            <div style="font-size:11px;color:#E11D48;margin-top:2px">
+                                سبب الرفض: @p.RejectionReason
+                            </div>
+                        }
+                        @if (p.Status == 2 && p.ApprovedAt.HasValue)
+                        {
+                            <div style="font-size:11px;color:#059669;margin-top:2px">
+                                اعتمده: @p.ApprovedByName · @p.ApprovedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Approve/Reject for pending -->
+                    @if (p.Status == 1)
+                    {
+                        <div class="d-flex gap-2">
+                            <form asp-action="ApprovePayment" asp-controller="Accountant" method="post"
+                                  onsubmit="return confirm('تأكيد اعتماد الدفعة؟')">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="paymentId" value="@p.Id" />
+                                <button type="submit" class="btn btn-sm"
+                                        style="background:#ECFDF5;color:#059669;border:1px solid #A7F3D0;font-size:12px">
+                                    <i class="bi bi-check-lg"></i> اعتماد
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn-sm"
+                                    style="background:#FFF0F3;color:#E11D48;border:1px solid #FECDD3;font-size:12px"
+                                    onclick="openRejectModal('@p.Id', '@p.CandidateFullName', '@p.AmountEGP.ToString("N0")')">
+                                <i class="bi bi-x-lg"></i> رفض
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:var(--radius);border:none">
+            <div class="modal-header" style="border-bottom:1px solid var(--border)">
+                <h5 class="modal-title" style="font-weight:700;font-size:15px">
+                    <i class="bi bi-x-circle-fill" style="color:#E11D48;margin-left:8px"></i> رفض الدفعة
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="RejectPayment" asp-controller="Accountant" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="paymentId" id="rejectPaymentId" />
+                <div class="modal-body" style="padding:24px">
+                    <div class="alert alert-danger" style="font-size:13px">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        رفض دفعة <strong id="rejectCandidateName"></strong> —
+                        <strong id="rejectAmount"></strong> ج.م
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">سبب الرفض <span style="color:var(--danger)">*</span></label>
+                        <textarea name="rejectionReason" class="form-control" rows="3"
+                                  placeholder="اذكر سبب الرفض..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid var(--border);gap:8px">
+                    <button type="button" class="btn btn-sm" data-bs-dismiss="modal"
+                            style="border:1px solid var(--border)">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-danger">
+                        <i class="bi bi-x-lg"></i> تأكيد الرفض
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openRejectModal(paymentId, candidateName, amount) {
+        document.getElementById('rejectPaymentId').value = paymentId;
+        document.getElementById('rejectCandidateName').textContent = candidateName;
+        document.getElementById('rejectAmount').textContent = amount;
+        new bootstrap.Modal(document.getElementById('rejectModal')).show();
+    }
+</script>
+}

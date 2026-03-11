@@ -1,0 +1,185 @@
+@model List<RecruitmentSaaS.Models.DTOs.AccountantPaymentDto>
+@{
+    ViewData["Title"] = "الدفعات المعلقة";
+    ViewData["Subtitle"] = "في انتظار الاعتماد";
+    var page       = (int)(ViewBag.Page ?? 1);
+    var totalPages = (int)(ViewBag.TotalPages ?? 1);
+    var total      = (int)(ViewBag.Total ?? 0);
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-header-title">الدفعات المعلقة</h1>
+        <div class="page-header-sub">@total دفعة في انتظار الاعتماد</div>
+    </div>
+    <a href="/Accountant/History" class="btn" style="border:1px solid var(--border);font-size:13px">
+        <i class="bi bi-journal-check"></i> سجل المدفوعات
+    </a>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success mb-3" style="font-size:13px">
+        <i class="bi bi-check-circle-fill"></i> @TempData["Success"]
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger mb-3" style="font-size:13px">
+        <i class="bi bi-x-circle-fill"></i> @TempData["Error"]
+    </div>
+}
+
+@if (!Model.Any())
+{
+    <div class="card">
+        <div style="padding:48px;text-align:center;color:var(--text-muted)">
+            <i class="bi bi-check-circle" style="font-size:48px;display:block;margin-bottom:12px;color:#059669"></i>
+            <div style="font-size:16px;font-weight:600;margin-bottom:4px">لا توجد دفعات معلقة</div>
+            <div style="font-size:13px">جميع الدفعات تمت معالجتها</div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body p-0">
+            @foreach (var p in Model)
+            {
+                var methodName = p.PaymentMethod switch { 1=>"كاش", 2=>"تحويل بنكي", 3=>"بطاقة", _=>"—" };
+                var typeName   = p.TransactionType == 2 ? "استرداد" : "دفعة";
+                var typeColor  = p.TransactionType == 2 ? "#E11D48" : "#059669";
+
+                <div style="padding:16px 20px;border-bottom:1px solid #F1F5F9">
+                    <div class="row align-items-center g-2">
+
+                        <!-- Candidate Info -->
+                        <div class="col-md-4">
+                            <div style="display:flex;align-items:center;gap:10px">
+                                <div style="width:38px;height:38px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                    <i class="bi bi-person-fill" style="color:var(--primary)"></i>
+                                </div>
+                                <div>
+                                    <a href="/Accountant/CandidateFinancials/@p.CandidateId"
+                                       style="font-size:13px;font-weight:700;color:var(--text-primary);text-decoration:none">
+                                        @p.CandidateFullName
+                                    </a>
+                                    <div style="font-size:11px;color:var(--text-muted)">@p.CandidatePhone</div>
+                                    <div style="font-size:10px;color:var(--text-muted)">@p.JobPackageName</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payment Info -->
+                        <div class="col-md-4">
+                            <div style="font-size:15px;font-weight:800;color:@typeColor">
+                                @(p.TransactionType == 2 ? "-" : "+")@p.AmountEGP.ToString("N0") ج.م
+                                <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(@typeName)</span>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+                                @p.PaymentDate.ToString("dd/MM/yyyy") · @methodName
+                            </div>
+                            <div style="font-size:11px;color:var(--text-muted)">
+                                سجّله: <strong>@p.RecordedByName</strong> · @p.CreatedAt.ToString("dd/MM HH:mm")
+                            </div>
+                            @if (!string.IsNullOrEmpty(p.Notes))
+                            {
+                                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;font-style:italic">@p.Notes</div>
+                            }
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="col-md-4">
+                            <div class="d-flex gap-2 justify-content-end">
+                                <!-- Approve -->
+                                <form asp-action="ApprovePayment" asp-controller="Accountant" method="post"
+                                      onsubmit="return confirm('تأكيد اعتماد الدفعة؟')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="paymentId" value="@p.Id" />
+                                    <button type="submit" class="btn btn-sm"
+                                            style="background:#ECFDF5;color:#059669;border:1px solid #A7F3D0;font-size:12px">
+                                        <i class="bi bi-check-lg"></i> اعتماد
+                                    </button>
+                                </form>
+
+                                <!-- Reject button → opens modal -->
+                                <button type="button" class="btn btn-sm"
+                                        style="background:#FFF0F3;color:#E11D48;border:1px solid #FECDD3;font-size:12px"
+                                        onclick="openRejectModal('@p.Id', '@p.CandidateFullName', '@p.AmountEGP.ToString("N0")')">
+                                    <i class="bi bi-x-lg"></i> رفض
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    @if (totalPages > 1)
+    {
+        <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
+            @for (int i = 1; i <= totalPages; i++)
+            {
+                <a href="/Accountant/Pending?page=@i"
+                   style="padding:6px 12px;border-radius:6px;font-size:13px;text-decoration:none;
+                          background:@(i == page ? "var(--primary)" : "#F8FAFC");
+                          color:@(i == page ? "white" : "var(--text-primary)");
+                          border:1px solid @(i == page ? "var(--primary)" : "var(--border)")">
+                    @i
+                </a>
+            }
+        </div>
+    }
+}
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:var(--radius);border:none">
+            <div class="modal-header" style="border-bottom:1px solid var(--border)">
+                <h5 class="modal-title" style="font-weight:700;font-size:15px">
+                    <i class="bi bi-x-circle-fill" style="color:#E11D48;margin-left:8px"></i>
+                    رفض الدفعة
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="RejectPayment" asp-controller="Accountant" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="paymentId" id="rejectPaymentId" />
+                <div class="modal-body" style="padding:24px">
+                    <div class="alert alert-danger" style="font-size:13px">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        سيتم رفض دفعة <strong id="rejectCandidateName"></strong>
+                        بمبلغ <strong id="rejectAmount"></strong> ج.م
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">سبب الرفض <span style="color:var(--danger)">*</span></label>
+                        <textarea name="rejectionReason" class="form-control" rows="3"
+                                  placeholder="اذكر سبب الرفض..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid var(--border);gap:8px">
+                    <button type="button" class="btn btn-sm" data-bs-dismiss="modal"
+                            style="border:1px solid var(--border)">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-danger">
+                        <i class="bi bi-x-lg"></i> تأكيد الرفض
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openRejectModal(paymentId, candidateName, amount) {
+        document.getElementById('rejectPaymentId').value    = paymentId;
+        document.getElementById('rejectCandidateName').textContent = candidateName;
+        document.getElementById('rejectAmount').textContent = amount;
+        new bootstrap.Modal(document.getElementById('rejectModal')).show();
+    }
+</script>
+}

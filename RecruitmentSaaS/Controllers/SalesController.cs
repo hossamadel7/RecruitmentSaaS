@@ -259,6 +259,7 @@ namespace RecruitmentSaaS.Controllers
 
             var payments = await _context.Payments
                 .Include(p => p.RecordedBy)
+                .Include(p => p.ApprovedBy)
                 .Where(p => p.CandidateId == id)
                 .OrderByDescending(p => p.PaymentDate)
                 .Select(p => new PaymentDto
@@ -268,8 +269,12 @@ namespace RecruitmentSaaS.Controllers
                     PaymentDate = p.PaymentDate,
                     PaymentMethod = p.PaymentMethod,
                     TransactionType = p.TransactionType,
+                    Status = p.Status,
                     Notes = p.Notes,
                     RecordedByName = p.RecordedBy.FullName,
+                    ApprovedByName = p.ApprovedBy != null ? p.ApprovedBy.FullName : null,
+                    ApprovedAt = p.ApprovedAt,
+                    RejectionReason = p.RejectionReason,
                     CreatedAt = p.CreatedAt
                 })
                 .ToListAsync();
@@ -527,15 +532,11 @@ namespace RecruitmentSaaS.Controllers
                 PaymentMethod = paymentMethod,
                 TransactionType = transactionType,
                 Notes = notes,
+                Status = 1,  // Pending — TotalPaidEgp updated only after accountant approval
                 CreatedAt = DateTime.UtcNow
             });
 
-            // Update TotalPaidEgp on candidate
-            if (transactionType == 1)
-                candidate.TotalPaidEgp += amountEgp;
-            else if (transactionType == 2)
-                candidate.TotalPaidEgp -= amountEgp;
-
+            // Do NOT update TotalPaidEgp here — accountant approves first
             candidate.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();

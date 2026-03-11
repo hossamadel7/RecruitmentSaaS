@@ -1,0 +1,124 @@
+@{
+    ViewData["Title"] = "لوحة المحاسب";
+    ViewData["Subtitle"] = "إدارة المدفوعات";
+    var pendingCount  = (int)(ViewBag.PendingCount ?? 0);
+    var approvedToday = (decimal)(ViewBag.ApprovedToday ?? 0m);
+    var rejectedCount = (int)(ViewBag.RejectedCount ?? 0);
+    var totalApproved = (decimal)(ViewBag.TotalApproved ?? 0m);
+    var recentPending = ViewBag.RecentPending as List<RecruitmentSaaS.Models.DTOs.PaymentDto> ?? new();
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-header-title">لوحة المحاسب</h1>
+        <div class="page-header-sub">إدارة واعتماد المدفوعات</div>
+    </div>
+</div>
+
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#FFFBEB;color:#D97706"><i class="bi bi-clock-history"></i></div>
+            <div class="stat-value">@pendingCount</div>
+            <div class="stat-label">في انتظار الاعتماد</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#ECFDF5;color:#059669"><i class="bi bi-cash-coin"></i></div>
+            <div class="stat-value">@approvedToday.ToString("N0")</div>
+            <div class="stat-label">معتمد اليوم (ج.م)</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#FFF0F3;color:#E11D48"><i class="bi bi-x-circle"></i></div>
+            <div class="stat-value">@rejectedCount</div>
+            <div class="stat-label">مرفوض</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#EEF2FF;color:var(--primary)"><i class="bi bi-wallet2"></i></div>
+            <div class="stat-value">@totalApproved.ToString("N0")</div>
+            <div class="stat-label">إجمالي المعتمد (ج.م)</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Quick Actions -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <div class="header-icon" style="background:#FFFBEB;color:#D97706"><i class="bi bi-lightning-fill"></i></div>
+                إجراءات سريعة
+            </div>
+            <div class="card-body" style="padding:12px">
+                <a href="/Accountant/Pending" class="btn w-100 mb-2"
+                   style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;text-align:right;padding:12px 16px">
+                    <i class="bi bi-clock-history ms-2"></i>
+                    الدفعات المعلقة
+                    @if (pendingCount > 0)
+                    {
+                        <span class="badge ms-1" style="background:#D97706;color:white">@pendingCount</span>
+                    }
+                </a>
+                <a href="/Accountant/History" class="btn w-100 mb-2"
+                   style="background:#ECFDF5;color:#059669;border:1px solid #A7F3D0;text-align:right;padding:12px 16px">
+                    <i class="bi bi-journal-check ms-2"></i>
+                    سجل المدفوعات
+                </a>
+                <a href="/Accountant/History?status=3" class="btn w-100"
+                   style="background:#FFF0F3;color:#E11D48;border:1px solid #FECDD3;text-align:right;padding:12px 16px">
+                    <i class="bi bi-x-circle ms-2"></i>
+                    المدفوعات المرفوضة
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Pending -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <div class="header-icon" style="background:#FFFBEB;color:#D97706"><i class="bi bi-clock-history"></i></div>
+                أحدث الدفعات المعلقة
+                <a href="/Accountant/Pending" class="btn btn-sm ms-auto"
+                   style="border:1px solid var(--border);font-size:11px">عرض الكل</a>
+            </div>
+            @if (!recentPending.Any())
+            {
+                <div style="padding:32px;text-align:center;color:var(--text-muted)">
+                    <i class="bi bi-check-circle" style="font-size:32px;display:block;margin-bottom:8px;color:#059669"></i>
+                    لا توجد دفعات معلقة
+                </div>
+            }
+            else
+            {
+                <div class="card-body p-0">
+                    @foreach (var p in recentPending)
+                    {
+                        var methodName = p.PaymentMethod switch { 1=>"كاش", 2=>"تحويل", 3=>"بطاقة", _=>"—" };
+                        <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #F1F5F9">
+                            <div style="width:36px;height:36px;border-radius:50%;background:#FFFBEB;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                <i class="bi bi-cash" style="color:#D97706"></i>
+                            </div>
+                            <div style="flex:1">
+                                <div style="font-size:13px;font-weight:600">@p.RecordedByName</div>
+                                <div style="font-size:11px;color:var(--text-muted)">
+                                    @p.PaymentDate.ToString("dd/MM/yyyy") · @methodName
+                                </div>
+                            </div>
+                            <div style="text-align:left">
+                                <div style="font-size:14px;font-weight:800;color:#D97706">@p.AmountEGP.ToString("N0") ج.م</div>
+                                <div style="font-size:10px;color:var(--text-muted)">@p.CreatedAt.ToString("HH:mm")</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
