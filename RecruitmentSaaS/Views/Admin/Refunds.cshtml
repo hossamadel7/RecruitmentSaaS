@@ -1,0 +1,240 @@
+@using RecruitmentSaaS.Models.Entities
+@model List<Refund>
+@{
+    ViewData["Title"] = "طلبات الاسترداد";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    int  page         = ViewBag.Page;
+    int  totalPages   = ViewBag.TotalPages;
+    int  total        = ViewBag.Total;
+    byte statusFilter = ViewBag.StatusFilter;
+
+    string[] statusLabels = { "", "انتظار الإدارة", "معتمد من الإدارة", "مرفوض", "منفّذ" };
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#fef2f2,#fecaca);">↩️</div>
+        <div>
+            <h1 class="page-title">طلبات الاسترداد</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@total طلب</p>
+        </div>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success mb-4" data-auto-dismiss="4000">✅ @TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger mb-4" data-auto-dismiss="4000">❌ @TempData["Error"]</div>
+}
+
+@* Status tabs *@
+<div class="d-flex gap-2 mb-4 flex-wrap">
+    @{
+        var tabs = new[] {
+            ("في انتظار موافقتي", (byte)1, "#3b82f6"),
+            ("معتمدة — إحالة للمحاسب", (byte)2, "#f59e0b"),
+            ("مرفوضة", (byte)3, "#dc2626"),
+            ("منفّذة", (byte)4, "#16a34a"),
+        };
+    }
+    @foreach (var (label, val, color) in tabs)
+    {
+        bool active = statusFilter == val;
+        <a href="?status=@val" style="padding:7px 16px;border-radius:99px;font-size:.8rem;font-weight:700;
+               text-decoration:none;transition:all .15s;
+               background:@(active ? color : "var(--card-bg)");
+               color:@(active ? "#fff" : "var(--text-muted)");
+               border:1.5px solid @(active ? color : "var(--border)");">
+            @label
+        </a>
+    }
+</div>
+
+<div class="card">
+    @if (!Model.Any())
+    {
+        <div class="empty-state" style="padding:48px;">
+            <div class="empty-state-icon">↩️</div>
+            <div class="empty-state-title">
+                @if (statusFilter == 1)
+                {
+                    <text>لا توجد طلبات استرداد معلقة ✅</text>
+                }
+                else
+                {
+                    <text>لا توجد طلبات بهذه الحالة</text>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>المرشح</th>
+                        <th>المبلغ</th>
+                        <th>السبب</th>
+                        <th>طُلب بواسطة</th>
+                        <th>الحالة</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div style="font-weight:700;">@r.Candidate?.FullName</div>
+                                <div style="font-size:.75rem;color:var(--text-faint);">@r.Candidate?.Phone</div>
+                            </td>
+                            <td>
+                                <span style="font-weight:800;color:#dc2626;font-size:.95rem;">
+                                    @r.AmountEgp.ToString("N0") ج.م
+                                </span>
+                            </td>
+                            <td style="font-size:.82rem;max-width:200px;">@r.Reason</td>
+                            <td style="font-size:.82rem;">
+                                @r.RequestedBy?.FullName
+                                <div style="font-size:.72rem;color:var(--text-faint);">
+                                    @r.RequestedAt.ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                            </td>
+                            <td>
+                                @{
+                                    var (bg, col, border) = r.Status switch {
+                                        1 => ("#eff6ff", "#2563eb", "#bfdbfe"),
+                                        2 => ("#fffbeb", "#b45309", "#fde68a"),
+                                        3 => ("#fef2f2", "#dc2626", "#fecaca"),
+                                        4 => ("#f0fdf4", "#16a34a", "#bbf7d0"),
+                                        _ => ("#f1f5f9", "#64748b", "#e2e8f0")
+                                    };
+                                }
+                                <span class="badge-pill" style="background:@bg;color:@col;border:1px solid @border;">
+                                    @(r.Status < statusLabels.Length ? statusLabels[r.Status] : "—")
+                                </span>
+                            </td>
+                            <td>
+                                @if (r.Status == 1)
+                                {
+                                    <div class="d-flex gap-1 flex-wrap">
+                                        @* Approve *@
+                                        <form method="post" action="/Admin/ApproveRefund" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="refundId" value="@r.Id" />
+                                            <button type="submit" class="btn btn-sm"
+                                                    style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;"
+                                                    data-confirm
+                                                    data-confirm-title="اعتماد الاسترداد"
+                                                    data-confirm-message="اعتماد استرداد @r.AmountEgp.ToString("N0") ج.م وإحالته للمحاسب؟"
+                                                    data-confirm-ok="اعتماد"
+                                                    data-confirm-class="btn-success"
+                                                    data-confirm-icon="✅">
+                                                اعتماد
+                                            </button>
+                                        </form>
+
+                                        @* Reject *@
+                                        <button class="btn btn-sm"
+                                                style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;"
+                                                onclick="openRejectRefund('@r.Id', '@r.AmountEgp.ToString("N0")')">
+                                            رفض
+                                        </button>
+                                    </div>
+                                }
+                                else if (r.Status == 2)
+                                {
+                                    <span style="font-size:.78rem;color:var(--text-faint);">بانتظار المحاسب</span>
+                                }
+                                else if (r.Status == 3)
+                                {
+                                    <span style="font-size:.78rem;color:#dc2626;">
+                                        @r.RejectReason
+                                    </span>
+                                }
+                                else if (r.Status == 4)
+                                {
+                                    <span style="font-size:.78rem;color:var(--text-faint);">
+                                        نُفّذ @r.ExecutedAt?.ToString("dd/MM")
+                                    </span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (totalPages > 1)
+        {
+            <div class="card-footer d-flex justify-content-center">
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        @if (page > 1)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="?status=@statusFilter&page=@(page-1)">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        }
+                        @for (int p = Math.Max(1, page - 2); p <= Math.Min(totalPages, page + 2); p++)
+                        {
+                            <li class="page-item @(p == page ? "active" : "")">
+                                <a class="page-link" href="?status=@statusFilter&page=@p">@p</a>
+                            </li>
+                        }
+                        @if (page < totalPages)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="?status=@statusFilter&page=@(page+1)">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+            </div>
+        }
+    }
+</div>
+
+@* Reject modal *@
+<div id="rejectRefundModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
+    <div class="modal-card" style="width:400px;max-width:95vw;">
+        <div class="modal-header">
+            <h5 class="modal-title">رفض طلب الاسترداد</h5>
+            <button class="btn-close" onclick="document.getElementById('rejectRefundModal').style.display='none'"></button>
+        </div>
+        <form method="post" action="/Admin/RejectRefund">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="refundId" id="rejectRefundId" />
+            <div class="modal-body">
+                <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;">
+                    رفض طلب استرداد بمبلغ <strong id="rejectRefundAmount"></strong> ج.م
+                </p>
+                <div class="mb-3">
+                    <label class="form-label">سبب الرفض</label>
+                    <textarea name="rejectReason" class="form-control" rows="3" required placeholder="اذكر سبب رفض الطلب..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('rejectRefundModal').style.display='none'">إلغاء</button>
+                <button type="submit" class="btn btn-danger">رفض الطلب</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openRejectRefund(refundId, amount) {
+    document.getElementById('rejectRefundId').value = refundId;
+    document.getElementById('rejectRefundAmount').textContent = amount;
+    document.getElementById('rejectRefundModal').style.display = 'flex';
+}
+</script>

@@ -1,0 +1,172 @@
+@using RecruitmentSaaS.Models.Entities
+@model IEnumerable<Candidate>
+@{
+    ViewData["Title"] = "المرشحون";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    string? q = ViewBag.Q;
+    int? stage = ViewBag.Stage;
+    int page = ViewBag.Page;
+    int total = ViewBag.Total;
+    int totalPgs = ViewBag.TotalPages;
+
+    string[] stageLabels = { "", "توثيق المستندات", "تجهيز الملف", "الكشف الطبي",
+                              "معالجة التأشيرة", "حجز التذاكر", "التجهيز للسفر", "مكتمل - سافر" };
+    string[] stageColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#ec4899", "#6366f1", "#22c55e" };
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);">👥</div>
+        <div>
+            <h1 class="page-title">المرشحون</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@total مرشح</p>
+        </div>
+    </div>
+</div>
+
+@* Filters *@
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" action="/Operations/Candidates" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label form-label-sm">بحث</label>
+                <input name="q" value="@q" class="form-control form-control-sm"
+                       placeholder="اسم، هاتف، رقم قومي..." />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label form-label-sm">المرحلة</label>
+                <select name="stage" class="form-select form-select-sm">
+                    <option value="">كل المراحل</option>
+                    @for (int i = 1; i < stageLabels.Length; i++)
+                    {
+                        if (i == (stage ?? 0))
+                        {
+                            <option value="@i" selected="selected">@stageLabels[i]</option>
+                        }
+                        else
+                        {
+                            <option value="@i">@stageLabels[i]</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-search me-1"></i> بحث
+                </button>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(q) || stage.HasValue)
+            {
+                <div class="col-md-2">
+                    <a href="/Operations/Candidates" class="btn btn-ghost btn-sm w-100">مسح</a>
+                </div>
+            }
+        </form>
+    </div>
+</div>
+
+@* Table *@
+<div class="card">
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="empty-state" style="padding:48px;">
+                <div class="empty-state-icon">👥</div>
+                <div class="empty-state-title">لا يوجد مرشحون</div>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>المرشح</th>
+                            <th>الهاتف</th>
+                            <th>الباقة</th>
+                            <th>المرحلة الحالية</th>
+                            <th>المسؤول</th>
+                            <th>تاريخ التحويل</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in Model)
+                        {
+                            int s = (int)c.CurrentStage;
+                            string label = s >= 1 && s < stageLabels.Length ? stageLabels[s] : $"مرحلة {s}";
+                            string color = s >= 1 && s < stageColors.Length ? stageColors[s] : "#64748b";
+                            string colorBg = color + "20";
+                            string colorBorder = color + "50";
+
+                            <tr>
+                                <td>
+                                    <div style="font-weight:600;">@c.FullName</div>
+                                    @if (!string.IsNullOrWhiteSpace(c.NationalId))
+                                    {
+                                        <div style="font-size:.75rem;color:var(--text-muted);">@c.NationalId</div>
+                                    }
+                                </td>
+                                <td><span style="font-family:monospace;">@c.Phone</span></td>
+                                <td>
+                                    @if (c.JobPackage != null)
+                                    {
+                                        <span>@c.JobPackage.Name</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:var(--text-muted);">—</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span style="background:@colorBg;color:@color;border:1px solid @colorBorder;font-size:.7rem;padding:4px 10px;border-radius:20px;font-weight:700;">
+                                        @label
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (c.AssignedSales != null)
+                                    {
+                                        <span>@c.AssignedSales.FullName</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:var(--text-muted);">—</span>
+                                    }
+                                </td>
+                                <td style="color:var(--text-muted);font-size:.8rem;">
+                                    @c.CreatedAt.ToString("dd/MM/yyyy")
+                                </td>
+                                <td>
+                                    <a href="/Sales/CandidateDetail/@c.Id" class="btn btn-ghost btn-sm">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @* Pagination *@
+            @if (totalPgs > 1)
+            {
+                <div class="d-flex justify-content-center py-3 gap-2">
+                    @if (page > 1)
+                    {
+                        <a href="/Operations/Candidates?q=@q&stage=@stage&page=@(page - 1)" class="btn btn-ghost btn-sm">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    }
+                    <span class="btn btn-ghost btn-sm" style="cursor:default;">@(page) / @(totalPgs)</span>
+                    @if (page < totalPgs)
+                    {
+                        <a href="/Operations/Candidates?q=@q&stage=@stage&page=@(page + 1)" class="btn btn-ghost btn-sm">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>

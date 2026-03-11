@@ -1,0 +1,173 @@
+@using RecruitmentSaaS.Models.Entities
+@model IEnumerable<Lead>
+@{
+    ViewData["Title"] = "العملاء المحتملون";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    string? q = ViewBag.Q;
+    int? status = ViewBag.Status;
+    Guid? campId = ViewBag.CampaignId;
+    int page = ViewBag.Page;
+    int total = ViewBag.Total;
+    int totalPages = ViewBag.TotalPages;
+    var campaigns = (IEnumerable<Campaign>)ViewBag.Campaigns;
+
+    string[] statusLabels = { "", "عميل جديد", "تم التواصل", "مهتم", "يفكر", "وعد بالزيارة", "زيارة", "تحويل", "ملغى" };
+    string[] statusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626" };
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);">👥</div>
+        <div>
+            <h1 class="page-title">العملاء المحتملون</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@total.ToString("N0") سجل</p>
+        </div>
+    </div>
+</div>
+
+@* Filters *@
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" action="/Admin/Leads" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label form-label-sm">بحث</label>
+                <input name="q" value="@q" class="form-control form-control-sm" placeholder="اسم، هاتف، بريد..." />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label form-label-sm">الحالة</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">كل الحالات</option>
+                    @for (int i = 1; i < statusLabels.Length; i++)
+                    {
+                        if (i == (status ?? 0))
+                        {
+                            <option value="@i" selected="selected">@statusLabels[i]</option>
+                        }
+                        else
+                        {
+                            <option value="@i">@statusLabels[i]</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label form-label-sm">الحملة</label>
+                <select name="campaignId" class="form-select form-select-sm">
+                    <option value="">كل الحملات</option>
+                    @foreach (var c in campaigns)
+                    {
+                        if (c.Id == campId)
+                        {
+                            <option value="@c.Id" selected="selected">@c.Name</option>
+                        }
+                        else
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100">بحث</button>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(q) || status.HasValue || campId.HasValue)
+            {
+                <div class="col-md-1">
+                    <a href="/Admin/Leads" class="btn btn-ghost btn-sm w-100">مسح</a>
+                </div>
+            }
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="empty-state" style="padding:48px;">
+                <div class="empty-state-icon">👥</div>
+                <div class="empty-state-title">لا يوجد عملاء محتملون</div>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>الاسم</th>
+                            <th>الهاتف</th>
+                            <th>الحملة</th>
+                            <th>المسؤول (تيلي)</th>
+                            <th>مسؤول المكتب</th>
+                            <th>الحالة</th>
+                            <th>التاريخ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var lead in Model)
+                        {
+                            int s = lead.Status;
+                            string label = s >= 1 && s < statusLabels.Length ? statusLabels[s] : $"حالة {s}";
+                            string color = s >= 1 && s < statusColors.Length ? statusColors[s] : "#64748b";
+                            string colorBg = color + "20";
+                            string colorBorder = color + "40";
+
+                            <tr>
+                                <td>
+                                    <div style="font-weight:600;">@lead.FullName</div>
+                                </td>
+                                <td style="font-family:monospace;font-size:.83rem;">@lead.Phone</td>
+                                <td style="font-size:.8rem;color:var(--text-muted);">@(lead.Campaign?.Name ?? "—")</td>
+                                <td style="font-size:.8rem;">@(lead.AssignedSales?.FullName ?? "—")</td>
+                                <td style="font-size:.8rem;">@(lead.AssignedOfficeSales?.FullName ?? "—")</td>
+                                <td>
+                                    <span style="background:@colorBg;color:@color;border:1px solid @colorBorder;font-size:.7rem;padding:3px 10px;border-radius:99px;font-weight:700;">
+                                        @label
+                                    </span>
+                                </td>
+                                <td style="font-size:.78rem;color:var(--text-muted);">
+                                    @lead.CreatedAt.ToString("dd/MM/yyyy")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (totalPages > 1)
+            {
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <div style="font-size:.8rem;color:var(--text-muted);">@total.ToString("N0") سجل</div>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            @if (page > 1)
+                            {
+                                <li class="page-item">
+                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&page=@(page - 1)">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                </li>
+                            }
+                            @for (int p = Math.Max(1, page - 2); p <= Math.Min(totalPages, page + 2); p++)
+                            {
+                                <li class="page-item @(p == page ? "active" : "")">
+                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&page=@p">@p</a>
+                                </li>
+                            }
+                            @if (page < totalPages)
+                            {
+                                <li class="page-item">
+                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&page=@(page + 1)">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </a>
+                                </li>
+                            }
+                        </ul>
+                    </nav>
+                </div>
+            }
+        }
+    </div>
+</div>
