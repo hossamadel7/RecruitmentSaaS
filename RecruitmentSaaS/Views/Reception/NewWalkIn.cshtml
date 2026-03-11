@@ -1,0 +1,104 @@
+@{
+    ViewData["Title"] = "تسجيل عميل جديد";
+    ViewData["Subtitle"] = "زيارة مكتبية جديدة";
+    var officeSalesUsers = ViewBag.OfficeSalesUsers as List<RecruitmentSaaS.Models.DTOs.UserListItemDto>
+                           ?? new List<RecruitmentSaaS.Models.DTOs.UserListItemDto>();
+    var campaigns = ViewBag.Campaigns as List<RecruitmentSaaS.Models.DTOs.CampaignListItemDto>
+                    ?? new List<RecruitmentSaaS.Models.DTOs.CampaignListItemDto>();
+    var prefilledPhone = TempData["NewWalkInPhone"]?.ToString() ?? "";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+
+        <div class="page-header">
+            <div class="d-flex align-items-center gap-3">
+                <a href="/Reception/WalkIn" style="color:var(--text-muted);text-decoration:none;font-size:20px">
+                    <i class="bi bi-arrow-right"></i>
+                </a>
+                <div>
+                    <h1 class="page-header-title">تسجيل عميل جديد</h1>
+                    <div class="page-header-sub">لم يتم العثور على الرقم — تسجيل جديد</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="header-icon" style="background:#EEF2FF;color:var(--primary)">
+                    <i class="bi bi-person-plus-fill"></i>
+                </div>
+                بيانات العميل
+            </div>
+            <div class="card-body">
+                <form asp-action="CreateWalkIn" asp-controller="Reception" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">الاسم الكامل <span style="color:var(--danger)">*</span></label>
+                            <input type="text" name="FullName" class="form-control" placeholder="الاسم رباعي" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">رقم الهاتف <span style="color:var(--danger)">*</span></label>
+                            <input type="tel" name="Phone" class="form-control"
+                                   placeholder="01xxxxxxxxx"
+                                   value="@prefilledPhone"
+                                   style="direction:ltr;text-align:right"
+                                   required />
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">الوظيفة المطلوبة</label>
+                            <input type="text" name="InterestedJobTitle" class="form-control" placeholder="مثال: سائق — عامل مصنع" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">الدولة المطلوبة</label>
+                            <input type="text" name="InterestedCountry" class="form-control" placeholder="مثال: المملكة العربية السعودية" />
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">الحملة</label>
+                            <select name="CampaignId" class="form-select">
+                                <option value="">— بدون حملة —</option>
+                                @foreach (var c in campaigns)
+                                {
+                                    @Html.Raw($"<option value=\"{c.Id}\">{c.Name}</option>")
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">تعيين لمندوب مبيعات مكتبي</label>
+                            <select name="OfficeSalesId" class="form-select">
+                                <option value="">— بدون تعيين —</option>
+                                @foreach (var u in officeSalesUsers)
+                                {
+                                    @Html.Raw($"<option value=\"{u.Id}\">{u.FullName}</option>")
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">ملاحظات <span style="color:var(--text-muted);font-weight:400">(اختياري)</span></label>
+                        <textarea name="Notes" class="form-control" rows="2" placeholder="أي ملاحظات..."></textarea>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1" style="padding:10px">
+                            <i class="bi bi-person-plus-fill"></i> تسجيل الزيارة
+                        </button>
+                        <a href="/Reception/WalkIn" class="btn" style="border:1px solid var(--border);padding:10px 20px">
+                            إلغاء
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>

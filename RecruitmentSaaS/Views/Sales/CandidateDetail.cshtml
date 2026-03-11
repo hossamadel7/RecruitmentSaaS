@@ -1,0 +1,601 @@
+@model RecruitmentSaaS.Models.DTOs.CandidateDetailDto
+@{
+    ViewData["Title"] = Model.FullName;
+    ViewData["Subtitle"] = "ملف المرشح";
+    var payments = ViewBag.Payments as List<RecruitmentSaaS.Models.DTOs.PaymentDto> ?? new();
+    var documents = ViewBag.Documents as List<RecruitmentSaaS.Models.DTOs.DocumentDto> ?? new();
+    var history = ViewBag.StageHistory as List<RecruitmentSaaS.Models.DTOs.CandidateStageHistoryDto> ?? new();
+
+    var stageInfo = new[] {
+        (1, "تسجيل",       "bi-person-plus-fill",      "#EEF2FF", "var(--primary)"),
+        (2, "استيفاء ملف", "bi-folder-fill",            "#F0FDF4", "#16A34A"),
+        (3, "طبي",         "bi-heart-pulse-fill",       "#FFF0F3", "#E11D48"),
+        (4, "تأشيرة",      "bi-passport-fill",          "#FFFBEB", "#D97706"),
+        (5, "عقد",         "bi-file-earmark-text-fill", "#F5F3FF", "#7C3AED"),
+        (6, "تذكرة",       "bi-airplane-fill",          "#EFF6FF", "#2563EB"),
+        (7, "سفر",         "bi-check-circle-fill",      "#ECFDF5", "#059669"),
+    };
+
+    // Build stage completion map — IsOverride=true means "un-done" action
+    var stageCompleted = new Dictionary<int, bool>();
+    foreach (var h in history.OrderBy(h => h.CreatedAt))
+        stageCompleted[h.ToStage] = !h.IsOverride;
+}
+
+<div class="page-header">
+    <div class="d-flex align-items-center gap-3">
+        <a href="/Sales/Candidates" style="color:var(--text-muted);text-decoration:none;font-size:20px">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+        <div>
+            <h1 class="page-header-title">@Model.FullName</h1>
+            <div class="page-header-sub">
+                <span style="font-size:11px;font-weight:700;background:#F1F5F9;padding:2px 8px;border-radius:5px;color:var(--text-muted)">@Model.JobPackageName</span>
+                @if (Model.IsCompleted)
+                {
+                    <span class="badge ms-1" style="background:#ECFDF5;color:#059669"><i class="bi bi-check-circle-fill"></i> مكتمل</span>
+                }
+                @if (Model.IsProfileComplete)
+                {
+                    <span class="badge ms-1" style="background:#EEF2FF;color:var(--primary)"><i class="bi bi-folder-check"></i> ملف مكتمل</span>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn" style="border:1px solid var(--border);font-size:13px"
+                data-bs-toggle="modal" data-bs-target="#editInfoModal">
+            <i class="bi bi-pencil-fill"></i> تعديل البيانات
+        </button>
+        <button type="button" class="btn" style="border:1px solid var(--border);font-size:13px"
+                data-bs-toggle="modal" data-bs-target="#addPaymentModal">
+            <i class="bi bi-cash-coin"></i> إضافة دفعة
+        </button>
+        <button type="button" class="btn" style="border:1px solid var(--border);font-size:13px"
+                data-bs-toggle="modal" data-bs-target="#uploadDocModal">
+            <i class="bi bi-upload"></i> رفع مستند
+        </button>
+    </div>
+</div>
+
+<div class="row g-3">
+
+    <!-- Left Column -->
+    <div class="col-lg-4">
+
+        <!-- Personal Info -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="header-icon" style="background:#EEF2FF;color:var(--primary)"><i class="bi bi-person-fill"></i></div>
+                المعلومات الشخصية
+                <button type="button" class="btn btn-sm ms-auto" style="border:1px solid var(--border);font-size:11px"
+                        data-bs-toggle="modal" data-bs-target="#editInfoModal">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </div>
+            <div class="card-body p-0">
+                @{
+                    var rows = new[] {
+                                ("bi-telephone-fill",  "الهاتف",        Model.Phone),
+                                ("bi-card-text",       "الرقم القومي",  Model.NationalId ?? "—"),
+                                ("bi-calendar-heart",  "العمر",         Model.Age.HasValue ? $"{Model.Age} سنة" : "—"),
+                                ("bi-geo-alt-fill",    "المدينة",       Model.City ?? "—"),
+                                ("bi-briefcase-fill",  "الباقة",        Model.JobPackageName),
+                                ("bi-calendar3",       "تاريخ التسجيل", Model.CreatedAt.ToString("dd/MM/yyyy")),
+                                };
+                }
+                @foreach (var (icon, label, value) in rows)
+                {
+                    <div style="display:flex;align-items:center;gap:12px;padding:11px 20px;border-bottom:1px solid #F1F5F9">
+                        <div style="width:30px;height:30px;border-radius:8px;background:#F8FAFC;display:flex;align-items:center;justify-content:center;color:var(--text-muted);flex-shrink:0">
+                            <i class="bi @icon" style="font-size:12px"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:10.5px;color:var(--text-muted);font-weight:600">@label</div>
+                            <div style="font-size:13px;font-weight:600;color:var(--text-primary)">@value</div>
+                        </div>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(Model.Notes))
+                {
+                    <div style="padding:12px 20px">
+                        <div style="font-size:10.5px;color:var(--text-muted);font-weight:600;margin-bottom:4px">ملاحظات</div>
+                        <div style="font-size:13px;color:var(--text-primary);line-height:1.6">@Model.Notes</div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Financial Summary -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="header-icon" style="background:#ECFDF5;color:#059669"><i class="bi bi-cash-coin"></i></div>
+                الملخص المالي
+                <button type="button" class="btn btn-sm ms-auto" style="border:1px solid var(--border);font-size:11px"
+                        data-bs-toggle="modal" data-bs-target="#addPaymentModal">
+                    <i class="bi bi-plus"></i> دفعة
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div style="padding:14px 20px;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;align-items:center">
+                    <span style="font-size:13px;color:var(--text-muted)">إجمالي المدفوع</span>
+                    <span style="font-size:15px;font-weight:800;color:var(--success)">@Model.TotalPaidEGP.ToString("N0") ج.م</span>
+                </div>
+                @if (!payments.Any())
+                {
+                    <div style="padding:14px 20px;text-align:center;color:var(--text-muted);font-size:13px">لا توجد دفعات بعد</div>
+                }
+                else
+                {
+                    @foreach (var p in payments.Take(4))
+                    {
+                        var methodName = p.PaymentMethod switch { 1 => "كاش", 2 => "تحويل", 3 => "بطاقة", _ => "—" };
+                        var typeColor = p.TransactionType == 2 ? "#E11D48" : "#059669";
+                        <div style="padding:9px 20px;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;align-items:center">
+                            <div>
+                                <div style="font-size:13px;font-weight:700;color:@typeColor">
+                                    @(p.TransactionType == 2 ? "-" : "+")@p.AmountEGP.ToString("N0") ج.م
+                                </div>
+                                <div style="font-size:11px;color:var(--text-muted)">@p.PaymentDate.ToString("dd/MM/yyyy") · @methodName</div>
+                            </div>
+                            <span style="font-size:10px;background:#F1F5F9;padding:2px 7px;border-radius:5px;color:var(--text-muted)">@p.RecordedByName</span>
+                        </div>
+                    }
+                    @if (payments.Count > 4)
+                    {
+                        <div style="padding:8px 20px;text-align:center;font-size:12px;color:var(--primary)">+@(payments.Count - 4) دفعات أخرى</div>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- Documents -->
+        <div class="card">
+            <div class="card-header">
+                <div class="header-icon" style="background:#F5F3FF;color:#7C3AED"><i class="bi bi-folder-fill"></i></div>
+                المستندات
+                <span class="badge ms-1" style="background:#F5F3FF;color:#7C3AED;font-size:10px">@documents.Count</span>
+                <button type="button" class="btn btn-sm ms-auto" style="border:1px solid var(--border);font-size:11px"
+                        data-bs-toggle="modal" data-bs-target="#uploadDocModal">
+                    <i class="bi bi-upload"></i>
+                </button>
+            </div>
+            <div class="card-body" style="padding:12px">
+                @if (!documents.Any())
+                {
+                    <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px">
+                        <i class="bi bi-folder2-open" style="font-size:24px;display:block;margin-bottom:6px"></i>
+                        لا توجد مستندات
+                    </div>
+                }
+                else
+                {
+                    @foreach (var doc in documents)
+                    {
+                        var fileIcon = doc.MimeType.Contains("pdf") ? "bi-file-earmark-pdf-fill" :
+                        doc.MimeType.Contains("image") ? "bi-file-earmark-image-fill" : "bi-file-earmark-fill";
+                        var fileColor = doc.MimeType.Contains("pdf") ? "#E11D48" :
+                        doc.MimeType.Contains("image") ? "#2563EB" : "#64748B";
+                        <div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+                            <i class="bi @fileIcon" style="font-size:20px;color:@fileColor;flex-shrink:0"></i>
+                            <div style="overflow:hidden;flex:1">
+                                <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@doc.FileName</div>
+                                <div style="font-size:10px;color:var(--text-muted)">@(doc.FileSizeBytes / 1024) KB</div>
+                            </div>
+                            <a href="/Sales/DownloadDocument/@doc.Id" style="color:var(--text-muted);font-size:15px" title="تحميل">
+                                <i class="bi bi-download"></i>
+                            </a>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Right Column: Stage Sections -->
+    <div class="col-lg-8">
+
+        <!-- Visit History -->
+        @{
+            var visits = ViewBag.Visits as List<RecruitmentSaaS.Models.DTOs.VisitDto> ?? new();
+            var visitComments = ViewBag.VisitComments as List<RecruitmentSaaS.Models.DTOs.CandidateStageHistoryDto> ?? new();
+        }
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="header-icon" style="background:#EFF6FF;color:#2563EB"><i class="bi bi-door-open-fill"></i></div>
+                سجل الزيارات
+                <span class="badge ms-1" style="background:#EFF6FF;color:#2563EB;font-size:10px">@visits.Count</span>
+            </div>
+            @if (!visits.Any())
+            {
+                <div style="padding:14px 20px;font-size:13px;color:var(--text-muted)">لا توجد زيارات مسجلة</div>
+            }
+            else
+            {
+                @foreach (var v in visits)
+                {
+                    // Match comments for this visit by visitId
+                    var visitIdStr = v.Id.ToString();
+                    var thisVisitComments = visitComments
+                    .Where(c => c.OverrideReason != null && c.OverrideReason.StartsWith($"visit:{visitIdStr}:"))
+                    .ToList();
+
+                    <div style="padding:14px 20px;border-bottom:1px solid #F1F5F9">
+                        <!-- Visit Header -->
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                            <div style="width:32px;height:32px;border-radius:50%;background:#EFF6FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                <i class="bi bi-door-open-fill" style="font-size:13px;color:#2563EB"></i>
+                            </div>
+                            <div style="flex:1">
+                                <div style="font-size:13px;font-weight:600">@v.VisitDateTime.ToString("dd/MM/yyyy — HH:mm")</div>
+                                <div style="font-size:11px;color:var(--text-muted)">
+                                    استقبال: <strong>@v.ReceptionUserName</strong>
+                                    @if (!string.IsNullOrEmpty(v.Notes))
+                                    {
+                                        <span style="margin-right:8px">· @v.Notes</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Comments for this visit -->
+                        @if (thisVisitComments.Any())
+                        {
+                            <div style="margin-right:42px;margin-bottom:10px">
+                                @foreach (var c in thisVisitComments)
+                                {
+                                    // Extract comment text after "visit:{id}:"
+                                    var parts = c.OverrideReason!.Split(':', 3);
+                                    var commentText = parts.Length == 3 ? parts[2] : c.OverrideReason;
+                                    <div style="display:flex;gap:8px;margin-bottom:6px;align-items:flex-start">
+                                        <div style="width:26px;height:26px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                            <i class="bi bi-chat-fill" style="font-size:10px;color:var(--primary)"></i>
+                                        </div>
+                                        <div style="background:#F8FAFC;border-radius:8px;padding:8px 12px;flex:1">
+                                            <div style="font-size:13px;color:var(--text-primary)">@commentText</div>
+                                            <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
+                                                <strong>@c.ChangedByName</strong> · @c.CreatedAt.ToString("dd/MM/yyyy — HH:mm")
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        <!-- Add comment form -->
+                        <form asp-action="AddVisitComment" asp-controller="Sales" method="post"
+                              style="display:flex;gap:8px;margin-right:42px">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="candidateId" value="@Model.Id" />
+                            <input type="hidden" name="visitId" value="@v.Id" />
+                            <input type="text" name="comment" class="form-control form-control-sm"
+                                   placeholder="أضف تعليقاً على هذه الزيارة..." required
+                                   style="font-size:12.5px" />
+                            <button type="submit" class="btn btn-sm"
+                                    style="border:1px solid var(--border);font-size:12px;white-space:nowrap;flex-shrink:0">
+                                <i class="bi bi-send-fill"></i> إرسال
+                            </button>
+                        </form>
+                    </div>
+                }
+            }
+        </div>
+
+        @foreach (var (num, name, icon, bg, color) in stageInfo)
+        {
+            bool isDone = stageCompleted.ContainsKey(num) && stageCompleted[num];
+            var stageHistoryItems = history.Where(h => h.ToStage == num).OrderByDescending(h => h.CreatedAt).ToList();
+
+            <div class="card mb-3" style="border:2px solid @(isDone ? "#BBF7D0" : "var(--border)");transition:border 0.2s">
+                <div class="card-header" style="background:@(isDone ? "#F0FDF4" : "#FAFAFA")">
+                    <div class="header-icon" style="background:@bg;color:@color">
+                        <i class="bi @icon"></i>
+                    </div>
+                    <span style="font-weight:700;font-size:14px;color:var(--text-primary)">@name</span>
+                    <div class="ms-auto d-flex align-items-center gap-2">
+                        @if (isDone)
+                        {
+                            <span style="font-size:12px;color:#059669;font-weight:600">
+                                <i class="bi bi-check-circle-fill"></i> مكتملة
+                            </span>
+                        }
+                        else
+                        {
+                            <span style="font-size:12px;color:var(--text-muted)">
+                                <i class="bi bi-circle"></i> لم تكتمل
+                            </span>
+                        }
+                        <button type="button"
+                                class="btn btn-sm"
+                                style="font-size:11px;padding:4px 10px;border:1px solid @(isDone ? "#059669" : "var(--border)");color:@(isDone ? "#059669" : "var(--text-muted)");background:@(isDone ? "#ECFDF5" : "transparent")"
+                                data-stage="@num"
+                                data-done="@isDone.ToString().ToLower()"
+                                data-stage-name="@name"
+                                onclick="openStageModal(this)">
+                            @if (isDone)
+                            {
+                                <i class="bi bi-x-circle"></i>
+                                <text> إلغاء الإكمال</text>
+                            }
+                            else
+                            {
+                                <i class="bi bi-check-circle"></i>
+                                <text> تعيين مكتملة</text>
+                            }
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stage log -->
+                <div class="card-body" style="padding:0">
+                    @if (!stageHistoryItems.Any())
+                    {
+                        <div style="padding:12px 20px;font-size:12.5px;color:var(--text-muted)">
+                            لا توجد تعليقات على هذه المرحلة بعد
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var h in stageHistoryItems.Take(3))
+                        {
+                            <div style="display:flex;gap:10px;padding:10px 20px;border-bottom:1px solid #F8FAFC">
+                                <div style="width:26px;height:26px;border-radius:50%;background:@(h.IsOverride ? "#FFF0F3" : "#ECFDF5");display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
+                                    <i class="bi @(h.IsOverride ? "bi-x" : "bi-check")" style="font-size:12px;color:@(h.IsOverride ? "#E11D48" : "#059669")"></i>
+                                </div>
+                                <div style="flex:1">
+                                    @if (!string.IsNullOrEmpty(h.OverrideReason))
+                                    {
+                                        <div style="font-size:13px;color:var(--text-primary);margin-bottom:2px">@h.OverrideReason</div>
+                                    }
+                                    <div style="font-size:11px;color:var(--text-muted)">
+                                        <strong>@h.ChangedByName</strong> ·
+                                        @h.CreatedAt.ToString("dd/MM/yyyy — HH:mm") ·
+                                        @if (h.IsOverride)
+                                        {
+                                            <span style="color:#E11D48">تم إلغاء الإكمال</span>
+                                        }
+                                        else
+                                        {
+                                            <span style="color:#059669">تم الإكمال</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        @if (stageHistoryItems.Count > 3)
+                        {
+                            <div style="padding:8px 20px;font-size:12px;color:var(--primary)">+@(stageHistoryItems.Count - 3) سجلات أخرى</div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+
+    </div>
+</div>
+
+<!-- ── Stage Toggle Modal ─────────────────────────────────────────────── -->
+<div class="modal fade" id="stageToggleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:var(--radius);border:none">
+            <div class="modal-header" style="border-bottom:1px solid var(--border)">
+                <h5 class="modal-title" id="stageModalTitle" style="font-weight:700;font-size:15px"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="ToggleStage" asp-controller="Sales" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="candidateId" value="@Model.Id" />
+                <input type="hidden" name="stage" id="stageInput" />
+                <input type="hidden" name="markDone" id="markDoneInput" />
+                <div class="modal-body" style="padding:24px">
+                    <div id="undoAlert" class="alert alert-warning d-none" style="font-size:13px">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <strong>تنبيه:</strong> سيتم إلغاء إكمال هذه المرحلة وتسجيل ذلك في السجل.
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" id="commentLabel">تعليق</label>
+                        <textarea name="comment" id="stageComment" class="form-control" rows="3"
+                                  placeholder="أضف تعليقاً أو سبباً..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid var(--border);gap:8px">
+                    <button type="button" class="btn btn-sm" data-bs-dismiss="modal"
+                            style="border:1px solid var(--border)">
+                        إلغاء
+                    </button>
+                    <button type="submit" class="btn btn-sm" id="stageSubmitBtn">تأكيد</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Edit Info Modal ────────────────────────────────────────────────── -->
+<div class="modal fade" id="editInfoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="border-radius:var(--radius);border:none">
+            <div class="modal-header" style="border-bottom:1px solid var(--border)">
+                <h5 class="modal-title" style="font-weight:700;font-size:15px">
+                    <i class="bi bi-pencil-fill" style="color:var(--primary);margin-left:8px"></i> تعديل بيانات المرشح
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="EditCandidate" asp-controller="Sales" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="candidateId" value="@Model.Id" />
+                <div class="modal-body" style="padding:24px">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">الاسم الكامل</label>
+                            <input type="text" name="fullName" class="form-control" value="@Model.FullName" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">رقم الهاتف</label>
+                            <input type="tel" name="phone" class="form-control" value="@Model.Phone"
+                                   style="direction:ltr;text-align:right" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">الرقم القومي</label>
+                            <input type="text" name="nationalId" class="form-control" value="@(Model.NationalId ?? "")" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">العمر</label>
+                            <input type="number" name="age" class="form-control"
+                                   value="@(Model.Age?.ToString() ?? "")" min="18" max="65" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">المدينة</label>
+                            <input type="text" name="city" class="form-control" value="@(Model.City ?? "")" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">ملاحظات</label>
+                            <textarea name="notes" class="form-control" rows="2">@(Model.Notes ?? "")</textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid var(--border);gap:8px">
+                    <button type="button" class="btn btn-sm" data-bs-dismiss="modal"
+                            style="border:1px solid var(--border)">
+                        إلغاء
+                    </button>
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-check-lg"></i> حفظ التعديلات
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Add Payment Modal ──────────────────────────────────────────────── -->
+<div class="modal fade" id="addPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:var(--radius);border:none">
+            <div class="modal-header" style="border-bottom:1px solid var(--border)">
+                <h5 class="modal-title" style="font-weight:700;font-size:15px">
+                    <i class="bi bi-cash-coin" style="color:var(--success);margin-left:8px"></i> إضافة دفعة
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="AddPayment" asp-controller="Sales" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="candidateId" value="@Model.Id" />
+                <div class="modal-body" style="padding:24px">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">المبلغ (ج.م) <span style="color:var(--danger)">*</span></label>
+                            <input type="number" name="amountEgp" class="form-control" step="0.01" min="1" placeholder="0.00" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">تاريخ الدفع <span style="color:var(--danger)">*</span></label>
+                            <input type="date" name="paymentDate" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd")" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">طريقة الدفع</label>
+                            <select name="paymentMethod" class="form-select">
+                                @Html.Raw("<option value=\"1\">كاش</option>")
+                                @Html.Raw("<option value=\"2\">تحويل بنكي</option>")
+                                @Html.Raw("<option value=\"3\">بطاقة</option>")
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">نوع المعاملة</label>
+                            <select name="transactionType" class="form-select">
+                                @Html.Raw("<option value=\"1\">دفعة</option>")
+                                @Html.Raw("<option value=\"2\">استرداد</option>")
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">ملاحظات</label>
+                            <input type="text" name="notes" class="form-control" placeholder="اختياري..." />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid var(--border);gap:8px">
+                    <button type="button" class="btn btn-sm" data-bs-dismiss="modal" style="border:1px solid var(--border)">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg"></i> حفظ الدفعة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Upload Document Modal ─────────────────────────────────────────── -->
+<div class="modal fade" id="uploadDocModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:var(--radius);border:none">
+            <div class="modal-header" style="border-bottom:1px solid var(--border)">
+                <h5 class="modal-title" style="font-weight:700;font-size:15px">
+                    <i class="bi bi-upload" style="color:#7C3AED;margin-left:8px"></i> رفع مستند
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="UploadDocument" asp-controller="Sales" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="candidateId" value="@Model.Id" />
+                <div class="modal-body" style="padding:24px">
+                    <div class="mb-3">
+                        <label class="form-label">نوع المستند <span style="color:var(--danger)">*</span></label>
+                        <select name="documentType" class="form-select" required>
+                            @Html.Raw("<option value=\"1\">بطاقة شخصية</option>")
+                            @Html.Raw("<option value=\"2\">صورة شخصية</option>")
+                            @Html.Raw("<option value=\"3\">شهادة ميلاد</option>")
+                            @Html.Raw("<option value=\"4\">مؤهل دراسي</option>")
+                            @Html.Raw("<option value=\"5\">شهادة خبرة</option>")
+                            @Html.Raw("<option value=\"6\">كشف طبي</option>")
+                            @Html.Raw("<option value=\"7\">عقد</option>")
+                            @Html.Raw("<option value=\"8\">تأشيرة</option>")
+                            @Html.Raw("<option value=\"9\">تذكرة</option>")
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">الملف <span style="color:var(--danger)">*</span></label>
+                        <input type="file" name="file" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required />
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">PDF, صور, Word — حد أقصى 10 MB</div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid var(--border);gap:8px">
+                    <button type="button" class="btn btn-sm" data-bs-dismiss="modal" style="border:1px solid var(--border)">إلغاء</button>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-upload"></i> رفع</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openStageModal(btn) {
+            const stage     = btn.dataset.stage;
+            const isDone    = btn.dataset.done === 'true';
+            const stageName = btn.dataset.stageName;
+            const markDone  = !isDone;
+
+            document.getElementById('stageInput').value    = stage;
+            document.getElementById('markDoneInput').value = markDone.toString();
+            document.getElementById('stageComment').value  = '';
+
+            const title  = document.getElementById('stageModalTitle');
+            const alert  = document.getElementById('undoAlert');
+            const label  = document.getElementById('commentLabel');
+            const submit = document.getElementById('stageSubmitBtn');
+
+            if (markDone) {
+                title.innerHTML  = '<i class="bi bi-check-circle-fill" style="color:#059669;margin-left:8px"></i> تعيين "' + stageName + '" مكتملة';
+                alert.classList.add('d-none');
+                label.innerHTML  = 'تعليق <span style="color:var(--text-muted);font-weight:400">(اختياري)</span>';
+                submit.className = 'btn btn-sm btn-primary';
+                submit.innerHTML = '<i class="bi bi-check-lg"></i> تأكيد الإكمال';
+            } else {
+                title.innerHTML  = '<i class="bi bi-x-circle-fill" style="color:#E11D48;margin-left:8px"></i> إلغاء إكمال "' + stageName + '"';
+                alert.classList.remove('d-none');
+                label.innerHTML  = 'سبب الإلغاء <span style="color:var(--danger)">*</span>';
+                submit.className = 'btn btn-sm btn-danger';
+                submit.innerHTML = '<i class="bi bi-x-lg"></i> تأكيد الإلغاء';
+            }
+
+            new bootstrap.Modal(document.getElementById('stageToggleModal')).show();
+        }
+    </script>
+}

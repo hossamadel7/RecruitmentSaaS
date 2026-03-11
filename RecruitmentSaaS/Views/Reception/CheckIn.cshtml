@@ -1,0 +1,147 @@
+@model RecruitmentSaaS.Models.DTOs.WalkInSearchResultDto
+@{
+    ViewData["Title"] = "تسجيل الزيارة";
+    ViewData["Subtitle"] = Model.FullName;
+    var officeSalesUsers = ViewBag.OfficeSalesUsers as List<RecruitmentSaaS.Models.DTOs.UserListItemDto>
+                           ?? new List<RecruitmentSaaS.Models.DTOs.UserListItemDto>();
+    var statusName = Model.Status switch
+    {
+        1 => "جديد",
+        2 => "تم التواصل",
+        3 => "استجاب",
+        4 => "مهتم",
+        5 => "موعد مجدول",
+        6 => "زار المكتب",
+        7 => "تم التحويل",
+        8 => "خسارة",
+        _ => "غير معروف"
+    };
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+
+        <!-- Found Client Card -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="header-icon" style="background:#ECFDF5;color:#059669">
+                    <i class="bi bi-person-check-fill"></i>
+                </div>
+                تم العثور على العميل
+            </div>
+            <div class="card-body p-0">
+                <div style="display:flex;align-items:center;gap:16px;padding:20px">
+                    <div style="width:52px;height:52px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:700;flex-shrink:0">
+                        @Model.FullName.Substring(0, 1)
+                    </div>
+                    <div>
+                        <div style="font-size:16px;font-weight:700">@Model.FullName</div>
+                        <div style="font-size:13px;color:var(--text-muted);direction:ltr;text-align:right">@Model.Phone</div>
+                        <div style="margin-top:4px">
+                            <span style="font-size:11px;font-weight:700;background:#F1F5F9;padding:2px 8px;border-radius:5px;color:var(--text-muted)">
+                                @Model.LeadCode
+                            </span>
+                            &nbsp;
+                            <span class="badge badge-status-@Model.Status">@statusName</span>
+                            @if (Model.IsConverted)
+                            {
+                                <span class="badge ms-1" style="background:#ECFDF5;color:#059669">
+                                    <i class="bi bi-check-circle-fill"></i> تم التحويل مسبقاً
+                                </span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrEmpty(Model.AssignedSalesName))
+                        {
+                            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">
+                                <i class="bi bi-person-fill"></i> تيلي سيلز: @Model.AssignedSalesName
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.IsConverted)
+        {
+            <div class="alert alert-warning" style="font-size:13px">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <strong>عميل عائد</strong> — هذا العميل تم تحويله مسبقاً إلى مرشح.
+                سيتم تسجيل الزيارة وإعادته لقائمة انتظار مندوب المبيعات.
+                @if (Model.ConvertedCandidateId.HasValue)
+                {
+                    <a href="/Sales/CandidateDetail/@Model.ConvertedCandidateId"
+                       style="font-weight:700;color:var(--primary);margin-right:8px">
+                        <i class="bi bi-person-fill"></i> فتح ملف المرشح
+                    </a>
+                }
+            </div>
+        }
+
+        <!-- CheckIn Form -->
+        <div class="card">
+            <div class="card-header">
+                <div class="header-icon" style="background:#EEF2FF;color:var(--primary)">
+                    <i class="bi bi-door-open-fill"></i>
+                </div>
+                تسجيل الزيارة
+            </div>
+            <div class="card-body">
+                <form asp-action="CheckIn" asp-controller="Reception" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="LeadId" value="@Model.LeadId" />
+
+                    <!-- Assign Office Sales (only for new clients) -->
+                    @if (!Model.IsConverted)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">تعيين لمندوب مبيعات مكتبي</label>
+                            @if (!officeSalesUsers.Any())
+                            {
+                                <div class="alert alert-warning" style="font-size:13px;padding:10px 14px">
+                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                    لا يوجد مندوبي مبيعات مكتبيين متاحين
+                                </div>
+                            }
+                            else
+                            {
+                                <select name="OfficeSalesId" class="form-select">
+                                    <option value="">— بدون تعيين —</option>
+                                    @foreach (var u in officeSalesUsers)
+                                    {
+                                        @Html.Raw($"<option value=\"{u.Id}\">{u.FullName}</option>")
+                                    }
+                                </select>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">مندوب المبيعات</label>
+                            <div style="padding:10px 14px;background:#F8FAFC;border-radius:8px;font-size:13px;color:var(--text-muted)">
+                                <i class="bi bi-person-check-fill" style="color:var(--primary)"></i>
+                                @(Model.AssignedSalesName ?? "معين مسبقاً")
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Notes -->
+                    <div class="mb-4">
+                        <label class="form-label">ملاحظات <span style="color:var(--text-muted);font-weight:400">(اختياري)</span></label>
+                        <input type="text" name="Notes" class="form-control" placeholder="أي ملاحظات عن الزيارة..." />
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1" style="padding:10px">
+                            <i class="bi bi-check-lg"></i> تأكيد الزيارة
+                        </button>
+                        <a href="/Reception/WalkIn" class="btn" style="border:1px solid var(--border);padding:10px 20px">
+                            إلغاء
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
