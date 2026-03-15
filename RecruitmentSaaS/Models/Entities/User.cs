@@ -42,6 +42,9 @@ public partial class User
     [InverseProperty("CreatedBy")]
     public virtual ICollection<Campaign> Campaigns { get; set; } = new List<Campaign>();
 
+    [InverseProperty("CreatedBy")]
+    public virtual ICollection<CandidateActivity> CandidateActivities { get; set; } = new List<CandidateActivity>();
+
     [InverseProperty("AssignedSales")]
     public virtual ICollection<Candidate> CandidateAssignedSales { get; set; } = new List<Candidate>();
 
@@ -96,6 +99,9 @@ public partial class User
     [InverseProperty("User")]
     public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 
+    [InverseProperty("DownloadedBy")]
+    public virtual ICollection<PassportDownloadLog> PassportDownloadLogs { get; set; } = new List<PassportDownloadLog>();
+
     [InverseProperty("ApprovedBy")]
     public virtual ICollection<Payment> PaymentApprovedBies { get; set; } = new List<Payment>();
 
@@ -113,4 +119,16 @@ public partial class User
 
     [InverseProperty("ReviewedBy")]
     public virtual ICollection<Refund> RefundReviewedBies { get; set; } = new List<Refund>();
+
+    [InverseProperty("CompletedBy")]
+    public virtual ICollection<StageActionCompletion> StageActionCompletions { get; set; } = new List<StageActionCompletion>();
+
+    [InverseProperty("RequestedBy")]
+    public virtual ICollection<StageApprovalRequest> StageApprovalRequestRequestedBies { get; set; } = new List<StageApprovalRequest>();
+
+    [InverseProperty("ReviewedBy")]
+    public virtual ICollection<StageApprovalRequest> StageApprovalRequestReviewedBies { get; set; } = new List<StageApprovalRequest>();
+
+    [InverseProperty("UploadedBy")]
+    public virtual ICollection<VisaUpload> VisaUploads { get; set; } = new List<VisaUpload>();
 }

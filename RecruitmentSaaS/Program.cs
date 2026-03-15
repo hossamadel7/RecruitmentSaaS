@@ -21,6 +21,12 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddControllersWithViews();
 
+builder.Services.AddScoped<RecruitmentSaaS.Services.INotificationService,
+                           RecruitmentSaaS.Services.NotificationService>();
+
+builder.Services.AddScoped<RecruitmentSaaS.Services.IVisaParserService,
+                           RecruitmentSaaS.Services.VisaParserService>();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())

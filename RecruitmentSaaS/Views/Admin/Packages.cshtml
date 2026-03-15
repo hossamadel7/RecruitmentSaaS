@@ -1,0 +1,180 @@
+@model List<RecruitmentSaaS.Models.Entities.JobPackage>
+@{
+    ViewData["Title"] = "إدارة الباقات";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div style="padding:24px">
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+        <div>
+            <h1 style="font-size:22px;font-weight:800;margin:0">📦 إدارة الباقات</h1>
+            <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0">
+                إدارة باقات التوظيف ومراحلها
+            </p>
+        </div>
+        <button onclick="document.getElementById('addPackageModal').style.display='flex'"
+                style="margin-right:auto;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+            <i class="bi bi-plus-lg me-1"></i> باقة جديدة
+        </button>
+    </div>
+
+    <!-- Packages Grid -->
+    @if (!Model.Any())
+    {
+        <div style="background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);padding:60px;text-align:center">
+            <div style="font-size:48px;margin-bottom:12px">📦</div>
+            <div style="font-weight:700;font-size:16px;margin-bottom:6px">لا توجد باقات نشطة</div>
+            <div style="font-size:13px;color:var(--text-muted)">أضف باقات من خلال قاعدة البيانات</div>
+        </div>
+    }
+    else
+    {
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+            @foreach (var pkg in Model)
+            {
+                var stageCount = pkg.PackageStages?.Count ?? 0;
+                var hasMinPay = pkg.PackageStages?.Any(s => s.RequiredMinPaymentEgp.HasValue) ?? false;
+
+                <div style="background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden">
+
+                    <!-- Card Header -->
+                    <div style="background:var(--primary);padding:16px 20px">
+                        <div style="font-weight:800;font-size:15px;color:#fff;margin-bottom:4px">@pkg.Name</div>
+                        <div style="font-size:12px;color:rgba(255,255,255,.75)">
+                            <i class="bi bi-geo-alt-fill me-1"></i>@pkg.DestinationCountry
+                            &nbsp;·&nbsp;
+                            <i class="bi bi-briefcase-fill me-1"></i>@pkg.JobTitle
+                        </div>
+                    </div>
+
+                    <!-- Card Body -->
+                    <div style="padding:16px 20px">
+                        <div style="display:flex;gap:16px;margin-bottom:16px">
+                            <div style="flex:1;background:var(--primary-light);border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                                <div style="font-size:20px;font-weight:800;color:var(--primary)">@stageCount</div>
+                                <div style="font-size:11px;color:var(--text-muted)">مرحلة</div>
+                            </div>
+                            <div style="flex:1;background:#f0fdf4;border-radius:var(--radius-sm);padding:10px 14px;text-align:center">
+                                <div style="font-size:14px;font-weight:800;color:#16a34a">@pkg.PriceEgp.ToString("N0")</div>
+                                <div style="font-size:11px;color:var(--text-muted)">ج.م السعر</div>
+                            </div>
+                        </div>
+
+                        <!-- Stages Preview -->
+                        @if (pkg.PackageStages != null && pkg.PackageStages.Any())
+                        {
+                            <div style="margin-bottom:16px">
+                                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">المراحل</div>
+                                <div style="display:flex;flex-direction:column;gap:4px">
+                                    @foreach (var stage in pkg.PackageStages.Take(4))
+                                    {
+                                        <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                                            <span style="width:20px;height:20px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">@stage.StageOrder</span>
+                                            <span style="color:var(--text-primary)">@stage.StageName</span>
+                                            @if (stage.RequiredMinPaymentEgp.HasValue)
+                                            {
+                                                <span style="margin-right:auto;font-size:10px;background:#fef9c3;color:#854d0e;padding:1px 6px;border-radius:4px">
+                                                    @stage.RequiredMinPaymentEgp.Value.ToString("N0") ج.م
+                                                </span>
+                                            }
+                                        </div>
+                                    }
+                                    @if (pkg.PackageStages.Count > 4)
+                                    {
+                                        <div style="font-size:11px;color:var(--text-muted);padding-right:28px">
+                                            + @(pkg.PackageStages.Count - 4) مراحل أخرى...
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <div style="display:flex;gap:8px">
+                            <a href="/Admin/PackageStages/@pkg.Id"
+                               style="flex:1;text-align:center;background:var(--primary);color:#fff;border-radius:var(--radius-sm);padding:8px;font-size:13px;font-weight:700;text-decoration:none">
+                                <i class="bi bi-gear-fill me-1"></i> إدارة المراحل
+                            </a>
+                            <a href="/Admin/PackagePassports/@pkg.Id"
+                               style="text-align:center;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:var(--radius-sm);padding:8px 12px;font-size:13px;font-weight:700;text-decoration:none"
+                               title="تحميل جوازات الباقة">
+                                <i class="bi bi-file-zip-fill"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- ── Add Package Modal ──────────────────────────────────────────────────── -->
+<div id="addPackageModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border-radius:var(--radius);width:480px;max-width:95vw">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <h5 style="margin:0;font-weight:800;font-size:16px">📦 إضافة باقة جديدة</h5>
+            <button onclick="document.getElementById('addPackageModal').style.display='none'"
+                    style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">
+                ×
+            </button>
+        </div>
+        <form method="post" action="/Admin/CreatePackage" style="padding:24px">
+            @Html.AntiForgeryToken()
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">اسم الباقة <span style="color:var(--danger)">*</span></label>
+                <input type="text" name="name" class="form-control" placeholder="مثال: باقة سائق السعودية" required />
+            </div>
+            <div class="row mb-3">
+                <div class="col-6">
+                    <label class="form-label" style="font-weight:600;font-size:13px">الدولة <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="destinationCountry" class="form-control" placeholder="المملكة العربية السعودية" required />
+                </div>
+                <div class="col-6">
+                    <label class="form-label" style="font-weight:600;font-size:13px">المسمى الوظيفي <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="jobTitle" class="form-control" placeholder="سائق" required />
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="form-label" style="font-weight:600;font-size:13px">السعر الإجمالي (ج.م) <span style="color:var(--danger)">*</span></label>
+                <input type="number" name="priceEgp" class="form-control" step="0.01" min="0" placeholder="15000" required />
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button type="button"
+                        onclick="document.getElementById('addPackageModal').style.display='none'"
+                        style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit">
+                    إلغاء
+                </button>
+                <button type="submit"
+                        style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                    <i class="bi bi-plus-lg me-1"></i> إنشاء الباقة
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        window.addEventListener('click', function(e) {
+            var m = document.getElementById('addPackageModal');
+            if (m && e.target === m) m.style.display = 'none';
+        });
+    </script>
+}

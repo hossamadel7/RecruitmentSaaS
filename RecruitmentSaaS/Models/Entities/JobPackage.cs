@@ -36,4 +36,10 @@ public partial class JobPackage
 
     [InverseProperty("JobPackage")]
     public virtual ICollection<LeadVisit> LeadVisits { get; set; } = new List<LeadVisit>();
+
+    [InverseProperty("Package")]
+    public virtual ICollection<PackageStage> PackageStages { get; set; } = new List<PackageStage>();
+
+    [InverseProperty("Package")]
+    public virtual ICollection<PassportDownloadLog> PassportDownloadLogs { get; set; } = new List<PassportDownloadLog>();
 }

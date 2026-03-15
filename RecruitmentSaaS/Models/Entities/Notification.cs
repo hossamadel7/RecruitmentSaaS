@@ -30,6 +30,12 @@ public partial class Notification
     [Precision(0)]
     public DateTime CreatedAt { get; set; }
 
+    [StringLength(500)]
+    public string? Link { get; set; }
+
+    [Column(TypeName = "datetime")]
+    public DateTime? ReadAt { get; set; }
+
     [ForeignKey("UserId")]
     [InverseProperty("Notifications")]
     public virtual User User { get; set; } = null!;

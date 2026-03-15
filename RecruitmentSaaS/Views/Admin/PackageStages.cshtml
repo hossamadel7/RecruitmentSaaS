@@ -1,0 +1,614 @@
+@model RecruitmentSaaS.Models.Entities.JobPackage
+@{
+    ViewData["Title"] = "مراحل الباقة — " + Model.Name;
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var stages = Model.PackageStages?.OrderBy(s => s.StageOrder).ToList() ?? new();
+}
+
+<div style="padding:24px">
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+        <a href="/Admin/Packages" style="color:var(--text-muted);text-decoration:none;font-size:13px">
+            <i class="bi bi-arrow-right me-1"></i> الباقات
+        </a>
+        <span style="color:var(--border)">/</span>
+        <div>
+            <h1 style="font-size:20px;font-weight:800;margin:0">@Model.Name</h1>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+                <i class="bi bi-geo-alt me-1"></i>@Model.DestinationCountry
+                &nbsp;·&nbsp;
+                <i class="bi bi-currency-dollar me-1"></i>@Model.PriceEgp.ToString("N0") ج.م
+                &nbsp;·&nbsp;
+                @stages.Count مرحلة
+            </div>
+        </div>
+        <div style="margin-right:auto;display:flex;gap:8px">
+            <button onclick="document.getElementById('editPackageModal').style.display='flex'"
+                    style="background:#f1f5f9;color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+                <i class="bi bi-pencil-fill me-1"></i> تعديل الباقة
+            </button>
+            <button onclick="document.getElementById('addStageModal').style.display='flex'"
+                    style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                <i class="bi bi-plus-lg me-1"></i> إضافة مرحلة
+            </button>
+        </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+
+        <!-- Stages List -->
+        <div>
+            @if (!stages.Any())
+            {
+                <div style="background:var(--card-bg);border-radius:var(--radius);border:2px dashed var(--border);padding:60px;text-align:center">
+                    <div style="font-size:40px;margin-bottom:12px">🪜</div>
+                    <div style="font-weight:700;font-size:15px;margin-bottom:6px">لا توجد مراحل بعد</div>
+                    <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">أضف أول مرحلة للباقة</div>
+                    <button onclick="document.getElementById('addStageModal').style.display='flex'"
+                            style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                        <i class="bi bi-plus-lg me-1"></i> إضافة مرحلة
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div id="stagesContainer" style="display:flex;flex-direction:column;gap:10px">
+                @foreach (var stage in stages)
+                {
+                    var isActive = stage.IsActive == true;
+                    var hasMinPay = stage.RequiredMinPaymentEgp.HasValue;
+
+                    <div class="stage-row" data-stage-id="@stage.Id"
+                         style="background:var(--card-bg);border-radius:var(--radius);border:1px solid @(isActive ? "var(--border)" : "#fecaca");box-shadow:var(--shadow-sm);padding:16px 20px;display:flex;align-items:center;gap:16px;@(!isActive ? "opacity:.7" : "")">
+
+                        <!-- Drag Handle -->
+                        <div class="drag-handle" style="cursor:grab;color:var(--text-muted);padding:0 4px;font-size:18px" title="اسحب لإعادة الترتيب">
+                            <i class="bi bi-grip-vertical"></i>
+                        </div>
+
+                        <!-- Order Badge -->
+                        <div style="width:36px;height:36px;border-radius:50%;background:@(isActive ? "var(--primary)" : "#94a3b8");color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0">
+                            @stage.StageOrder
+                        </div>
+
+                        <!-- Stage Info -->
+                        <div style="flex:1;min-width:0">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                                <span style="font-weight:700;font-size:14px">@stage.StageName</span>
+                                @if (!isActive)
+                                {
+                                    <span style="font-size:10px;background:#fee2e2;color:#dc2626;padding:2px 6px;border-radius:4px;font-weight:600">موقوفة</span>
+                                }
+                                @if (stage.NotifySalesOnEnter == true)
+                                {
+                                    <span style="font-size:10px;background:#eff6ff;color:var(--primary);padding:2px 6px;border-radius:4px;font-weight:600">
+                                        <i class="bi bi-bell-fill"></i> إشعار
+                                    </span>
+                                }
+                            </div>
+                            <div style="display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text-muted)">
+                                @if (hasMinPay)
+                                {
+                                    <span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:4px;font-weight:600">
+                                        <i class="bi bi-cash me-1"></i>حد أدنى: @stage.RequiredMinPaymentEgp!.Value.ToString("N0") ج.م
+                                    </span>
+                                }
+                                @if (!string.IsNullOrEmpty(stage.Description))
+                                {
+                                    <span><i class="bi bi-info-circle me-1"></i>@stage.Description</span>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div style="display:flex;gap:6px;flex-shrink:0">
+                            <button onclick="openEditStage('@stage.Id','@Html.Raw(stage.StageName)','@stage.StageOrder','@(stage.RequiredMinPaymentEgp?.ToString() ?? "")','@Html.Raw(stage.Description ?? "")','@(stage.NotifySalesOnEnter == true ? "true" : "false")','@(stage.StageTypeId?.ToString() ?? "")')"
+                                    style="background:#f1f5f9;border:none;border-radius:var(--radius-sm);padding:6px 10px;cursor:pointer;font-size:13px;color:var(--text-primary)"
+                                    title="تعديل">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+
+                            <form method="post" action="/Admin/TogglePackageStage" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="stageId" value="@stage.Id" />
+                                <input type="hidden" name="packageId" value="@Model.Id" />
+                                <button type="submit"
+                                        style="background:@(isActive ? "#fef9c3" : "#f0fdf4");border:none;border-radius:var(--radius-sm);padding:6px 10px;cursor:pointer;font-size:13px;color:@(isActive ? "#854d0e" : "#16a34a")"
+                                        title="@(isActive ? "إيقاف" : "تفعيل")">
+                                    <i class="bi bi-@(isActive ? "pause-fill" : "play-fill")"></i>
+                                </button>
+                            </form>
+
+                            <form method="post" action="/Admin/DeletePackageStage" class="d-inline"
+                                  onsubmit="return confirm('حذف مرحلة @stage.StageName ؟')">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="stageId" value="@stage.Id" />
+                                <input type="hidden" name="packageId" value="@Model.Id" />
+                                <button type="submit"
+                                        style="background:#fef2f2;border:none;border-radius:var(--radius-sm);padding:6px 10px;cursor:pointer;font-size:13px;color:#dc2626"
+                                        title="حذف">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                }
+                </div>
+
+                <!-- Drag hint -->
+                <div style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:10px">
+                    <i class="bi bi-grip-vertical me-1"></i> اسحب المراحل لإعادة ترتيبها
+                </div>
+            }
+        </div>
+
+        <!-- Info Panel -->
+        <div style="position:sticky;top:80px">
+            <!-- Payment Ladder -->
+            <div style="background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-bottom:16px">
+                <div style="font-weight:700;font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:6px">
+                    <span>💰</span> سلّم المدفوعات
+                </div>
+                @{
+                    var payStages = stages.Where(s => s.RequiredMinPaymentEgp.HasValue && s.IsActive == true).OrderBy(s => s.StageOrder).ToList();
+                }
+                @if (!payStages.Any())
+                {
+                    <div style="font-size:12px;color:var(--text-muted)">لا توجد مراحل بحد أدنى للدفع</div>
+                }
+                else
+                {
+                    <div style="display:flex;flex-direction:column;gap:8px">
+                    @foreach (var ps in payStages)
+                    {
+                        var pct = Model.PriceEgp > 0 ? (int)((ps.RequiredMinPaymentEgp!.Value / Model.PriceEgp) * 100) : 0;
+                        <div>
+                            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                                <span>@ps.StageName</span>
+                                <span style="font-weight:700;color:var(--primary)">@ps.RequiredMinPaymentEgp!.Value.ToString("N0") ج.م</span>
+                            </div>
+                            <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+                                <div style="height:100%;width:@(pct)%;background:var(--primary);border-radius:3px"></div>
+                            </div>
+                            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">@pct% من السعر الإجمالي</div>
+                        </div>
+                    }
+                    </div>
+                }
+            </div>
+
+            <!-- Quick Stats -->
+            <div style="background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);padding:20px">
+                <div style="font-weight:700;font-size:13px;margin-bottom:14px">📊 إحصائيات الباقة</div>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                    <div style="display:flex;justify-content:space-between;font-size:13px">
+                        <span style="color:var(--text-muted)">إجمالي المراحل</span>
+                        <span style="font-weight:700">@stages.Count</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px">
+                        <span style="color:var(--text-muted)">مراحل نشطة</span>
+                        <span style="font-weight:700;color:var(--success)">@stages.Count(s => s.IsActive == true)</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px">
+                        <span style="color:var(--text-muted)">مراحل بإشعار</span>
+                        <span style="font-weight:700;color:var(--primary)">@stages.Count(s => s.NotifySalesOnEnter == true)</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px">
+                        <span style="color:var(--text-muted)">السعر الإجمالي</span>
+                        <span style="font-weight:700">@Model.PriceEgp.ToString("N0") ج.م</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ Edit Package Modal ═══════════════════════════════════════════════════ -->
+<div id="editPackageModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border-radius:var(--radius);width:480px;max-width:95vw">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <h5 style="margin:0;font-weight:800;font-size:16px">✏️ تعديل الباقة</h5>
+            <button type="button" onclick="document.getElementById('editPackageModal').style.display='none'"
+                    style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>
+        </div>
+
+        <!-- Edit Package Form -->
+        <form method="post" action="/Admin/EditPackage" style="padding:24px 24px 16px">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="packageId" value="@Model.Id" />
+
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">
+                    اسم الباقة <span style="color:var(--danger)">*</span>
+                </label>
+                <input type="text" name="name" class="form-control"
+                       value="@Model.Name" required />
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-6">
+                    <label class="form-label" style="font-weight:600;font-size:13px">
+                        الدولة <span style="color:var(--danger)">*</span>
+                    </label>
+                    <input type="text" name="destinationCountry" class="form-control"
+                           value="@Model.DestinationCountry" required />
+                </div>
+                <div class="col-6">
+                    <label class="form-label" style="font-weight:600;font-size:13px">
+                        المسمى الوظيفي <span style="color:var(--danger)">*</span>
+                    </label>
+                    <input type="text" name="jobTitle" class="form-control"
+                           value="@Model.JobTitle" required />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">
+                    السعر الإجمالي (ج.م) <span style="color:var(--danger)">*</span>
+                </label>
+                <input type="number" name="priceEgp" class="form-control"
+                       value="@Model.PriceEgp" step="0.01" min="0" required />
+            </div>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px">
+                <button type="button"
+                        onclick="document.getElementById('editPackageModal').style.display='none'"
+                        style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit">
+                    إلغاء
+                </button>
+                <button type="submit"
+                        style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                    <i class="bi bi-check-lg me-1"></i> حفظ التعديلات
+                </button>
+            </div>
+        </form>
+
+        <!-- Toggle Package — separate form, outside the edit form -->
+        <div style="padding:12px 24px;border-top:1px solid var(--border);background:#fafafa;border-radius:0 0 var(--radius) var(--radius)">
+            <form method="post" action="/Admin/TogglePackage">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="packageId" value="@Model.Id" />
+                <button type="submit"
+                        style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:var(--radius-sm);padding:6px 14px;font-size:12px;cursor:pointer;font-family:inherit"
+                        onclick="return confirm('@(Model.IsActive ? "إيقاف الباقة؟" : "تفعيل الباقة؟")')">
+                    <i class="bi bi-@(Model.IsActive ? "pause-fill" : "play-fill") me-1"></i>
+                    @(Model.IsActive ? "إيقاف الباقة" : "تفعيل الباقة")
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ══ Add Stage Modal ══════════════════════════════════════════════════════ -->
+<div id="addStageModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border-radius:var(--radius);width:500px;max-width:95vw;max-height:90vh;overflow-y:auto">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <h5 style="margin:0;font-weight:800;font-size:16px">➕ إضافة مرحلة جديدة</h5>
+            <button onclick="document.getElementById('addStageModal').style.display='none'"
+                    style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>
+        </div>
+        <form method="post" action="/Admin/AddPackageStage" style="padding:24px">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="packageId" value="@Model.Id" />
+
+            @{
+                var stageTypes = ViewBag.StageTypes as List<RecruitmentSaaS.Models.Entities.StageType> ?? new();
+            }
+
+            @if (stageTypes.Any())
+            {
+                <!-- StageType Dropdown -->
+                <div class="mb-3">
+                    <label class="form-label" style="font-weight:600;font-size:13px">
+                        نوع المرحلة
+                    </label>
+                    <select name="stageTypeId" id="addStageTypeId" class="form-select"
+                            onchange="onStageTypeChange(this,'add')">
+                        <option value="">— مرحلة مخصصة (اكتب الاسم يدوياً) —</option>
+                        @foreach (var st in stageTypes)
+                        {
+                            <option value="@st.Id"
+                                    data-name="@st.Name"
+                                    data-action="@(st.RequiredAction?.ToString() ?? "")"
+                                    data-label="@(st.ActionLabel ?? "")">
+                                @st.Name
+                                @if (st.RequiredAction == 1) { <text> 📄</text> }
+                                else if (st.RequiredAction == 2) { <text> ✍️</text> }
+                                else if (st.RequiredAction == 3) { <text> ✅</text> }
+                            </option>
+                        }
+                    </select>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                        📄 = رفع مستند &nbsp;·&nbsp; ✍️ = إدخال بيانات &nbsp;·&nbsp; ✅ = تأكيد يدوي
+                    </div>
+                </div>
+
+                <!-- Action preview -->
+                <div id="addActionPreview" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:12px;color:#15803d">
+                    <i class="bi bi-info-circle-fill me-1"></i>
+                    <span id="addActionLabel"></span>
+                </div>
+            }
+
+            <!-- Stage Name (custom or auto-filled) -->
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">
+                    اسم المرحلة <span style="color:var(--danger)">*</span>
+                </label>
+                <input type="text" name="stageName" id="addStageName" class="form-control"
+                       placeholder="@(stageTypes.Any() ? "يتعبأ تلقائياً عند اختيار النوع، أو اكتب اسماً مخصصاً" : "مثال: تقديم الجواز")" />
+                @if (stageTypes.Any())
+                {
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                        اتركه فارغاً لاستخدام اسم النوع المختار
+                    </div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">
+                    رقم الترتيب <span style="color:var(--danger)">*</span>
+                </label>
+                <input type="number" name="stageOrder" class="form-control"
+                       min="1" value="@(stages.Any() ? stages.Max(s => s.StageOrder) + 1 : 1)" required />
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                    آخر مرحلة الآن: @(stages.Any() ? stages.Max(s => s.StageOrder) : 0)
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">
+                    الحد الأدنى للمدفوعات (ج.م)
+                </label>
+                <input type="number" name="requiredMinPaymentEgp" class="form-control"
+                       step="0.01" min="0" placeholder="اتركه فارغاً إن لم يكن هناك حد أدنى" />
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                    يمنع الانتقال لهذه المرحلة حتى يتم سداد هذا المبلغ على الأقل
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">وصف المرحلة</label>
+                <input type="text" name="description" class="form-control"
+                       placeholder="وصف اختياري للمرحلة" />
+            </div>
+
+            <div class="mb-4">
+                <div style="display:flex;align-items:center;gap:10px;background:var(--primary-light);border-radius:var(--radius-sm);padding:12px 14px">
+                    <input type="checkbox" name="notifySalesOnEnter" value="true" id="addNotify"
+                           style="width:16px;height:16px;cursor:pointer" />
+                    <label for="addNotify" style="font-size:13px;font-weight:600;cursor:pointer;margin:0">
+                        <i class="bi bi-bell-fill me-1" style="color:var(--primary)"></i>
+                        إرسال إشعار للمبيعات عند الوصول لهذه المرحلة
+                    </label>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button type="button"
+                        onclick="document.getElementById('addStageModal').style.display='none'"
+                        style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit">
+                    إلغاء
+                </button>
+                <button type="submit"
+                        style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                    <i class="bi bi-plus-lg me-1"></i> إضافة المرحلة
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ══ Edit Stage Modal ═════════════════════════════════════════════════════ -->
+<div id="editStageModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border-radius:var(--radius);width:500px;max-width:95vw;max-height:90vh;overflow-y:auto">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <h5 style="margin:0;font-weight:800;font-size:16px">✏️ تعديل المرحلة</h5>
+            <button onclick="document.getElementById('editStageModal').style.display='none'"
+                    style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>
+        </div>
+        <form method="post" action="/Admin/EditPackageStage" style="padding:24px">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="stageId"   id="editStageId" />
+            <input type="hidden" name="packageId" value="@Model.Id" />
+
+            @{
+                var editStageTypes = ViewBag.StageTypes as List<RecruitmentSaaS.Models.Entities.StageType> ?? new();
+            }
+
+            @if (editStageTypes.Any())
+            {
+                <div class="mb-3">
+                    <label class="form-label" style="font-weight:600;font-size:13px">نوع المرحلة</label>
+                    <select name="stageTypeId" id="editStageTypeId" class="form-select"
+                            onchange="onStageTypeChange(this,'edit')">
+                        <option value="">— مرحلة مخصصة —</option>
+                        @foreach (var st in editStageTypes)
+                        {
+                            <option value="@st.Id"
+                                    data-name="@st.Name"
+                                    data-action="@(st.RequiredAction?.ToString() ?? "")"
+                                    data-label="@(st.ActionLabel ?? "")">
+                                @st.Name
+                                @if (st.RequiredAction == 1) { <text> 📄</text> }
+                                else if (st.RequiredAction == 2) { <text> ✍️</text> }
+                                else if (st.RequiredAction == 3) { <text> ✅</text> }
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div id="editActionPreview" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:12px;color:#15803d">
+                    <i class="bi bi-info-circle-fill me-1"></i>
+                    <span id="editActionLabel"></span>
+                </div>
+            }
+
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">
+                    اسم المرحلة <span style="color:var(--danger)">*</span>
+                </label>
+                <input type="text" name="stageName" id="editStageName" class="form-control" required />
+                @if (editStageTypes.Any())
+                {
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                        يمكن تغييره بعد اختيار النوع
+                    </div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">
+                    رقم الترتيب <span style="color:var(--danger)">*</span>
+                </label>
+                <input type="number" name="stageOrder" id="editStageOrder" class="form-control" min="1" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">
+                    الحد الأدنى للمدفوعات (ج.م)
+                </label>
+                <input type="number" name="requiredMinPaymentEgp" id="editMinPay" class="form-control"
+                       step="0.01" min="0" placeholder="اتركه فارغاً إن لم يكن هناك حد أدنى" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">وصف المرحلة</label>
+                <input type="text" name="description" id="editDescription" class="form-control" />
+            </div>
+
+            <div class="mb-4">
+                <div style="display:flex;align-items:center;gap:10px;background:var(--primary-light);border-radius:var(--radius-sm);padding:12px 14px">
+                    <input type="checkbox" name="notifySalesOnEnter" value="true" id="editNotify"
+                           style="width:16px;height:16px;cursor:pointer" />
+                    <label for="editNotify" style="font-size:13px;font-weight:600;cursor:pointer;margin:0">
+                        <i class="bi bi-bell-fill me-1" style="color:var(--primary)"></i>
+                        إرسال إشعار للمبيعات عند الوصول لهذه المرحلة
+                    </label>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button type="button"
+                        onclick="document.getElementById('editStageModal').style.display='none'"
+                        style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit">
+                    إلغاء
+                </button>
+                <button type="submit"
+                        style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                    <i class="bi bi-check-lg me-1"></i> حفظ التعديلات
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+// ── StageType dropdown change ───────────────────────────────────────────────
+function onStageTypeChange(select, prefix) {
+    const opt     = select.options[select.selectedIndex];
+    const name    = opt.getAttribute('data-name') || '';
+    const label   = opt.getAttribute('data-label') || '';
+    const nameInput    = document.getElementById(prefix + 'StageName');
+    const preview      = document.getElementById(prefix + 'ActionPreview');
+    const previewLabel = document.getElementById(prefix + 'ActionLabel');
+
+    if (nameInput && name) nameInput.placeholder = name;
+
+    if (preview && previewLabel) {
+        if (label) {
+            previewLabel.textContent = label;
+            preview.style.display = 'block';
+        } else {
+            preview.style.display = 'none';
+        }
+    }
+}
+
+// ── Edit Modal ──────────────────────────────────────────────────────────────
+function openEditStage(id, name, order, minPay, desc, notify, stageTypeId) {
+    document.getElementById('editStageId').value     = id;
+    document.getElementById('editStageName').value   = name;
+    document.getElementById('editStageOrder').value  = order;
+    document.getElementById('editMinPay').value      = minPay;
+    document.getElementById('editDescription').value = desc;
+    document.getElementById('editNotify').checked    = notify === 'true';
+
+    // Set stageType dropdown if present
+    var stSelect = document.getElementById('editStageTypeId');
+    if (stSelect) {
+        stSelect.value = stageTypeId || '';
+        // Trigger preview update
+        if (stageTypeId) onStageTypeChange(stSelect, 'edit');
+    }
+
+    document.getElementById('editStageModal').style.display = 'flex';
+}
+
+// ── Drag & Drop Reorder ─────────────────────────────────────────────────────
+const container = document.getElementById('stagesContainer');
+if (container) {
+    Sortable.create(container, {
+        handle: '.drag-handle',
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        onEnd: async function () {
+            const rows   = container.querySelectorAll('.stage-row');
+            const orders = Array.from(rows).map((row, idx) => ({
+                stageId: row.dataset.stageId,
+                order:   idx + 1
+            }));
+
+            // تحديث رقم الترتيب في الواجهة فوراً
+            rows.forEach((row, idx) => {
+                const badge = row.querySelector('div[style*="border-radius:50%"]');
+                if (badge) badge.textContent = idx + 1;
+            });
+
+            // إرسال الترتيب الجديد للسيرفر
+            try {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                await fetch('/Admin/ReorderStages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token ?? ''
+                    },
+                    body: JSON.stringify(orders)
+                });
+            } catch (e) {
+                console.error('Reorder failed:', e);
+            }
+        }
+    });
+}
+</script>
+<style>
+.sortable-ghost {
+    opacity: .4;
+    background: var(--primary-light) !important;
+    border: 2px dashed var(--primary) !important;
+}
+</style>
+}

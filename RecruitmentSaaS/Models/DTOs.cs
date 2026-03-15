@@ -177,7 +177,8 @@ namespace RecruitmentSaaS.Models.DTOs
         public string FullName { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
         public string? NationalId { get; set; }
-        public byte CurrentStage { get; set; }
+        public string CurrentStageName { get; set; } = "—";
+        public int CurrentStageOrder { get; set; }
         public byte Status { get; set; }
         public string JobPackageName { get; set; } = string.Empty;
         public string? AssignedSalesName { get; set; }
@@ -193,17 +194,30 @@ namespace RecruitmentSaaS.Models.DTOs
         public string FullName { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
         public string? NationalId { get; set; }
+        public string? PassportNumber { get; set; }
+        public DateOnly? PassportExpiry { get; set; }
         public int? Age { get; set; }
         public string? City { get; set; }
         public string? Notes { get; set; }
-        public byte CurrentStage { get; set; }
+        public string CurrentStageName { get; set; } = "—";
+        public int CurrentStageOrder { get; set; }
         public byte Status { get; set; }
-        public string JobPackageName { get; set; } = string.Empty;
         public decimal TotalPaidEGP { get; set; }
         public bool IsProfileComplete { get; set; }
         public bool IsCompleted { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public string JobPackageName { get; set; } = string.Empty;
+        public decimal JobPackagePriceEGP { get; set; }
+        public string? AssignedSalesName { get; set; }
+        public string? BranchName { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime? PassportDownloadedAt { get; set; }
+        public List<CandidateStageHistoryDto> StageHistory { get; set; } = new();
+        public List<PaymentDto> Payments { get; set; } = new();
+        public List<DocumentDto> Documents { get; set; } = new();
     }
+
+
 
 
     public class AdvanceCandidateStageDto
@@ -447,13 +461,15 @@ namespace RecruitmentSaaS.Models.DTOs
     // =============================================================================
     //  STAGE HISTORY DTO
     // =============================================================================
-
     public class CandidateStageHistoryDto
     {
         public byte? FromStage { get; set; }
         public byte ToStage { get; set; }
+        public int ToStageOrder { get; set; }   // used for stage timeline matching
         public bool IsOverride { get; set; }
         public string? OverrideReason { get; set; }
+        public string? Notes { get; set; }
+        public string? MeetingOutcome { get; set; }
         public string? ChangedByName { get; set; }
         public DateTime CreatedAt { get; set; }
     }

@@ -19,8 +19,6 @@
     string[] leadStatusLabels = { "", "عميل جديد", "تم التواصل", "مهتم", "يفكر", "وعد بالزيارة", "زيارة", "تحويل", "ملغى" };
     string[] leadStatusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626" };
 
-    string[] stageLabels = { "", "توثيق المستندات", "تجهيز الملف", "الكشف الطبي", "معالجة التأشيرة", "حجز التذاكر", "التجهيز للسفر", "مكتمل" };
-    string[] stageColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#ec4899", "#6366f1", "#22c55e" };
 }
 
 <div class="page-header">
@@ -185,10 +183,9 @@
                 {
                     @foreach (var item in candidatesByStage)
                     {
-                        int s = (int)item.Stage;
+                        string label = item.Stage?.ToString() ?? "—";
                         int count = (int)item.Count;
-                        string label = s >= 1 && s < stageLabels.Length ? stageLabels[s] : $"مرحلة {s}";
-                        string color = s >= 1 && s < stageColors.Length ? stageColors[s] : "#64748b";
+                        string color = "#1B4FD8";
                         double pct = totalCandidates > 0 ? (count * 100.0 / totalCandidates) : 0;
 
                         <div class="mb-2">
