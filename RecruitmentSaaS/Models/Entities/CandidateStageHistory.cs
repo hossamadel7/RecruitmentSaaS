@@ -31,6 +31,13 @@ public partial class CandidateStageHistory
     [Precision(0)]
     public DateTime CreatedAt { get; set; }
 
+    public Guid? FromStageId { get; set; }
+
+    public Guid? ToStageId { get; set; }
+
+    [StringLength(500)]
+    public string? Notes { get; set; }
+
     [ForeignKey("CandidateId")]
     [InverseProperty("CandidateStageHistories")]
     public virtual Candidate Candidate { get; set; } = null!;
@@ -38,4 +45,12 @@ public partial class CandidateStageHistory
     [ForeignKey("ChangedById")]
     [InverseProperty("CandidateStageHistories")]
     public virtual User ChangedBy { get; set; } = null!;
+
+    [ForeignKey("FromStageId")]
+    [InverseProperty("CandidateStageHistoryFromStageNavigations")]
+    public virtual PackageStage? FromStageNavigation { get; set; }
+
+    [ForeignKey("ToStageId")]
+    [InverseProperty("CandidateStageHistoryToStageNavigations")]
+    public virtual PackageStage? ToStageNavigation { get; set; }
 }

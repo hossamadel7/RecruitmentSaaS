@@ -352,6 +352,7 @@ namespace RecruitmentSaaS.Controllers
             var query = _context.Candidates
                 .Include(c => c.JobPackage)
                 .Include(c => c.AssignedSales)
+                .Include(c => c.CurrentPackageStage)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(q))
@@ -373,7 +374,7 @@ namespace RecruitmentSaaS.Controllers
                     c.FullName,
                     c.Phone,
                     c.NationalId,
-                    c.CurrentStage,
+                    CurrentStageName = c.CurrentPackageStage != null ? c.CurrentPackageStage.StageName : "—",
                     c.TotalPaidEgp,
                     PriceEgp = c.JobPackage.PriceEgp,
                     JobPackageName = c.JobPackage.Name,

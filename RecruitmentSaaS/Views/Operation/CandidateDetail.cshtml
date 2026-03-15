@@ -2,25 +2,13 @@
 @{
     ViewData["Title"] = Model.FullName;
     ViewData["Subtitle"] = "ملف المرشح";
-    var payments  = ViewBag.Payments  as List<RecruitmentSaaS.Models.DTOs.PaymentDto>  ?? new();
+    var payments = ViewBag.Payments as List<RecruitmentSaaS.Models.DTOs.PaymentDto> ?? new();
     var documents = ViewBag.Documents as List<RecruitmentSaaS.Models.DTOs.DocumentDto> ?? new();
-    var history   = ViewBag.StageHistory as List<RecruitmentSaaS.Models.DTOs.CandidateStageHistoryDto> ?? new();
-    var visits        = ViewBag.Visits        as List<RecruitmentSaaS.Models.DTOs.VisitDto> ?? new();
+    var history = ViewBag.StageHistory as List<RecruitmentSaaS.Models.DTOs.CandidateStageHistoryDto> ?? new();
+    var visits = ViewBag.Visits as List<RecruitmentSaaS.Models.DTOs.VisitDto> ?? new();
     var visitComments = ViewBag.VisitComments as List<RecruitmentSaaS.Models.DTOs.CandidateStageHistoryDto> ?? new();
 
-    var stageInfo = new[] {
-        (1, "توثيق المستندات", "bi-person-plus-fill",      "#EEF2FF", "var(--primary)"),
-        (2, "تجهيز الملف",    "bi-folder-fill",            "#F0FDF4", "#16A34A"),
-        (3, "الكشف الطبي",    "bi-heart-pulse-fill",       "#FFF0F3", "#E11D48"),
-        (4, "معالجة التأشيرة","bi-passport-fill",          "#FFFBEB", "#D97706"),
-        (5, "حجز التذاكر",    "bi-airplane-fill",          "#EFF6FF", "#2563EB"),
-        (6, "التجهيز للسفر",  "bi-file-earmark-text-fill", "#F5F3FF", "#7C3AED"),
-        (7, "مكتمل - سافر",   "bi-check-circle-fill",      "#ECFDF5", "#059669"),
-    };
 
-    var stageCompleted = new Dictionary<int, bool>();
-    foreach (var h in history.OrderBy(h => h.CreatedAt))
-        stageCompleted[h.ToStage] = !h.IsOverride;
 }
 
 <div class="page-header">
@@ -84,13 +72,13 @@
             <div class="card-body p-0">
                 @{
                     var rows = new[] {
-                        ("bi-telephone-fill",  "الهاتف",        Model.Phone),
-                        ("bi-card-text",       "الرقم القومي",  Model.NationalId ?? "—"),
-                        ("bi-calendar-heart",  "العمر",         Model.Age.HasValue ? $"{Model.Age} سنة" : "—"),
-                        ("bi-geo-alt-fill",    "المدينة",       Model.City ?? "—"),
-                        ("bi-briefcase-fill",  "الباقة",        Model.JobPackageName),
-                        ("bi-calendar3",       "تاريخ التسجيل", Model.CreatedAt.ToString("dd/MM/yyyy")),
-                    };
+                                ("bi-telephone-fill",  "الهاتف",        Model.Phone),
+                                ("bi-card-text",       "الرقم القومي",  Model.NationalId ?? "—"),
+                                ("bi-calendar-heart",  "العمر",         Model.Age.HasValue ? $"{Model.Age} سنة" : "—"),
+                                ("bi-geo-alt-fill",    "المدينة",       Model.City ?? "—"),
+                                ("bi-briefcase-fill",  "الباقة",        Model.JobPackageName),
+                                ("bi-calendar3",       "تاريخ التسجيل", Model.CreatedAt.ToString("dd/MM/yyyy")),
+                                };
                 }
                 @foreach (var (icon, label, value) in rows)
                 {
@@ -145,14 +133,14 @@
                 {
                     @foreach (var p in payments.Take(4))
                     {
-                        var methodName  = p.PaymentMethod switch { 1 => "كاش", 2 => "تحويل", 3 => "بطاقة", _ => "—" };
-                        var isPending   = p.Status == 1 || p.Status == 0;
+                        var methodName = p.PaymentMethod switch { 1 => "كاش", 2 => "تحويل", 3 => "بطاقة", _ => "—" };
+                        var isPending = p.Status == 1 || p.Status == 0;
                         var amountColor = isPending ? "#D97706" : p.Status == 3 ? "#94A3B8" : p.TransactionType == 2 ? "#E11D48" : "#059669";
                         var statusBadge = isPending
-                            ? "<span style=\"font-size:10px;background:#FFFBEB;color:#D97706;padding:2px 7px;border-radius:5px;font-weight:600\">⏳ معلق</span>"
-                            : p.Status == 2
-                            ? "<span style=\"font-size:10px;background:#ECFDF5;color:#059669;padding:2px 7px;border-radius:5px;font-weight:600\">✓ معتمد</span>"
-                            : "<span style=\"font-size:10px;background:#F1F5F9;color:#94A3B8;padding:2px 7px;border-radius:5px;font-weight:600\">✕ مرفوض</span>";
+                        ? "<span style=\"font-size:10px;background:#FFFBEB;color:#D97706;padding:2px 7px;border-radius:5px;font-weight:600\">⏳ معلق</span>"
+                        : p.Status == 2
+                        ? "<span style=\"font-size:10px;background:#ECFDF5;color:#059669;padding:2px 7px;border-radius:5px;font-weight:600\">✓ معتمد</span>"
+                        : "<span style=\"font-size:10px;background:#F1F5F9;color:#94A3B8;padding:2px 7px;border-radius:5px;font-weight:600\">✕ مرفوض</span>";
                         <div style="padding:9px 20px;border-bottom:1px solid #F1F5F9;@(p.Status == 3 ? "opacity:0.6" : "")">
                             <div style="display:flex;align-items:center;gap:6px">
                                 <span style="font-size:13px;font-weight:700;color:@amountColor">
@@ -200,10 +188,10 @@
                 {
                     @foreach (var doc in documents)
                     {
-                        var fileIcon  = doc.MimeType.Contains("pdf")   ? "bi-file-earmark-pdf-fill"   :
-                                        doc.MimeType.Contains("image") ? "bi-file-earmark-image-fill" : "bi-file-earmark-fill";
-                        var fileColor = doc.MimeType.Contains("pdf")   ? "#E11D48" :
-                                        doc.MimeType.Contains("image") ? "#2563EB" : "#64748B";
+                        var fileIcon = doc.MimeType.Contains("pdf") ? "bi-file-earmark-pdf-fill" :
+                        doc.MimeType.Contains("image") ? "bi-file-earmark-image-fill" : "bi-file-earmark-fill";
+                        var fileColor = doc.MimeType.Contains("pdf") ? "#E11D48" :
+                        doc.MimeType.Contains("image") ? "#2563EB" : "#64748B";
                         <div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
                             <i class="bi @fileIcon" style="font-size:20px;color:@fileColor;flex-shrink:0"></i>
                             <div style="overflow:hidden;flex:1">
@@ -239,10 +227,10 @@
             {
                 @foreach (var v in visits)
                 {
-                    var visitIdStr        = v.Id.ToString();
+                    var visitIdStr = v.Id.ToString();
                     var thisVisitComments = visitComments
-                        .Where(c => c.OverrideReason != null && c.OverrideReason.StartsWith($"visit:{visitIdStr}:"))
-                        .ToList();
+                    .Where(c => c.OverrideReason != null && c.OverrideReason.StartsWith($"visit:{visitIdStr}:"))
+                    .ToList();
 
                     <div style="padding:14px 20px;border-bottom:1px solid #F1F5F9">
                         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -266,7 +254,7 @@
                             <div style="margin-right:42px;margin-bottom:10px">
                                 @foreach (var c in thisVisitComments)
                                 {
-                                    var parts       = c.OverrideReason!.Split(':', 3);
+                                    var parts = c.OverrideReason!.Split(':', 3);
                                     var commentText = parts.Length == 3 ? parts[2] : c.OverrideReason;
                                     <div style="display:flex;gap:8px;margin-bottom:6px;align-items:flex-start">
                                         <div style="width:26px;height:26px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -287,7 +275,7 @@
                               style="display:flex;gap:8px;margin-right:42px">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="candidateId" value="@Model.Id" />
-                            <input type="hidden" name="visitId"     value="@v.Id" />
+                            <input type="hidden" name="visitId" value="@v.Id" />
                             <input type="text" name="comment" class="form-control form-control-sm"
                                    placeholder="أضف تعليقاً على هذه الزيارة..." required style="font-size:12.5px" />
                             <button type="submit" class="btn btn-sm"
@@ -300,266 +288,210 @@
             }
         </div>
 
-        <!-- Stage Sections -->
-        @foreach (var (num, name, icon, bg, color) in stageInfo)
-        {
-            bool isDone           = stageCompleted.ContainsKey(num) && stageCompleted[num];
-            var stageHistoryItems = history.Where(h => h.ToStage == num).OrderByDescending(h => h.CreatedAt).ToList();
-            string borderColor    = isDone ? "#BBF7D0" : "var(--border)";
-            string headerBg       = isDone ? "#F0FDF4" : "#FAFAFA";
-            string btnBorder      = isDone ? "#059669" : "var(--border)";
-            string btnColor       = isDone ? "#059669" : "var(--text-muted)";
-            string btnBg          = isDone ? "#ECFDF5" : "transparent";
+        <!-- ── Package Stage Timeline ──────────────────────────────────────── -->
+        @{
+            var packageStages = ViewBag.PackageStages as List<RecruitmentSaaS.Models.Entities.PackageStage> ?? new();
+            var currentStageOrder = Model.CurrentStageOrder;
+            var isLastStage = packageStages.Any() && currentStageOrder >= packageStages.Max(s => s.StageOrder);
+            var nextStage = packageStages.Where(s => s.StageOrder > currentStageOrder).OrderBy(s => s.StageOrder).FirstOrDefault();
+            var nextMinPay = nextStage?.RequiredMinPaymentEgp;
+            var canMove = !Model.IsCompleted && nextStage != null && (nextMinPay == null || Model.TotalPaidEGP >= nextMinPay);
+            var blocked = !Model.IsCompleted && nextStage != null && nextMinPay.HasValue && Model.TotalPaidEGP < nextMinPay;
+        }
 
-            <div class="card mb-3" style="border:2px solid @borderColor;transition:border 0.2s">
-                <div class="card-header" style="background:@headerBg">
-                    <div class="header-icon" style="background:@bg;color:@color">
-                        <i class="bi @icon"></i>
+        @if (!packageStages.Any())
+        {
+            <div style="background:var(--card-bg);border-radius:var(--radius);border:2px dashed var(--border);padding:32px;text-align:center;margin-bottom:16px">
+                <div style="font-size:32px;margin-bottom:8px">🪜</div>
+                <div style="font-size:13px;color:var(--text-muted)">لم يتم تهيئة مراحل هذه الباقة بعد</div>
+            </div>
+        }
+        else
+        {
+            @if (Model.IsCompleted)
+            {
+                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius);padding:14px 20px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+                    <i class="bi bi-check-circle-fill" style="color:#16a34a;font-size:20px"></i>
+                    <span style="font-weight:700;color:#15803d;font-size:14px">اكتمل المرشح — تم السفر ✈️</span>
+                </div>
+            }
+            else if (canMove)
+            {
+                <div style="background:var(--primary);border-radius:var(--radius);padding:14px 20px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+                    <div>
+                        <div style="font-weight:700;font-size:14px;color:#fff">
+                            <i class="bi bi-arrow-left-circle-fill me-2"></i>الانتقال إلى: @nextStage!.StageName
+                        </div>
+                        <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px">
+                            المرحلة @nextStage.StageOrder من @packageStages.Count
+                        </div>
                     </div>
-                    <span style="font-weight:700;font-size:14px;color:var(--text-primary)">@name</span>
-                    <div class="ms-auto d-flex align-items-center gap-2">
-                        @if (isDone)
-                        {
-                            <span style="font-size:12px;color:#059669;font-weight:600">
-                                <i class="bi bi-check-circle-fill"></i> مكتملة
-                            </span>
-                        }
-                        else
-                        {
-                            <span style="font-size:12px;color:var(--text-muted)">
-                                <i class="bi bi-circle"></i> لم تكتمل
-                            </span>
-                        }
-                        <button type="button" class="btn btn-sm"
-                                style="font-size:11px;padding:4px 10px;border:1px solid @btnBorder;color:@btnColor;background:@btnBg"
-                                data-stage="@num"
-                                data-done="@isDone.ToString().ToLower()"
-                                data-stage-name="@name"
-                                onclick="openStageModal(this)">
-                            @if (isDone)
+                    <button onclick="document.getElementById('moveStageModal').style.display='flex'"
+                            style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
+                        انتقل <i class="bi bi-arrow-left ms-1"></i>
+                    </button>
+                </div>
+            }
+            else if (blocked)
+            {
+                <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:var(--radius);padding:14px 20px;margin-bottom:12px">
+                    <div style="font-weight:700;font-size:13px;color:#854d0e">
+                        <i class="bi bi-lock-fill me-2"></i>
+                        مطلوب @nextMinPay!.Value.ToString("N0") ج.م للانتقال إلى "@nextStage!.StageName"
+                    </div>
+                    <div style="font-size:12px;color:#854d0e;margin-top:4px">
+                        المدفوع: @Model.TotalPaidEGP.ToString("N0") ج.م
+                        &nbsp;·&nbsp; المتبقي: @((nextMinPay.Value - Model.TotalPaidEGP).ToString("N0")) ج.م
+                    </div>
+                </div>
+            }
+
+            <!-- Stages Timeline -->
+            @foreach (var ps in packageStages.OrderBy(s => s.StageOrder))
+            {
+                bool isCompleted = ps.StageOrder < currentStageOrder;
+                bool isCurrent = ps.StageOrder == currentStageOrder;
+
+                string dotBg = isCompleted ? "#16a34a" : isCurrent ? "var(--primary)" : "#e2e8f0";
+                string dotColor = isCompleted || isCurrent ? "#fff" : "#94a3b8";
+                string dotIcon = isCompleted ? "bi-check-lg" : isCurrent ? "bi-arrow-left" : "bi-circle";
+                string cardBorder = isCurrent ? "2px solid var(--primary)"
+                : isCompleted ? "1px solid #bbf7d0"
+                : "1px solid var(--border)";
+                string hdrBg = isCurrent ? "#eef2ff"
+                : isCompleted ? "#f0fdf4"
+                : "#fafafa";
+
+                var stageHistory = history
+                .Where(h => h.ToStageOrder == ps.StageOrder)
+                .OrderByDescending(h => h.CreatedAt).ToList();
+                string bodyDisplay = (stageHistory.Any() || isCurrent) ? "block" : "none";
+
+                <div class="card mb-2" style="border:@cardBorder;transition:all .2s">
+                    <div class="card-header" style="background:@hdrBg;padding:12px 16px;cursor:pointer"
+                         onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                        <div style="display:flex;align-items:center;gap:10px;width:100%">
+                            <div style="width:30px;height:30px;border-radius:50%;background:@dotBg;color:@dotColor;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">
+                                @if (isCompleted)
+                                {
+                                    <i class="bi bi-check-lg"></i>
+                                }
+                                else
+                                {
+                                    <span>@ps.StageOrder</span>
+                                }
+                            </div>
+                            <div style="flex:1">
+                                <div style="font-weight:700;font-size:13px;color:var(--text-primary)">@ps.StageName</div>
+                                @if (ps.RequiredMinPaymentEgp.HasValue)
+                                {
+                                    <div style="font-size:11px;color:var(--text-muted)">
+                                        <i class="bi bi-cash me-1"></i>حد أدنى: @ps.RequiredMinPaymentEgp.Value.ToString("N0") ج.م
+                                    </div>
+                                }
+                            </div>
+                            @if (isCurrent)
                             {
-                                <i class="bi bi-x-circle"></i>
-                                <text> إلغاء الإكمال</text>
+                                <span style="font-size:11px;background:var(--primary);color:#fff;padding:2px 8px;border-radius:20px;font-weight:600;white-space:nowrap">
+                                    المرحلة الحالية
+                                </span>
+                            }
+                            else if (isCompleted)
+                            {
+                                <span style="font-size:11px;background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:20px;font-weight:600">
+                                    <i class="bi bi-check-circle-fill"></i> مكتملة
+                                </span>
                             }
                             else
                             {
-                                <i class="bi bi-check-circle"></i>
-                                <text> تعيين مكتملة</text>
+                                <span style="font-size:11px;color:var(--text-muted)">قادمة</span>
                             }
-                        </button>
-                    </div>
-                </div>
-
-                <div class="card-body" style="padding:0">
-                    @if (!stageHistoryItems.Any())
-                    {
-                        <div style="padding:12px 20px;font-size:12.5px;color:var(--text-muted)">
-                            لا توجد تعليقات على هذه المرحلة بعد
+                            <i class="bi bi-chevron-down" style="color:var(--text-muted);font-size:11px"></i>
                         </div>
-                    }
-                    else
-                    {
-                        @foreach (var h in stageHistoryItems.Take(3))
+                    </div>
+                    <div style="display:@bodyDisplay">
+                        @if (!stageHistory.Any())
                         {
-                            string logBg    = h.IsOverride ? "#FFF0F3" : "#ECFDF5";
-                            string logColor = h.IsOverride ? "#E11D48" : "#059669";
-                            string logIcon  = h.IsOverride ? "bi-x"    : "bi-check";
-                            <div style="display:flex;gap:10px;padding:10px 20px;border-bottom:1px solid #F8FAFC">
-                                <div style="width:26px;height:26px;border-radius:50%;background:@logBg;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
-                                    <i class="bi @logIcon" style="font-size:12px;color:@logColor"></i>
-                                </div>
-                                <div style="flex:1">
-                                    @if (!string.IsNullOrEmpty(h.OverrideReason))
-                                    {
-                                        <div style="font-size:13px;color:var(--text-primary);margin-bottom:2px">@h.OverrideReason</div>
-                                    }
-                                    <div style="font-size:11px;color:var(--text-muted)">
-                                        <strong>@h.ChangedByName</strong> · @h.CreatedAt.ToString("dd/MM/yyyy — HH:mm")
-                                        @if (h.IsOverride)
+                            <div style="padding:12px 20px;font-size:12px;color:var(--text-muted)">
+                                لا توجد سجلات على هذه المرحلة بعد
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var h in stageHistory.Take(3))
+                            {
+                                <div style="display:flex;gap:10px;padding:10px 20px;border-bottom:1px solid #f1f5f9">
+                                    <div style="width:24px;height:24px;border-radius:50%;background:#ecfdf5;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
+                                        <i class="bi bi-check" style="font-size:11px;color:#16a34a"></i>
+                                    </div>
+                                    <div>
+                                        @if (!string.IsNullOrEmpty(h.Notes))
                                         {
-                                            <span style="margin-right:6px;color:#E11D48;font-weight:600">· تم الإلغاء</span>
+                                            <div style="font-size:12.5px;color:var(--text-primary);margin-bottom:2px">@h.Notes</div>
                                         }
+                                        <div style="font-size:11px;color:var(--text-muted)">
+                                            <strong>@h.ChangedByName</strong> · @h.CreatedAt.ToString("dd/MM/yyyy — HH:mm")
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            }
+                            @if (stageHistory.Count > 3)
+                            {
+                                <div style="padding:6px 20px;font-size:12px;color:var(--text-muted)">
+                                    +@(stageHistory.Count - 3) سجلات أخرى
+                                </div>
+                            }
                         }
-                        @if (stageHistoryItems.Count > 3)
-                        {
-                            <div style="padding:6px 20px;font-size:12px;color:var(--text-muted)">
-                                +@(stageHistoryItems.Count - 3) سجلات أخرى
-                            </div>
-                        }
-                    }
+                    </div>
                 </div>
-            </div>
+            }
         }
-
     </div>
 </div>
 
-<!-- ── Stage Toggle Modal ────────────────────────────────────────────── -->
-<div class="modal fade" id="stageToggleModal" tabindex="-1">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content" style="border-radius:var(--radius);border:none">
-            <div class="modal-header" style="border-bottom:1px solid var(--border)">
-                <h5 class="modal-title" id="stageModalTitle" style="font-weight:700;font-size:15px"></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form asp-action="ToggleStage" asp-controller="Operations" method="post">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="candidateId" value="@Model.Id" />
-                <input type="hidden" name="stage"       id="stageInput" />
-                <input type="hidden" name="markDone"    id="markDoneInput" />
-                <div class="modal-body" style="padding:20px">
-                    <div id="undoAlert" class="alert alert-warning d-none" style="font-size:12px;padding:10px 14px">
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                        هذا الإجراء سيُعيد تعيين حالة المرحلة — يُسجَّل في السجل.
-                    </div>
-                    <label class="form-label" id="commentLabel" style="font-size:13px">
-                        تعليق <span style="color:var(--text-muted);font-weight:400">(اختياري)</span>
-                    </label>
-                    <textarea name="comment" id="stageComment" class="form-control" rows="3"
-                              style="font-size:13px" placeholder="أضف تعليقاً..."></textarea>
-                </div>
-                <div class="modal-footer" style="border-top:1px solid var(--border);gap:8px">
-                    <button type="button" class="btn btn-sm" data-bs-dismiss="modal"
-                            style="border:1px solid var(--border)">إلغاء</button>
-                    <button type="submit" id="stageSubmitBtn" class="btn btn-sm btn-primary">
-                        <i class="bi bi-check-lg"></i> تأكيد
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
-<!-- ── Upload Document Modal ────────────────────────────────────────── -->
-<div class="modal fade" id="uploadDocModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content" style="border-radius:var(--radius);border:none">
-            <div class="modal-header" style="border-bottom:1px solid var(--border)">
-                <h5 class="modal-title" style="font-weight:700;font-size:15px">
-                    <i class="bi bi-upload" style="color:#7C3AED;margin-left:8px"></i> رفع مستند
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form asp-action="UploadDocument" asp-controller="Operations" method="post" enctype="multipart/form-data">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="candidateId" value="@Model.Id" />
-                <div class="modal-body" style="padding:24px">
-                    <div class="mb-3">
-                        <label class="form-label">نوع المستند <span style="color:var(--danger)">*</span></label>
-                        <select name="documentType" class="form-select" required>
-                            @Html.Raw("<option value=\"1\">بطاقة شخصية</option>")
-                            @Html.Raw("<option value=\"2\">صورة شخصية</option>")
-                            @Html.Raw("<option value=\"3\">شهادة ميلاد</option>")
-                            @Html.Raw("<option value=\"4\">مؤهل دراسي</option>")
-                            @Html.Raw("<option value=\"5\">شهادة خبرة</option>")
-                            @Html.Raw("<option value=\"6\">كشف طبي</option>")
-                            @Html.Raw("<option value=\"7\">عقد</option>")
-                            @Html.Raw("<option value=\"8\">تأشيرة</option>")
-                            @Html.Raw("<option value=\"9\">تذكرة</option>")
-                        </select>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">الملف <span style="color:var(--danger)">*</span></label>
-                        <input type="file" name="file" class="form-control"
-                               accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required />
-                        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">PDF, صور, Word — حد أقصى 10 MB</div>
-                    </div>
-                </div>
-                <div class="modal-footer" style="border-top:1px solid var(--border);gap:8px">
-                    <button type="button" class="btn btn-sm" data-bs-dismiss="modal"
-                            style="border:1px solid var(--border)">إلغاء</button>
-                    <button type="submit" class="btn btn-sm btn-primary">
-                        <i class="bi bi-upload"></i> رفع
-                    </button>
-                </div>
-            </form>
+<!-- ── Move to Next Stage Modal ────────────────────────────────────────── -->
+<div id="moveStageModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border-radius:var(--radius);width:420px;max-width:95vw">
+        <div style="padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <h5 style="margin:0;font-weight:800;font-size:15px">
+                <i class="bi bi-arrow-left-circle-fill me-2" style="color:var(--primary)"></i>
+                الانتقال للمرحلة التالية
+            </h5>
+            <button onclick="document.getElementById('moveStageModal').style.display='none'"
+                    style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">
+                ×
+            </button>
         </div>
-    </div>
-</div>
-
-<!-- ── Request Refund Modal ──────────────────────────────────────────── -->
-<div class="modal fade" id="refundModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content" style="border-radius:var(--radius);border:none">
-            <div class="modal-header" style="border-bottom:1px solid var(--border)">
-                <h5 class="modal-title" style="font-weight:700;font-size:15px">
-                    <i class="bi bi-arrow-counterclockwise" style="color:#E11D48;margin-left:8px"></i> طلب استرداد
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <form method="post" action="/Operations/MoveToNextStage" style="padding:22px">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="candidateId" value="@Model.Id" />
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:13px">ملاحظات (اختياري)</label>
+                <textarea name="notes" class="form-control" rows="3"
+                          placeholder="أضف ملاحظة على هذه المرحلة..." style="font-size:13px"></textarea>
             </div>
-            <form asp-action="RequestRefund" asp-controller="Operations" method="post">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="candidateId" value="@Model.Id" />
-                <div class="modal-body" style="padding:24px">
-                    <div class="alert" style="background:#FFF0F3;border:1px solid #FECDD3;color:#9F1239;font-size:12.5px;padding:10px 14px;border-radius:8px;margin-bottom:16px">
-                        <i class="bi bi-info-circle-fill me-1"></i>
-                        سيتم إرسال الطلب للإدارة للموافقة قبل التنفيذ.
-                    </div>
-                    @{
-                        var maxRefund = payments.Where(p => p.Status == 2).Sum(p => p.AmountEGP);
-                    }
-                    <div class="mb-3">
-                        <label class="form-label">المبلغ (ج.م) <span style="color:var(--danger)">*</span></label>
-                        <input type="number" name="amountEgp" class="form-control"
-                               step="0.01" min="1" max="@maxRefund" placeholder="0.00" required />
-                        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-                            الحد الأقصى: @maxRefund.ToString("N0") ج.م
-                        </div>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">سبب الاسترداد <span style="color:var(--danger)">*</span></label>
-                        <textarea name="reason" class="form-control" rows="3"
-                                  placeholder="اذكر سبب طلب الاسترداد..." required
-                                  style="font-size:13px"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer" style="border-top:1px solid var(--border);gap:8px">
-                    <button type="button" class="btn btn-sm" data-bs-dismiss="modal"
-                            style="border:1px solid var(--border)">إلغاء</button>
-                    <button type="submit" class="btn btn-sm btn-danger">
-                        <i class="bi bi-send-fill"></i> إرسال الطلب
-                    </button>
-                </div>
-            </form>
-        </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button type="button"
+                        onclick="document.getElementById('moveStageModal').style.display='none'"
+                        style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit">
+                    إلغاء
+                </button>
+                <button type="submit"
+                        style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                    <i class="bi bi-arrow-left me-1"></i> تأكيد الانتقال
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
 @section Scripts {
-<script>
-    function openStageModal(btn) {
-        const stage     = btn.dataset.stage;
-        const isDone    = btn.dataset.done === 'true';
-        const stageName = btn.dataset.stageName;
-        const markDone  = !isDone;
-
-        document.getElementById('stageInput').value    = stage;
-        document.getElementById('markDoneInput').value = markDone.toString();
-        document.getElementById('stageComment').value  = '';
-
-        const title  = document.getElementById('stageModalTitle');
-        const alert  = document.getElementById('undoAlert');
-        const label  = document.getElementById('commentLabel');
-        const submit = document.getElementById('stageSubmitBtn');
-
-        if (markDone) {
-            title.innerHTML  = '<i class="bi bi-check-circle-fill" style="color:#059669;margin-left:8px"></i> تعيين "' + stageName + '" مكتملة';
-            alert.classList.add('d-none');
-            label.innerHTML  = 'تعليق <span style="color:var(--text-muted);font-weight:400">(اختياري)</span>';
-            submit.className = 'btn btn-sm btn-primary';
-            submit.innerHTML = '<i class="bi bi-check-lg"></i> تأكيد الإكمال';
-        } else {
-            title.innerHTML  = '<i class="bi bi-x-circle-fill" style="color:#E11D48;margin-left:8px"></i> إلغاء إكمال "' + stageName + '"';
-            alert.classList.remove('d-none');
-            label.innerHTML  = 'سبب الإلغاء <span style="color:var(--danger)">*</span>';
-            submit.className = 'btn btn-sm btn-danger';
-            submit.innerHTML = '<i class="bi bi-x-lg"></i> تأكيد الإلغاء';
-        }
-
-        new bootstrap.Modal(document.getElementById('stageToggleModal')).show();
-    }
-</script>
+    <script>
+        window.addEventListener('click', function(e) {
+            var modal = document.getElementById('moveStageModal');
+            if (modal && e.target === modal) modal.style.display = 'none';
+        });
+    </script>
 }

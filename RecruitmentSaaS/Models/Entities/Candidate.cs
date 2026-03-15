@@ -39,8 +39,6 @@ public partial class Candidate
 
     public string? Notes { get; set; }
 
-    public byte CurrentStage { get; set; }
-
     public byte Status { get; set; }
 
     [Column("TotalPaidEGP", TypeName = "decimal(18, 2)")]
@@ -59,6 +57,18 @@ public partial class Candidate
     [Precision(0)]
     public DateTime? UpdatedAt { get; set; }
 
+    public Guid? CurrentPackageStageId { get; set; }
+
+    [StringLength(50)]
+    public string? PassportNumber { get; set; }
+
+    public DateOnly? PassportExpiry { get; set; }
+
+    [StringLength(100)]
+    public string? VisaNumber { get; set; }
+
+    public DateOnly? VisaExpiry { get; set; }
+
     [ForeignKey("AssignedSalesId")]
     [InverseProperty("CandidateAssignedSales")]
     public virtual User AssignedSales { get; set; } = null!;
@@ -68,10 +78,17 @@ public partial class Candidate
     public virtual Branch Branch { get; set; } = null!;
 
     [InverseProperty("Candidate")]
+    public virtual ICollection<CandidateActivity> CandidateActivities { get; set; } = new List<CandidateActivity>();
+
+    [InverseProperty("Candidate")]
     public virtual ICollection<CandidateStageHistory> CandidateStageHistories { get; set; } = new List<CandidateStageHistory>();
 
     [InverseProperty("Candidate")]
     public virtual Commission? Commission { get; set; }
+
+    [ForeignKey("CurrentPackageStageId")]
+    [InverseProperty("Candidates")]
+    public virtual PackageStage? CurrentPackageStage { get; set; }
 
     [InverseProperty("Candidate")]
     public virtual ICollection<Document> Documents { get; set; } = new List<Document>();
@@ -79,6 +96,9 @@ public partial class Candidate
     [ForeignKey("JobPackageId")]
     [InverseProperty("Candidates")]
     public virtual JobPackage JobPackage { get; set; } = null!;
+
+    [InverseProperty("Candidate")]
+    public virtual PassportDownloadedCandidate? PassportDownloadedCandidate { get; set; }
 
     [InverseProperty("Candidate")]
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
@@ -89,4 +109,13 @@ public partial class Candidate
     [ForeignKey("RegisteredById")]
     [InverseProperty("CandidateRegisteredBies")]
     public virtual User RegisteredBy { get; set; } = null!;
+
+    [InverseProperty("Candidate")]
+    public virtual ICollection<StageActionCompletion> StageActionCompletions { get; set; } = new List<StageActionCompletion>();
+
+    [InverseProperty("Candidate")]
+    public virtual ICollection<StageApprovalRequest> StageApprovalRequests { get; set; } = new List<StageApprovalRequest>();
+
+    [InverseProperty("MatchedCandidate")]
+    public virtual ICollection<VisaUpload> VisaUploads { get; set; } = new List<VisaUpload>();
 }

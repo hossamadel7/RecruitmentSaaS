@@ -20,6 +20,8 @@ public partial class RecruitmentCrmContext : DbContext
 
     public virtual DbSet<Candidate> Candidates { get; set; }
 
+    public virtual DbSet<CandidateActivity> CandidateActivities { get; set; }
+
     public virtual DbSet<CandidateStageHistory> CandidateStageHistories { get; set; }
 
     public virtual DbSet<Commission> Commissions { get; set; }
@@ -42,17 +44,27 @@ public partial class RecruitmentCrmContext : DbContext
 
     public virtual DbSet<Notification> Notifications { get; set; }
 
+    public virtual DbSet<PackageStage> PackageStages { get; set; }
+
+    public virtual DbSet<PassportDownloadLog> PassportDownloadLogs { get; set; }
+
+    public virtual DbSet<PassportDownloadedCandidate> PassportDownloadedCandidates { get; set; }
+
     public virtual DbSet<Payment> Payments { get; set; }
 
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
 
     public virtual DbSet<Refund> Refunds { get; set; }
 
-    public virtual DbSet<SuperAdminUser> SuperAdminUsers { get; set; }
+    public virtual DbSet<StageActionCompletion> StageActionCompletions { get; set; }
 
-    public virtual DbSet<Tenant> Tenants { get; set; }
+    public virtual DbSet<StageApprovalRequest> StageApprovalRequests { get; set; }
+
+    public virtual DbSet<StageType> StageTypes { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<VisaUpload> VisaUploads { get; set; }
 
     public virtual DbSet<VwCampaignPerformance> VwCampaignPerformances { get; set; }
 
@@ -102,9 +114,12 @@ public partial class RecruitmentCrmContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PK_demorecruitment_Cnd");
 
+            entity.HasIndex(e => e.PassportNumber, "UIX_demo_Cand_Passport")
+                .IsUnique()
+                .HasFilter("([PassportNumber] IS NOT NULL)");
+
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
-            entity.Property(e => e.CurrentStage).HasDefaultValue((byte)1);
             entity.Property(e => e.Status).HasDefaultValue((byte)1);
 
             entity.HasOne(d => d.AssignedSales).WithMany(p => p.CandidateAssignedSales)
@@ -115,6 +130,8 @@ public partial class RecruitmentCrmContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_demorecruitment_Cnd_Br");
 
+            entity.HasOne(d => d.CurrentPackageStage).WithMany(p => p.Candidates).HasConstraintName("FK_demo_Cand_Stage");
+
             entity.HasOne(d => d.JobPackage).WithMany(p => p.Candidates)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_demorecruitment_Cnd_JP");
@@ -122,6 +139,20 @@ public partial class RecruitmentCrmContext : DbContext
             entity.HasOne(d => d.RegisteredBy).WithMany(p => p.CandidateRegisteredBies)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_demorecruitment_Cnd_Rg");
+        });
+
+        modelBuilder.Entity<CandidateActivity>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_demo_CandidateActivities");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+
+            entity.HasOne(d => d.Candidate).WithMany(p => p.CandidateActivities)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_demo_CA_Cand");
+
+            entity.HasOne(d => d.CreatedBy).WithMany(p => p.CandidateActivities).HasConstraintName("FK_demo_CA_CreBy");
         });
 
         modelBuilder.Entity<CandidateStageHistory>(entity =>
@@ -138,6 +169,10 @@ public partial class RecruitmentCrmContext : DbContext
             entity.HasOne(d => d.ChangedBy).WithMany(p => p.CandidateStageHistories)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_demorecruitment_CSH_By");
+
+            entity.HasOne(d => d.FromStageNavigation).WithMany(p => p.CandidateStageHistoryFromStageNavigations).HasConstraintName("FK_demo_CSH_FromStage");
+
+            entity.HasOne(d => d.ToStageNavigation).WithMany(p => p.CandidateStageHistoryToStageNavigations).HasConstraintName("FK_demo_CSH_ToStage");
         });
 
         modelBuilder.Entity<Commission>(entity =>
@@ -324,6 +359,55 @@ public partial class RecruitmentCrmContext : DbContext
                 .HasConstraintName("FK_demorecruitment_Not_Us");
         });
 
+        modelBuilder.Entity<PackageStage>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_demo_PackageStages");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+
+            entity.HasOne(d => d.Package).WithMany(p => p.PackageStages)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_demo_PS_Package");
+
+            entity.HasOne(d => d.StageType).WithMany(p => p.PackageStages)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_DR_PS_StageType");
+        });
+
+        modelBuilder.Entity<PassportDownloadLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_PDL");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.DownloadedAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.DownloadedBy).WithMany(p => p.PassportDownloadLogs)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PDL_User");
+
+            entity.HasOne(d => d.Package).WithMany(p => p.PassportDownloadLogs)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PDL_Package");
+        });
+
+        modelBuilder.Entity<PassportDownloadedCandidate>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_PDC");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.DownloadedAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.Candidate).WithOne(p => p.PassportDownloadedCandidate)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PDC_Cand");
+
+            entity.HasOne(d => d.Log).WithMany(p => p.PassportDownloadedCandidates)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PDC_Log");
+        });
+
         modelBuilder.Entity<Payment>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK_demorecruitment_Pay");
@@ -378,24 +462,60 @@ public partial class RecruitmentCrmContext : DbContext
             entity.HasOne(d => d.ReviewedBy).WithMany(p => p.RefundReviewedBies).HasConstraintName("FK_demorecruitment_Ref_RvBy");
         });
 
-        modelBuilder.Entity<SuperAdminUser>(entity =>
+        modelBuilder.Entity<StageActionCompletion>(entity =>
         {
+            entity.HasKey(e => e.Id).HasName("PK_SAC");
+
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CompletedAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.Candidate).WithMany(p => p.StageActionCompletions)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_SAC_Candidate");
+
+            entity.HasOne(d => d.CompletedBy).WithMany(p => p.StageActionCompletions)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_SAC_User");
+
+            entity.HasOne(d => d.PackageStage).WithMany(p => p.StageActionCompletions)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_SAC_Stage");
         });
 
-        modelBuilder.Entity<Tenant>(entity =>
+        modelBuilder.Entity<StageApprovalRequest>(entity =>
         {
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.StorageQuotaBytes).HasDefaultValueSql("((10737418240.))");
-            entity.Property(e => e.SubscriptionStatus).HasDefaultValue((byte)2);
+            entity.HasKey(e => e.Id).HasName("PK_SAR");
 
-            entity.HasOne(d => d.CreatedBySuperAdmin).WithMany(p => p.Tenants)
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.RequestedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.Status).HasDefaultValue((byte)1);
+
+            entity.HasOne(d => d.Candidate).WithMany(p => p.StageApprovalRequests)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Tenants_SuperAdmin");
+                .HasConstraintName("FK_SAR_Candidate");
+
+            entity.HasOne(d => d.FromStage).WithMany(p => p.StageApprovalRequestFromStages)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_SAR_FromStage");
+
+            entity.HasOne(d => d.RequestedBy).WithMany(p => p.StageApprovalRequestRequestedBies)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_SAR_ReqBy");
+
+            entity.HasOne(d => d.ReviewedBy).WithMany(p => p.StageApprovalRequestReviewedBies).HasConstraintName("FK_SAR_RevBy");
+
+            entity.HasOne(d => d.ToStage).WithMany(p => p.StageApprovalRequestToStages)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_SAR_ToStage");
+        });
+
+        modelBuilder.Entity<StageType>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_DR_ST");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
         });
 
         modelBuilder.Entity<User>(entity =>
@@ -409,6 +529,18 @@ public partial class RecruitmentCrmContext : DbContext
             entity.HasOne(d => d.Branch).WithMany(p => p.Users)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_demorecruitment_Us_Br");
+        });
+
+        modelBuilder.Entity<VisaUpload>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.UploadedAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.MatchedCandidate).WithMany(p => p.VisaUploads).HasConstraintName("FK_VisaUploads_Candidate");
+
+            entity.HasOne(d => d.UploadedBy).WithMany(p => p.VisaUploads)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_VisaUploads_User");
         });
 
         modelBuilder.Entity<VwCampaignPerformance>(entity =>

@@ -1,0 +1,310 @@
+@{
+    ViewData["Title"] = "جوازات الباقة";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var package = ViewBag.Package as RecruitmentSaaS.Models.Entities.JobPackage;
+    int allCount = 0; foreach (var _ in ViewBag.AllCandidates) allCount++;
+    int newCount = 0; foreach (var _ in ViewBag.NewCandidates) newCount++;
+}
+
+<div style="padding:24px">
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+        <div style="display:flex;align-items:center;gap:12px">
+            <a href="/Admin/Packages" style="color:var(--text-muted);text-decoration:none;font-size:13px">
+                <i class="bi bi-arrow-right me-1"></i> الباقات
+            </a>
+            <span style="color:var(--border)">/</span>
+            <div>
+                <h1 style="font-size:20px;font-weight:800;margin:0">🛂 جوازات — @package?.Name</h1>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+                    @allCount جواز جاهز للتحميل
+                    @if (newCount > 0)
+                    {
+                        <span style="background:#dcfce7;color:#16a34a;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:700;margin-right:6px">
+                            @newCount جديد
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+        @if (newCount > 0)
+        {
+            <a href="/Admin/DownloadPassportsZip/@package?.Id"
+               style="background:#16a34a;color:#fff;text-decoration:none;border-radius:var(--radius-sm);padding:9px 18px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px">
+                <i class="bi bi-file-zip-fill"></i> تحميل الجديد (@newCount)
+            </a>
+        }
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:0">
+        <button id="tab-new" onclick="showTab('new')"
+                style="background:none;border:none;border-bottom:2px solid var(--primary);margin-bottom:-2px;padding:10px 20px;font-size:13px;font-weight:700;color:var(--primary);cursor:pointer;font-family:inherit">
+            جديد
+            <span style="background:var(--primary);color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;margin-right:4px">@newCount</span>
+        </button>
+        <button id="tab-all" onclick="showTab('all')"
+                style="background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;padding:10px 20px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;font-family:inherit">
+            الكل (@allCount)
+        </button>
+        <button id="tab-history" onclick="showTab('history')"
+                style="background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;padding:10px 20px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;font-family:inherit">
+            <i class="bi bi-clock-history me-1"></i> سجل التحميل
+        </button>
+    </div>
+
+    <!-- ── Tab: New ──────────────────────────────────────────────────────── -->
+    <div id="pane-new" style="background:var(--card-bg);border-radius:0 0 var(--radius) var(--radius);border:1px solid var(--border);border-top:none;overflow:hidden">
+        @if (newCount == 0)
+        {
+            <div style="padding:60px;text-align:center">
+                <div style="font-size:40px;margin-bottom:12px">✅</div>
+                <div style="font-weight:700;font-size:15px;margin-bottom:6px">لا يوجد جوازات جديدة</div>
+                <div style="font-size:13px;color:var(--text-muted)">تم تحميل جميع الجوازات المتاحة</div>
+            </div>
+        }
+        else
+        {
+            int n = 0;
+            <table class="table mb-0">
+                <thead style="background:#f8fafc">
+                    <tr>
+                        <th style="font-size:12px;font-weight:700;color:var(--text-muted);padding:12px 20px">#</th>
+                        <th style="font-size:12px;font-weight:700;color:var(--text-muted)">المرشح</th>
+                        <th style="font-size:12px;font-weight:700;color:var(--text-muted)">رقم الجواز</th>
+                        <th style="font-size:12px;font-weight:700;color:var(--text-muted)">اسم الملف في ZIP</th>
+                        <th style="font-size:12px;font-weight:700;color:var(--text-muted)">تاريخ الرفع</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var cand in ViewBag.NewCandidates)
+                    {
+                        n++;
+                        var passNo = (string?)(cand.PassportNumber) ?? "—";
+                        var fullName = (string)cand.FullName;
+                        var doc = cand.PassportDoc;
+                        var ext = doc != null ? System.IO.Path.GetExtension((string)doc.FileName) : ".pdf";
+                        var safeName = fullName.Replace(" ", "_");
+                        var zipName = passNo != "—" ? $"{safeName}_{passNo}{ext}" : $"{safeName}{ext}";
+                        <tr style="border-top:1px solid var(--border)">
+                            <td style="padding:14px 20px;font-size:12px;color:var(--text-muted)">@n</td>
+                            <td style="padding:14px 20px;font-weight:700;font-size:13px">@fullName</td>
+                            <td style="padding:14px 20px">
+                                @if (passNo != "—")
+                                {
+                                    <span style="font-family:monospace;font-size:13px;background:#f1f5f9;padding:2px 8px;border-radius:4px">@passNo</span>
+                                }
+                                else
+                                {
+                                    <span style="font-size:12px;color:#f59e0b;font-weight:600">
+                                        <i class="bi bi-exclamation-triangle-fill me-1"></i>لم يُدخل
+                                    </span>
+                                }
+                            </td>
+                            <td style="padding:14px 20px;font-size:11px;color:var(--text-muted);font-family:monospace">@zipName</td>
+                            <td style="padding:14px 20px;font-size:12px;color:var(--text-muted)">
+                                @if (doc != null)
+                                {
+                                    @(((DateTime)doc.UploadedAt).ToString("dd/MM/yyyy HH:mm"))
+                                }
+                            </td>
+                            <td style="padding:14px 20px">
+                                @if (doc != null)
+                                {
+                                    <a href="/Admin/DownloadDocument/@doc.Id"
+                                       style="font-size:12px;color:var(--primary);text-decoration:none;font-weight:600">
+                                        <i class="bi bi-download me-1"></i>تحميل
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <!-- ── Tab: All ───────────────────────────────────────────────────────── -->
+    <div id="pane-all" style="display:none;background:var(--card-bg);border-radius:0 0 var(--radius) var(--radius);border:1px solid var(--border);border-top:none;overflow:hidden">
+        @if (allCount == 0)
+        {
+            <div style="padding:60px;text-align:center">
+                <div style="font-size:40px;margin-bottom:12px">🛂</div>
+                <div style="font-weight:700;font-size:15px">لا يوجد جوازات بعد</div>
+                <div style="font-size:13px;color:var(--text-muted)">لم يجتز أي مرشح مرحلة تقديم الجواز بعد</div>
+            </div>
+        }
+        else
+        {
+            int a = 0;
+            <table class="table mb-0">
+                <thead style="background:#f8fafc">
+                    <tr>
+                        <th style="font-size:12px;font-weight:700;color:var(--text-muted);padding:12px 20px">#</th>
+                        <th style="font-size:12px;font-weight:700;color:var(--text-muted)">المرشح</th>
+                        <th style="font-size:12px;font-weight:700;color:var(--text-muted)">رقم الجواز</th>
+                        <th style="font-size:12px;font-weight:700;color:var(--text-muted)">الحالة</th>
+                        <th style="font-size:12px;font-weight:700;color:var(--text-muted)">تاريخ الرفع</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var cand in ViewBag.AllCandidates)
+                    {
+                        a++;
+                        var passNo2 = (string?)(cand.PassportNumber) ?? "—";
+                        var fullName2 = (string)cand.FullName;
+                        var doc2 = cand.PassportDoc;
+                        bool isDl = (bool)cand.IsDownloaded;
+                        <tr style="border-top:1px solid var(--border)">
+                            <td style="padding:14px 20px;font-size:12px;color:var(--text-muted)">@a</td>
+                            <td style="padding:14px 20px;font-weight:700;font-size:13px">@fullName2</td>
+                            <td style="padding:14px 20px">
+                                @if (passNo2 != "—")
+                                {
+                                    <span style="font-family:monospace;font-size:13px;background:#f1f5f9;padding:2px 8px;border-radius:4px">@passNo2</span>
+                                }
+                                else
+                                {
+                                    <span style="font-size:12px;color:#f59e0b;font-weight:600">
+                                        <i class="bi bi-exclamation-triangle-fill me-1"></i>لم يُدخل
+                                    </span>
+                                }
+                            </td>
+                            <td style="padding:14px 20px">
+                                @if (isDl)
+                                {
+                                    <span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">
+                                        <i class="bi bi-check-circle-fill me-1"></i>تم التحميل
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">
+                                        ● لم يُحمَّل بعد
+                                    </span>
+                                }
+                            </td>
+                            <td style="padding:14px 20px;font-size:12px;color:var(--text-muted)">
+                                @if (doc2 != null)
+                                {
+                                    @(((DateTime)doc2.UploadedAt).ToString("dd/MM/yyyy HH:mm"))
+                                }
+                            </td>
+                            <td style="padding:14px 20px">
+                                @if (doc2 != null)
+                                {
+                                    <a href="/Admin/DownloadDocument/@doc2.Id"
+                                       style="font-size:12px;color:var(--primary);text-decoration:none;font-weight:600">
+                                        <i class="bi bi-download me-1"></i>تحميل
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <!-- ── Tab: History ───────────────────────────────────────────────────── -->
+    <div id="pane-history" style="display:none;padding:20px;background:var(--card-bg);border-radius:0 0 var(--radius) var(--radius);border:1px solid var(--border);border-top:none">
+        @{
+            bool hasBatches = false;
+            foreach (var _ in ViewBag.Batches) { hasBatches = true; break; }
+        }
+        @if (!hasBatches)
+        {
+            <div style="padding:40px;text-align:center;border:2px dashed var(--border);border-radius:var(--radius)">
+                <div style="font-size:32px;margin-bottom:8px">📦</div>
+                <div style="font-size:13px;color:var(--text-muted)">لم يتم تحميل أي دفعة بعد</div>
+            </div>
+        }
+        else
+        {
+            @foreach (var batch in ViewBag.Batches)
+            {
+                var log = batch.Log;
+                var batchCands = batch.Candidates;
+                int batchCount = 0;
+                foreach (var _ in batchCands) batchCount++;
+
+                <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden">
+                    <!-- Batch Header -->
+                    <div style="background:#f8fafc;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)">
+                        <div style="display:flex;align-items:center;gap:12px">
+                            <div style="width:38px;height:38px;border-radius:50%;background:#eff6ff;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                <i class="bi bi-archive-fill" style="color:var(--primary);font-size:16px"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight:700;font-size:13px">
+                                    📦 دفعة @(((DateTime)log.DownloadedAt).ToString("dd/MM/yyyy — HH:mm"))
+                                </div>
+                                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+                                    @batchCount جواز
+                                    · بواسطة @(log.DownloadedBy?.FullName ?? "—")
+                                </div>
+                            </div>
+                        </div>
+                        <a href="/Admin/RedownloadPassportsBatch/@log.Id"
+                           style="background:var(--primary);color:#fff;text-decoration:none;border-radius:var(--radius-sm);padding:7px 14px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px">
+                            <i class="bi bi-arrow-clockwise"></i> إعادة تحميل
+                        </a>
+                    </div>
+                    <!-- Candidates in this batch -->
+                    @if (batchCount > 0)
+                    {
+                        <div style="padding:14px 20px;display:flex;flex-wrap:wrap;gap:8px">
+                            @foreach (var cand in batchCands)
+                            {
+                                var pNo = (string?)(cand.PassportNumber) ?? "—";
+                                <span style="background:#f1f5f9;border-radius:6px;padding:5px 12px;font-size:12px;display:inline-flex;align-items:center;gap:6px">
+                                    <i class="bi bi-person-fill" style="color:var(--text-muted);font-size:11px"></i>
+                                    <span style="font-weight:600">@cand.FullName</span>
+                                    @if (pNo != "—")
+                                    {
+                                        <span style="font-family:monospace;color:var(--text-muted);font-size:11px;background:#e2e8f0;padding:1px 6px;border-radius:4px">@pNo</span>
+                                    }
+                                </span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="padding:12px 20px;font-size:12px;color:var(--text-muted)">
+                            ملفات هذه الدفعة غير متوفرة
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
+
+</div>
+
+@section Scripts {
+    <script>
+        function showTab(tab) {
+            ['new', 'all', 'history'].forEach(function(t) {
+                var pane = document.getElementById('pane-' + t);
+                var btn  = document.getElementById('tab-' + t);
+                var active = (t === tab);
+                pane.style.display        = active ? 'block' : 'none';
+                btn.style.borderBottomColor = active ? 'var(--primary)' : 'transparent';
+                btn.style.color             = active ? 'var(--primary)' : 'var(--text-muted)';
+                btn.style.fontWeight        = active ? '700' : '600';
+            });
+        }
+    </script>
+}

@@ -5,14 +5,11 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 
     string? q = ViewBag.Q;
-    int? stage = ViewBag.Stage;
+    Guid? stageId = ViewBag.StageId as Guid?;
     int page = ViewBag.Page;
     int total = ViewBag.Total;
     int totalPages = ViewBag.TotalPages;
 
-    string[] stageLabels = { "", "توثيق المستندات", "تجهيز الملف", "الكشف الطبي",
-                              "معالجة التأشيرة", "حجز التذاكر", "التجهيز للسفر", "مكتمل - سافر" };
-    string[] stageColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#ec4899", "#6366f1", "#22c55e" };
 }
 
 <div class="page-header">
@@ -34,26 +31,16 @@
                 <input name="q" value="@q" class="form-control form-control-sm" placeholder="اسم، هاتف، رقم قومي..." />
             </div>
             <div class="col-md-3">
-                <label class="form-label form-label-sm">المرحلة</label>
-                <select name="stage" class="form-select form-select-sm">
-                    <option value="">كل المراحل</option>
-                    @for (int i = 1; i < stageLabels.Length; i++)
-                    {
-                        if (i == (stage ?? 0))
-                        {
-                            <option value="@i" selected="selected">@stageLabels[i]</option>
-                        }
-                        else
-                        {
-                            <option value="@i">@stageLabels[i]</option>
-                        }
-                    }
+                <label class="form-label form-label-sm">المرحلة الحالية</label>
+                <input name="q" value="@q" class="form-control form-control-sm" placeholder="بحث بالاسم أو الهاتف..." style="display:none" />
+                <select class="form-select form-select-sm" disabled>
+                    <option>فلتر المراحل — قريباً</option>
                 </select>
             </div>
             <div class="col-md-2">
                 <button type="submit" class="btn btn-primary btn-sm w-100">بحث</button>
             </div>
-            @if (!string.IsNullOrWhiteSpace(q) || stage.HasValue)
+            @if (!string.IsNullOrWhiteSpace(q) || stageId.HasValue)
             {
                 <div class="col-md-2">
                     <a href="/Admin/Candidates" class="btn btn-ghost btn-sm w-100">مسح</a>
@@ -91,11 +78,10 @@
                     <tbody>
                         @foreach (var c in Model)
                         {
-                            int s = (int)c.CurrentStage;
-                            string label = s >= 1 && s < stageLabels.Length ? stageLabels[s] : $"مرحلة {s}";
-                            string color = s >= 1 && s < stageColors.Length ? stageColors[s] : "#64748b";
-                            string colorBg = color + "20";
-                            string colorBorder = color + "40";
+                            string label = c.CurrentPackageStage?.StageName ?? "—";
+                            string color = "#1B4FD8";
+                            string colorBg = "#EEF2FF";
+                            string colorBorder = "#93C5FD";
 
                             <tr>
                                 <td>
@@ -125,7 +111,7 @@
                                     @c.CreatedAt.ToString("dd/MM/yyyy")
                                 </td>
                                 <td>
-                                    <a href="/Sales/CandidateDetail/@c.Id" class="btn btn-ghost btn-sm">
+                                    <a href="/Admin/CandidateDetail/@c.Id" class="btn btn-ghost btn-sm">
                                         <i class="bi bi-eye"></i>
                                     </a>
                                 </td>
@@ -144,7 +130,7 @@
                             @if (page > 1)
                             {
                                 <li class="page-item">
-                                    <a class="page-link" href="?q=@q&stage=@stage&page=@(page - 1)">
+                                    <a class="page-link" href="?q=@q&stageId=@stageId&page=@(page - 1)">
                                         <i class="bi bi-chevron-right"></i>
                                     </a>
                                 </li>
@@ -152,13 +138,13 @@
                             @for (int p = Math.Max(1, page - 2); p <= Math.Min(totalPages, page + 2); p++)
                             {
                                 <li class="page-item @(p == page ? "active" : "")">
-                                    <a class="page-link" href="?q=@q&stage=@stage&page=@p">@p</a>
+                                    <a class="page-link" href="?q=@q&stageId=@stageId&page=@p">@p</a>
                                 </li>
                             }
                             @if (page < totalPages)
                             {
                                 <li class="page-item">
-                                    <a class="page-link" href="?q=@q&stage=@stage&page=@(page + 1)">
+                                    <a class="page-link" href="?q=@q&stageId=@stageId&page=@(page + 1)">
                                         <i class="bi bi-chevron-left"></i>
                                     </a>
                                 </li>

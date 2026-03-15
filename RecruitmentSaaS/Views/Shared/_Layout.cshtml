@@ -873,13 +873,23 @@
                 </div>
                 <div class="sidebar-section">الموافقات</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "Refunds" ? "active" : "")" href="/Admin/Refunds">
-                        <span class="nav-icon"><i class="bi bi-arrow-counterclockwise"></i></span> الاستردادات
+                    <a class="nav-link @(currentController == "Admin" && currentAction == "Refunds" ? "active" : "")" href="/Admin/Refunds"
+                       style="display:flex;align-items:center;justify-content:space-between">
+                        <span><span class="nav-icon"><i class="bi bi-arrow-counterclockwise"></i></span> الاستردادات</span>
+                        @if (ViewBag.PendingRefundsCount != null && (int)ViewBag.PendingRefundsCount > 0)
+                        {
+                            <span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;min-width:18px;text-align:center">@ViewBag.PendingRefundsCount</span>
+                        }
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "Commissions" ? "active" : "")" href="/Admin/Commissions">
-                        <span class="nav-icon"><i class="bi bi-cash-stack"></i></span> العمولات
+                    <a class="nav-link @(currentController == "Admin" && currentAction == "Commissions" ? "active" : "")" href="/Admin/Commissions"
+                       style="display:flex;align-items:center;justify-content:space-between">
+                        <span><span class="nav-icon"><i class="bi bi-cash-stack"></i></span> العمولات</span>
+                        @if (ViewBag.PendingCommissionsCount != null && (int)ViewBag.PendingCommissionsCount > 0)
+                        {
+                            <span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;min-width:18px;text-align:center">@ViewBag.PendingCommissionsCount</span>
+                        }
                     </a>
                 </div>
                 <div class="sidebar-section">الإعدادات</div>
@@ -896,6 +906,28 @@
                 <div class="nav-item">
                     <a class="nav-link @(currentController == "Admin" && currentAction == "Campaigns" ? "active" : "")" href="/Admin/Campaigns">
                         <span class="nav-icon"><i class="bi bi-megaphone-fill"></i></span> الحملات
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController == "Admin" && (currentAction == "Packages" || currentAction == "PackageStages") ? "active" : "")" href="/Admin/Packages">
+                        <span class="nav-icon"><i class="bi bi-boxes"></i></span> الباقات والمراحل
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController == "Visa" ? "active" : "")" href="/Visa/Index">
+                        <span class="nav-icon"><i class="bi bi-credit-card-2-front-fill"></i></span> التأشيرات
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController == "Admin" && currentAction == "StageApprovals" ? "active" : "")" href="/Admin/StageApprovals"
+                       style="display:flex;align-items:center;justify-content:space-between">
+                        <span><span class="nav-icon"><i class="bi bi-shield-lock-fill"></i></span> طلبات الموافقة</span>
+                        @if (ViewBag.PendingApprovalsCount != null && (int)ViewBag.PendingApprovalsCount > 0)
+                        {
+                            <span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;min-width:18px;text-align:center">
+                                @ViewBag.PendingApprovalsCount
+                            </span>
+                        }
                     </a>
                 </div>
             }
@@ -1076,12 +1108,124 @@
             }
         </div>
         <div class="topbar-actions">
-            <a href="#" class="btn-icon" title="الإشعارات">
-                <i class="bi bi-bell"></i>
-                <span class="notif-dot"></span>
-            </a>
+            <!-- Notification Bell -->
+            <div style="position:relative" id="notifWrapper">
+                <button id="notifBtn"
+                        onclick="toggleNotifDropdown()"
+                        style="position:relative;background:none;border:none;cursor:pointer;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:18px;transition:background .15s"
+                        onmouseover="this.style.background='var(--hover-bg)'"
+                        onmouseout="this.style.background='none'"
+                        title="الإشعارات">
+                    <i class="bi bi-bell"></i>
+                    <span id="notifBadge"
+                          style="display:none;position:absolute;top:2px;right:2px;width:17px;height:17px;background:#ef4444;color:#fff;border-radius:50%;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1">
+                        0
+                    </span>
+                </button>
+
+                <!-- Dropdown -->
+                <div id="notifDropdown"
+                     style="display:none;position:absolute;top:44px;left:0;width:340px;background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);box-shadow:0 8px 30px rgba(0,0,0,.12);z-index:9999;overflow:hidden">
+                    <!-- Header -->
+                    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+                        <span style="font-weight:700;font-size:13px">الإشعارات</span>
+                        <div style="display:flex;gap:8px">
+                            <button onclick="markAllRead()"
+                                    style="background:none;border:none;font-size:11px;color:var(--primary);cursor:pointer;font-family:inherit;font-weight:600">
+                                تعيين كمقروء
+                            </button>
+                            <a href="/Notifications" style="font-size:11px;color:var(--text-muted);text-decoration:none">عرض الكل</a>
+                        </div>
+                    </div>
+                    <!-- List -->
+                    <div id="notifList" style="max-height:360px;overflow-y:auto">
+                        <div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">
+                            <i class="bi bi-bell" style="font-size:24px;display:block;margin-bottom:8px"></i>
+                            لا توجد إشعارات
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </header>
+
+    <script>
+        // ── Notification System ────────────────────────────────────────────────────
+        let notifOpen = false;
+
+        async function loadNotifications() {
+            try {
+                const res  = await fetch('/Notifications/Recent');
+                const data = await res.json();
+
+                // Update badge
+                const badge = document.getElementById('notifBadge');
+                if (data.unreadCount > 0) {
+                    badge.style.display    = 'flex';
+                    badge.textContent      = data.unreadCount > 99 ? '99+' : data.unreadCount;
+                } else {
+                    badge.style.display    = 'none';
+                }
+
+                // Update list
+                const list = document.getElementById('notifList');
+                if (!data.notifications.length) {
+                    list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px"><i class="bi bi-bell" style="font-size:24px;display:block;margin-bottom:8px"></i>لا توجد إشعارات</div>';
+                    return;
+                }
+
+                const typeIcon  = t => (['','bi-shield-lock-fill','bi-arrow-left-circle-fill','bi-cash-coin','bi-arrow-counterclockwise','bi-cash-stack','bi-bell-fill'])[t] || 'bi-bell-fill';
+                const typeColor = t => (['','#7c3aed','var(--primary)','#16a34a','#f59e0b','#0ea5e9','#64748b'])[t] || '#64748b';
+                const typeBg    = t => (['','#f5f3ff','var(--primary-light)','#f0fdf4','#fffbeb','#f0f9ff','#f8fafc'])[t] || '#f8fafc';
+
+                list.innerHTML = data.notifications.map(n => `
+                    <a href="${n.link || '#'}"
+                       style="display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;background:${n.isRead ? 'transparent' : 'rgba(79,70,229,.04)'};transition:background .1s"
+                       onmouseover="this.style.background='var(--hover-bg)'"
+                       onmouseout="this.style.background='${n.isRead ? 'transparent' : 'rgba(79,70,229,.04)'}'">
+                        <div style="width:32px;height:32px;border-radius:50%;background:${typeBg(n.type)};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
+                            <i class="bi ${typeIcon(n.type)}" style="font-size:13px;color:${typeColor(n.type)}"></i>
+                        </div>
+                        <div style="flex:1;min-width:0">
+                            <div style="font-size:12px;font-weight:${n.isRead ? '600' : '700'};color:var(--text-primary);margin-bottom:2px;display:flex;align-items:center;gap:6px">
+                                ${n.title}
+                                ${!n.isRead ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--primary);flex-shrink:0;display:inline-block"></span>' : ''}
+                            </div>
+                            <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.message}</div>
+                            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${n.timeAgo}</div>
+                        </div>
+                    </a>
+                `).join('');
+            } catch(e) {
+                console.error('Notification load failed:', e);
+            }
+        }
+
+        function toggleNotifDropdown() {
+            const dd = document.getElementById('notifDropdown');
+            notifOpen = !notifOpen;
+            dd.style.display = notifOpen ? 'block' : 'none';
+            if (notifOpen) loadNotifications();
+        }
+
+        async function markAllRead() {
+            await fetch('/Notifications/MarkAllRead', { method: 'POST', headers: { 'RequestVerificationToken': document.querySelector('input[name=__RequestVerificationToken]')?.value || '' } });
+            document.getElementById('notifBadge').style.display = 'none';
+            loadNotifications();
+        }
+
+        // Close on outside click
+        document.addEventListener('click', function(e) {
+            if (!document.getElementById('notifWrapper')?.contains(e.target)) {
+                document.getElementById('notifDropdown').style.display = 'none';
+                notifOpen = false;
+            }
+        });
+
+        // Auto-refresh every 30 seconds
+        loadNotifications();
+        setInterval(loadNotifications, 30000);
+    </script>
 
     <!-- ── MAIN ──────────────────────────────────────────────── -->
     <main class="main-content">

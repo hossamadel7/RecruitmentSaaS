@@ -1,0 +1,216 @@
+@model List<RecruitmentSaaS.Models.Entities.StageApprovalRequest>
+@{
+    ViewData["Title"] = "طلبات الموافقة على المراحل";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    byte statusFilter = ViewBag.StatusFilter ?? (byte)1;
+    int pendingCount  = ViewBag.PendingCount ?? 0;
+}
+
+<div style="padding:24px">
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-3">
+            <i class="bi bi-check-circle-fill me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+        <div>
+            <h1 style="font-size:22px;font-weight:800;margin:0">
+                🔐 طلبات الموافقة على المراحل
+            </h1>
+            <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0">
+                طلبات الانتقال التي تحتاج موافقة الأدمن
+            </p>
+        </div>
+        @if (pendingCount > 0)
+        {
+            <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:var(--radius-sm);padding:10px 16px;font-size:13px;font-weight:700;color:#854d0e">
+                <i class="bi bi-clock-fill me-1"></i> @pendingCount طلب معلق
+            </div>
+        }
+    </div>
+
+    <!-- Status Filter -->
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+        <a href="/Admin/StageApprovals"
+           style="padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;text-decoration:none;
+                  background:@(statusFilter==1?"var(--primary)":"#f1f5f9");
+                  color:@(statusFilter==1?"#fff":"var(--text-muted)")">
+            معلقة @(pendingCount > 0 ? $"({pendingCount})" : "")
+        </a>
+        <a href="/Admin/StageApprovals?status=2"
+           style="padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;text-decoration:none;
+                  background:@(statusFilter==2?"#16a34a":"#f1f5f9");
+                  color:@(statusFilter==2?"#fff":"var(--text-muted)")">
+            موافق عليها
+        </a>
+        <a href="/Admin/StageApprovals?status=3"
+           style="padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;text-decoration:none;
+                  background:@(statusFilter==3?"#dc2626":"#f1f5f9");
+                  color:@(statusFilter==3?"#fff":"var(--text-muted)")">
+            مرفوضة
+        </a>
+    </div>
+
+    <!-- Requests List -->
+    @if (!Model.Any())
+    {
+        <div style="background:var(--card-bg);border-radius:var(--radius);border:2px dashed var(--border);padding:60px;text-align:center">
+            <div style="font-size:40px;margin-bottom:12px">✅</div>
+            <div style="font-weight:700;font-size:15px;margin-bottom:6px">
+                @(statusFilter == 1 ? "لا توجد طلبات معلقة" : "لا توجد طلبات")
+            </div>
+        </div>
+    }
+    else
+    {
+        <div style="display:flex;flex-direction:column;gap:12px">
+        @foreach (var r in Model)
+        {
+            var statusBg    = r.Status == 1 ? "#fef9c3" : r.Status == 2 ? "#f0fdf4" : "#fef2f2";
+            var statusColor = r.Status == 1 ? "#854d0e" : r.Status == 2 ? "#16a34a" : "#dc2626";
+            var statusText  = r.Status == 1 ? "⏳ معلق" : r.Status == 2 ? "✅ موافق عليه" : "❌ مرفوض";
+
+            <div style="background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden">
+                <!-- Request Header -->
+                <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+                    <div style="display:flex;align-items:center;gap:14px">
+                        <!-- Candidate -->
+                        <div style="width:44px;height:44px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0">
+                            @r.Candidate.FullName.First()
+                        </div>
+                        <div>
+                            <div style="font-weight:800;font-size:14px">@r.Candidate.FullName</div>
+                            <div style="font-size:12px;color:var(--text-muted)">
+                                @r.Candidate.JobPackage?.Name
+                                &nbsp;·&nbsp;
+                                @r.RequestedBy.FullName
+                                &nbsp;·&nbsp;
+                                @r.RequestedAt.ToString("dd/MM/yyyy HH:mm")
+                            </div>
+                        </div>
+                    </div>
+                    <span style="background:@statusBg;color:@statusColor;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">
+                        @statusText
+                    </span>
+                </div>
+
+                <!-- Stage Transition + Exception Details -->
+                <div style="padding:12px 20px;background:#f8fafc;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:@(r.ExceptionType == 1 ? "10px" : "0")">
+                        @if (r.ExceptionType == 1)
+                        {
+                            <span style="background:#fef9c3;color:#854d0e;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">
+                                💰 استثناء دفع
+                            </span>
+                        }
+                        else if (r.ExceptionType == 2)
+                        {
+                            <span style="background:#eff6ff;color:var(--primary);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">
+                                🔐 موافقة مرحلة
+                            </span>
+                        }
+                        <span style="background:#e2e8f0;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">
+                            @r.FromStage.StageName
+                        </span>
+                        <i class="bi bi-arrow-left" style="color:var(--text-muted)"></i>
+                        <span style="background:var(--primary-light);color:var(--primary);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">
+                            @r.ToStage.StageName
+                        </span>
+                    </div>
+                    @if (r.ExceptionType == 1 && r.MinPaymentRequired.HasValue)
+                    {
+                        <div style="display:flex;gap:16px;font-size:12px">
+                            <span style="color:#854d0e">
+                                <i class="bi bi-cash me-1"></i>
+                                المطلوب: <strong>@r.MinPaymentRequired.Value.ToString("N0") ج.م</strong>
+                            </span>
+                            <span style="color:var(--text-muted)">
+                                المدفوع: <strong>@(r.AmountPaid?.ToString("N0") ?? "0") ج.م</strong>
+                            </span>
+                            <span style="color:#dc2626">
+                                المتبقي: <strong>@((r.MinPaymentRequired.Value - (r.AmountPaid ?? 0)).ToString("N0")) ج.م</strong>
+                            </span>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(r.RequestNote))
+                    {
+                        <div style="font-size:12px;color:var(--text-muted);margin-top:6px">
+                            <i class="bi bi-chat-text me-1"></i>@r.RequestNote
+                        </div>
+                    }
+                </div>
+
+                <!-- Actions or Result -->
+                <div style="padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+                    @if (r.Status == 1)
+                    {
+                        <!-- Approve -->
+                        <form method="post" action="/Admin/ApproveStageRequest" style="display:flex;gap:8px;align-items:center;flex:1">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="requestId" value="@r.Id" />
+                            <input type="text" name="adminNote" class="form-control form-control-sm"
+                                   placeholder="ملاحظة للموافقة (اختياري)"
+                                   style="font-size:12px;max-width:250px" />
+                            <button type="submit"
+                                    style="background:#16a34a;color:#fff;border:none;border-radius:var(--radius-sm);padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
+                                <i class="bi bi-check-lg me-1"></i> موافقة
+                            </button>
+                        </form>
+
+                        <!-- Reject -->
+                        <form method="post" action="/Admin/RejectStageRequest"
+                              style="display:flex;gap:8px;align-items:center"
+                              onsubmit="return checkRejectNote(this)">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="requestId" value="@r.Id" />
+                            <input type="text" name="adminNote" class="form-control form-control-sm"
+                                   placeholder="سبب الرفض *"
+                                   style="font-size:12px;max-width:200px" />
+                            <button type="submit"
+                                    style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:var(--radius-sm);padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
+                                <i class="bi bi-x-lg me-1"></i> رفض
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <div style="font-size:12px;color:var(--text-muted)">
+                            @r.ReviewedBy?.FullName · @r.ReviewedAt?.ToString("dd/MM/yyyy HH:mm")
+                            @if (!string.IsNullOrEmpty(r.AdminNote))
+                            {
+                                <span style="margin-right:8px;color:var(--text-primary)">· @r.AdminNote</span>
+                            }
+                        </div>
+                        <a href="/Admin/Candidates"
+                           style="font-size:12px;color:var(--primary);text-decoration:none">
+                            عرض المرشح <i class="bi bi-arrow-left ms-1"></i>
+                        </a>
+                    }
+                </div>
+            </div>
+        }
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script>
+function checkRejectNote(form) {
+    var note = form.querySelector('input[name="adminNote"]').value.trim();
+    if (!note) { alert('يرجى كتابة سبب الرفض'); return false; }
+    return confirm('رفض طلب الانتقال؟');
+}
+</script>
+}

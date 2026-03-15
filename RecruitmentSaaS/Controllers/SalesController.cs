@@ -15,11 +15,14 @@ namespace RecruitmentSaaS.Controllers
     {
         private readonly RecruitmentCrmContext _context;
         private readonly IWebHostEnvironment _env;
+        private readonly RecruitmentSaaS.Services.INotificationService _notifications;
 
-        public SalesController(RecruitmentCrmContext context, IWebHostEnvironment env)
+        public SalesController(RecruitmentCrmContext context, IWebHostEnvironment env,
+                               RecruitmentSaaS.Services.INotificationService notifications)
         {
             _context = context;
             _env = env;
+            _notifications = notifications;
         }
 
         private Guid CurrentUserId =>
@@ -191,6 +194,26 @@ namespace RecruitmentSaaS.Controllers
                     await _context.SaveChangesAsync();
                 }
 
+                // Auto-create commission for this deal (Status=1 pending admin approval)
+                var existingCommission = await _context.Commissions
+                    .AnyAsync(c => c.CandidateId == newCandidateId);
+
+                if (!existingCommission)
+                {
+                    _context.Commissions.Add(new RecruitmentSaaS.Models.Entities.Commission
+                    {
+                        Id = Guid.NewGuid(),
+                        SalesUserId = userId,
+                        CandidateId = newCandidateId,
+                        CommissionMonth = DateOnly.FromDateTime(DateTime.UtcNow),
+                        AmountEgp = 0, // Admin sets the actual amount when approving
+                        DealsThisMonth = 1,
+                        Status = 1, // Pending admin approval
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    await _context.SaveChangesAsync();
+                }
+
                 TempData["Success"] = "تم تحويل العميل إلى مرشح بنجاح";
                 return RedirectToAction("CandidateDetail", new { id = newCandidateId });
             }
@@ -202,16 +225,17 @@ namespace RecruitmentSaaS.Controllers
         }
 
         // ── GET /Sales/Candidates ─────────────────────────────────────────────
-        public async Task<IActionResult> Candidates(byte? stage)
+        public async Task<IActionResult> Candidates(Guid? stageId)
         {
             var userId = CurrentUserId;
 
             var query = _context.Candidates
                 .Include(c => c.JobPackage)
+                .Include(c => c.CurrentPackageStage)
                 .Where(c => c.AssignedSalesId == userId);
 
-            if (stage.HasValue)
-                query = query.Where(c => c.CurrentStage == stage.Value);
+            if (stageId.HasValue)
+                query = query.Where(c => c.CurrentPackageStageId == stageId.Value);
 
             var candidates = await query
                 .OrderByDescending(c => c.CreatedAt)
@@ -221,7 +245,8 @@ namespace RecruitmentSaaS.Controllers
                     FullName = c.FullName,
                     Phone = c.Phone,
                     NationalId = c.NationalId,
-                    CurrentStage = c.CurrentStage,
+                    CurrentStageName = c.CurrentPackageStage != null ? c.CurrentPackageStage.StageName : "—",
+                    CurrentStageOrder = c.CurrentPackageStage != null ? (int)c.CurrentPackageStage.StageOrder : 0,
                     Status = c.Status,
                     JobPackageName = c.JobPackage.Name,
                     TotalPaidEGP = c.TotalPaidEgp,
@@ -231,7 +256,7 @@ namespace RecruitmentSaaS.Controllers
                 })
                 .ToListAsync();
 
-            ViewBag.CurrentStage = stage;
+            ViewBag.StageId = stageId;
             return View(candidates);
         }
 
@@ -242,7 +267,10 @@ namespace RecruitmentSaaS.Controllers
 
             var candidate = await _context.Candidates
                 .Include(c => c.JobPackage)
+                    .ThenInclude(p => p.PackageStages.Where(s => s.IsActive == true).OrderBy(s => s.StageOrder))
+                    .ThenInclude(ps => ps.StageType)
                 .Include(c => c.RegisteredBy)
+                .Include(c => c.CurrentPackageStage)
                 .FirstOrDefaultAsync(c => c.Id == id && c.AssignedSalesId == userId);
 
             if (candidate == null) return NotFound();
@@ -304,8 +332,10 @@ namespace RecruitmentSaaS.Controllers
                 {
                     FromStage = h.FromStage,
                     ToStage = h.ToStage,
+                    ToStageOrder = (int)h.ToStage,
                     IsOverride = h.IsOverride,
                     OverrideReason = h.OverrideReason,
+                    Notes = h.Notes,
                     ChangedByName = h.ChangedBy.FullName,
                     CreatedAt = h.CreatedAt
                 })
@@ -337,8 +367,10 @@ namespace RecruitmentSaaS.Controllers
                 {
                     FromStage = h.FromStage,
                     ToStage = h.ToStage,
+                    ToStageOrder = (int)h.ToStage,
                     IsOverride = h.IsOverride,
                     OverrideReason = h.OverrideReason,
+                    Notes = h.Notes,
                     ChangedByName = h.ChangedBy.FullName,
                     CreatedAt = h.CreatedAt
                 })
@@ -349,6 +381,20 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.StageHistory = history;
             ViewBag.Visits = visits;
             ViewBag.VisitComments = visitComments;
+            ViewBag.PackageStages = candidate.JobPackage.PackageStages
+                                        .Where(s => s.IsActive == true)
+                                        .OrderBy(s => s.StageOrder)
+                                        .ToList();
+
+            // Stage action completions
+            ViewBag.StageCompletions = await _context.StageActionCompletions
+                .Where(sc => sc.CandidateId == id)
+                .ToListAsync();
+
+            // Pending approval request
+            ViewBag.PendingApproval = await _context.StageApprovalRequests
+                .Include(r => r.ToStage)
+                .FirstOrDefaultAsync(r => r.CandidateId == id && r.Status == 1);
 
             var dto = new CandidateDetailDto
             {
@@ -356,10 +402,13 @@ namespace RecruitmentSaaS.Controllers
                 FullName = candidate.FullName,
                 Phone = candidate.Phone,
                 NationalId = candidate.NationalId,
+                PassportNumber = candidate.PassportNumber,
+                PassportExpiry = candidate.PassportExpiry,
                 Age = candidate.Age,
                 City = candidate.City,
                 Notes = candidate.Notes,
-                CurrentStage = candidate.CurrentStage,
+                CurrentStageName = candidate.CurrentPackageStage?.StageName ?? "—",
+                CurrentStageOrder = candidate.CurrentPackageStage?.StageOrder ?? 0,
                 Status = candidate.Status,
                 JobPackageName = candidate.JobPackage.Name,
                 TotalPaidEGP = candidate.TotalPaidEgp,
@@ -401,8 +450,8 @@ namespace RecruitmentSaaS.Controllers
             {
                 Id = Guid.NewGuid(),
                 CandidateId = candidateId,
-                FromStage = candidate.CurrentStage,
-                ToStage = candidate.CurrentStage,
+                FromStageId = candidate.CurrentPackageStageId,
+                ToStageId = candidate.CurrentPackageStageId,
                 ChangedById = userId,
                 IsOverride = false,
                 OverrideReason = $"visit:{visitId}:{comment}",
@@ -416,10 +465,112 @@ namespace RecruitmentSaaS.Controllers
             return RedirectToAction("CandidateDetail", new { id = candidateId });
         }
 
-        // ── POST /Sales/ToggleStage ───────────────────────────────────────────
+        // ── POST /Sales/MoveToNextStage ──────────────────────────────────────
+        // استبدل ToggleStage القديم بنظام المراحل الجديد
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ToggleStage(Guid candidateId, byte stage, bool markDone, string? comment)
+        public async Task<IActionResult> MoveToNextStage(Guid candidateId, string? notes)
+        {
+            var userId = CurrentUserId;
+
+            var candidate = await _context.Candidates
+                .Include(c => c.CurrentPackageStage)
+                .FirstOrDefaultAsync(c => c.Id == candidateId && c.AssignedSalesId == userId);
+
+            if (candidate == null)
+            {
+                TempData["Error"] = "المرشح غير موجود";
+                return RedirectToAction("Candidates");
+            }
+
+            // استدعاء الـ SP
+            var successParam = new Microsoft.Data.SqlClient.SqlParameter
+            {
+                ParameterName = "@Success",
+                SqlDbType = System.Data.SqlDbType.Bit,
+                Direction = System.Data.ParameterDirection.Output
+            };
+            var messageParam = new Microsoft.Data.SqlClient.SqlParameter
+            {
+                ParameterName = "@Message",
+                SqlDbType = System.Data.SqlDbType.NVarChar,
+                Size = 500,
+                Direction = System.Data.ParameterDirection.Output
+            };
+            var stageNameParam = new Microsoft.Data.SqlClient.SqlParameter
+            {
+                ParameterName = "@NewStageName",
+                SqlDbType = System.Data.SqlDbType.NVarChar,
+                Size = 200,
+                Direction = System.Data.ParameterDirection.Output
+            };
+
+            await _context.Database.ExecuteSqlRawAsync(
+                "EXEC demorecruitment.sp_MoveToNextStage @CandidateId, @MovedById, @Notes, @IsOverride, @OverrideReason, @Success OUTPUT, @Message OUTPUT, @NewStageName OUTPUT",
+                new Microsoft.Data.SqlClient.SqlParameter("@CandidateId", candidateId),
+                new Microsoft.Data.SqlClient.SqlParameter("@MovedById", userId),
+                new Microsoft.Data.SqlClient.SqlParameter("@Notes", (object?)notes ?? DBNull.Value),
+                new Microsoft.Data.SqlClient.SqlParameter("@IsOverride", false),
+                new Microsoft.Data.SqlClient.SqlParameter("@OverrideReason", DBNull.Value),
+                successParam, messageParam, stageNameParam
+            );
+
+            var success = (bool)successParam.Value;
+            var message = messageParam.Value?.ToString() ?? "";
+
+            if (success)
+            {
+                TempData["Success"] = message;
+            }
+            else if (message.StartsWith("DOCUMENT_REQUIRED:"))
+            {
+                // Format: DOCUMENT_REQUIRED:{stageName}
+                var parts = message.Split(':', 2);
+                TempData["DocumentRequired"] = "1";
+                TempData["Error"] = $"يجب رفع المستند المطلوب قبل الانتقال من مرحلة {(parts.Length > 1 ? parts[1] : "")}";
+            }
+            else if (message.StartsWith("PAYMENT_EXCEPTION_REQUIRED:"))
+            {
+                // Format: PAYMENT_EXCEPTION_REQUIRED:{fromId}:{toId}:{minPay}:{paid}
+                var parts = message.Split(':');
+                if (parts.Length == 5)
+                {
+                    TempData["PaymentException"] = "1";
+                    TempData["ExceptionFromStageId"] = parts[1];
+                    TempData["ExceptionToStageId"] = parts[2];
+                    TempData["ExceptionMinPay"] = parts[3];
+                    TempData["ExceptionAmountPaid"] = parts[4];
+                }
+                TempData["Error"] = $"مطلوب سداد المبلغ المطلوب أولاً — يمكنك طلب استثناء من الأدمن";
+            }
+            else if (message.StartsWith("REQUIRES_APPROVAL:"))
+            {
+                var parts = message.Split(':');
+                if (parts.Length == 3)
+                {
+                    TempData["RequiresApproval"] = "1";
+                    TempData["ApprovalFromStageId"] = parts[1];
+                    TempData["ApprovalToStageId"] = parts[2];
+                }
+                TempData["Error"] = "هذه المرحلة تحتاج موافقة الأدمن — اضغط طلب الموافقة";
+            }
+            else
+            {
+                TempData["Error"] = message;
+            }
+
+            candidate.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction("CandidateDetail", new { id = candidateId });
+        }
+
+        // ── POST /Sales/RequestStageApproval ─────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RequestStageApproval(
+            Guid candidateId, Guid fromStageId, Guid toStageId, string? requestNote,
+            byte exceptionType = 2, decimal? minPaymentRequired = null, decimal? amountPaid = null)
         {
             var userId = CurrentUserId;
 
@@ -432,45 +583,97 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("Candidates");
             }
 
-            // Log the toggle action
-            _context.CandidateStageHistories.Add(new CandidateStageHistory
+            // Check if pending request already exists
+            var existing = await _context.StageApprovalRequests
+                .AnyAsync(r => r.CandidateId == candidateId
+                    && r.FromStageId == fromStageId
+                    && r.Status == 1);
+
+            if (existing)
+            {
+                TempData["Error"] = "يوجد طلب معلق بالفعل في انتظار موافقة الأدمن";
+                return RedirectToAction("CandidateDetail", new { id = candidateId });
+            }
+
+            _context.StageApprovalRequests.Add(new StageApprovalRequest
             {
                 Id = Guid.NewGuid(),
                 CandidateId = candidateId,
-                FromStage = candidate.CurrentStage,
-                ToStage = stage,
-                ChangedById = userId,
-                IsOverride = !markDone,   // IsOverride=true means "un-done"
-                OverrideReason = comment,
-                MeetingOutcome = comment,
-                CreatedAt = DateTime.UtcNow
+                FromStageId = fromStageId,
+                ToStageId = toStageId,
+                RequestedById = userId,
+                RequestedAt = DateTime.UtcNow,
+                RequestNote = requestNote,
+                Status = 1, // Pending
+                ExceptionType = exceptionType,
+                MinPaymentRequired = minPaymentRequired,
+                AmountPaid = amountPaid ?? candidate.TotalPaidEgp
             });
 
-            // Update CurrentStage to highest completed stage
-            if (markDone && stage > candidate.CurrentStage)
-                candidate.CurrentStage = stage;
-            else if (!markDone && stage == candidate.CurrentStage && stage > 1)
-                candidate.CurrentStage = (byte)(stage - 1);
-
-            // Handle completion
-            if (markDone && stage == 7)
-            {
-                candidate.IsCompleted = true;
-                candidate.CompletedAt = DateTime.UtcNow;
-            }
-            else if (!markDone && stage == 7)
-            {
-                candidate.IsCompleted = false;
-                candidate.CompletedAt = null;
-            }
-
-            candidate.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = markDone
-                ? $"تم تعيين المرحلة مكتملة"
-                : $"تم إلغاء إكمال المرحلة";
+            // Notify all admins
+            var fromStage = await _context.PackageStages.FindAsync(fromStageId);
+            var toStage = await _context.PackageStages.FindAsync(toStageId);
+            var cand = await _context.Candidates.FindAsync(candidateId);
+            var typeText = exceptionType == 1 ? "استثناء دفع" : "موافقة مرحلة";
 
+            await _notifications.SendToAdminsAsync(
+                title: $"طلب {typeText} جديد",
+                message: $"{cand?.FullName ?? string.Empty} — من {fromStage?.StageName} إلى {toStage?.StageName}",
+                link: "/Admin/StageApprovals",
+                type: RecruitmentSaaS.Services.NotificationType.ApprovalRequest
+            );
+
+            TempData["Success"] = $"تم إرسال طلب {typeText} للأدمن بنجاح";
+            return RedirectToAction("CandidateDetail", new { id = candidateId });
+        }
+
+        // ── POST /Sales/CompleteStageAction ───────────────────────────────────
+        // يُسجل إتمام الـ action للمرحلة الحالية يدوياً
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CompleteStageAction(
+            Guid candidateId, Guid packageStageId, string? notes)
+        {
+            var userId = CurrentUserId;
+
+            var candidate = await _context.Candidates
+                .FirstOrDefaultAsync(c => c.Id == candidateId && c.AssignedSalesId == userId);
+
+            if (candidate == null)
+            {
+                TempData["Error"] = "المرشح غير موجود";
+                return RedirectToAction("Candidates");
+            }
+
+            // Upsert — إما يضيف أو يحدث لو موجود
+            var existing = await _context.StageActionCompletions
+                .FirstOrDefaultAsync(s => s.CandidateId == candidateId
+                    && s.PackageStageId == packageStageId);
+
+            if (existing == null)
+            {
+                _context.StageActionCompletions.Add(new StageActionCompletion
+                {
+                    Id = Guid.NewGuid(),
+                    CandidateId = candidateId,
+                    PackageStageId = packageStageId,
+                    CompletedAt = DateTime.UtcNow,
+                    CompletedById = userId,
+                    CompletionType = 1, // Manual
+                    Notes = notes
+                });
+            }
+            else
+            {
+                existing.CompletedAt = DateTime.UtcNow;
+                existing.CompletedById = userId;
+                existing.Notes = notes;
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = "تم تسجيل إتمام المرحلة بنجاح";
             return RedirectToAction("CandidateDetail", new { id = candidateId });
         }
 
@@ -548,7 +751,7 @@ namespace RecruitmentSaaS.Controllers
         // ── POST /Sales/UploadDocument ────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UploadDocument(Guid candidateId, byte documentType, IFormFile file)
+        public async Task<IActionResult> UploadDocument(Guid candidateId, byte documentType, IFormFile file, string? passportNumber = null, DateOnly? passportExpiry = null)
         {
             var userId = CurrentUserId;
 
@@ -572,6 +775,26 @@ namespace RecruitmentSaaS.Controllers
             {
                 TempData["Error"] = "حجم الملف يتجاوز الحد المسموح (10 MB)";
                 return RedirectToAction("CandidateDetail", new { id = candidateId });
+            }
+
+            // Passport fields are mandatory when documentType = 1
+            if (documentType == 1)
+            {
+                if (string.IsNullOrWhiteSpace(passportNumber))
+                {
+                    TempData["Error"] = "رقم الجواز إجباري عند رفع صورة الجواز";
+                    return RedirectToAction("CandidateDetail", new { id = candidateId });
+                }
+                if (!passportExpiry.HasValue)
+                {
+                    TempData["Error"] = "تاريخ انتهاء الجواز إجباري عند رفع صورة الجواز";
+                    return RedirectToAction("CandidateDetail", new { id = candidateId });
+                }
+                if (passportExpiry.Value <= DateOnly.FromDateTime(DateTime.Today))
+                {
+                    TempData["Error"] = "تاريخ انتهاء الجواز يجب أن يكون في المستقبل";
+                    return RedirectToAction("CandidateDetail", new { id = candidateId });
+                }
             }
 
             // Save file to local disk under wwwroot/uploads/candidates/{candidateId}/
@@ -605,9 +828,24 @@ namespace RecruitmentSaaS.Controllers
             candidate.IsProfileComplete = true;
             candidate.UpdatedAt = DateTime.UtcNow;
 
+            // ── If passport — save data to candidate profile ─────────────────
+            if (documentType == 1)
+            {
+                if (!string.IsNullOrWhiteSpace(passportNumber))
+                    candidate.PassportNumber = passportNumber.Trim().ToUpper();
+
+                if (passportExpiry.HasValue)
+                    candidate.PassportExpiry = passportExpiry.Value;
+
+                // StageActionCompletion is now recorded by sp_MoveToNextStage when candidate passes the stage
+                // No manual completion needed here — passport data saved, stage completion happens on transition
+            }
+
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = "تم رفع المستند بنجاح";
+            TempData["Success"] = documentType == 1
+                ? "تم رفع الجواز وحفظ البيانات بنجاح ✅"
+                : "تم رفع المستند بنجاح";
             return RedirectToAction("CandidateDetail", new { id = candidateId });
         }
 
