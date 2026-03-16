@@ -41,6 +41,8 @@ public partial class User
 
     public virtual ICollection<Commission> CommissionSalesUsers { get; set; } = new List<Commission>();
 
+    public virtual ICollection<Company> Companies { get; set; } = new List<Company>();
+
     public virtual ICollection<Document> Documents { get; set; } = new List<Document>();
 
     public virtual ICollection<FollowUpReminder> FollowUpReminderAssignedTos { get; set; } = new List<FollowUpReminder>();

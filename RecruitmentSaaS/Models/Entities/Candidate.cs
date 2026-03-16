@@ -51,6 +51,8 @@ public partial class Candidate
 
     public DateOnly? VisaExpiry { get; set; }
 
+    public Guid? CompanyId { get; set; }
+
     public virtual User AssignedSales { get; set; } = null!;
 
     public virtual Branch Branch { get; set; } = null!;
@@ -60,6 +62,8 @@ public partial class Candidate
     public virtual ICollection<CandidateStageHistory> CandidateStageHistories { get; set; } = new List<CandidateStageHistory>();
 
     public virtual Commission? Commission { get; set; }
+
+    public virtual Company? Company { get; set; }
 
     public virtual PackageStage? CurrentPackageStage { get; set; }
 
