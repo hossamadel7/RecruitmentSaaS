@@ -287,6 +287,8 @@ namespace RecruitmentSaaS.Models.DTOs
 
         [MaxLength(500)]
         public string? Note { get; set; }
+
+        public DateOnly? NextFollowUpDate { get; set; }
     }
 
     // =============================================================================

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
 using RecruitmentSaaS.Models.DTOs;
 using RecruitmentSaaS.Models.Entities;
+using RecruitmentSaaS.Services;
 using System.Security.Claims;
 
 namespace RecruitmentSaaS.Controllers
@@ -12,10 +13,12 @@ namespace RecruitmentSaaS.Controllers
     public class TeleSalesController : Controller
     {
         private readonly RecruitmentCrmContext _context;
+        private readonly INotificationService _notifications;
 
-        public TeleSalesController(RecruitmentCrmContext context)
+        public TeleSalesController(RecruitmentCrmContext context, INotificationService notifications)
         {
             _context = context;
+            _notifications = notifications;
         }
 
         private Guid CurrentUserId =>
@@ -293,7 +296,7 @@ namespace RecruitmentSaaS.Controllers
         // ── POST /TeleSales/UpdateStatus ──────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateStatus(Guid leadId, byte newStatus)
+        public async Task<IActionResult> UpdateStatus(Guid leadId, byte newStatus, DateTime? appointmentDate = null)
         {
             var userId = CurrentUserId;
 
@@ -301,6 +304,13 @@ namespace RecruitmentSaaS.Controllers
             if (!new byte[] { 2, 3, 4, 5, 8 }.Contains(newStatus))
             {
                 TempData["Error"] = "غير مسموح بهذه الحالة";
+                return RedirectToAction("LeadDetail", new { id = leadId });
+            }
+
+            // Status 5 requires appointment date
+            if (newStatus == 5 && appointmentDate == null)
+            {
+                TempData["Error"] = "يرجى تحديد تاريخ ووقت الموعد";
                 return RedirectToAction("LeadDetail", new { id = leadId });
             }
 
@@ -316,6 +326,35 @@ namespace RecruitmentSaaS.Controllers
             var oldStatus = lead.Status;
             lead.Status = newStatus;
             lead.UpdatedAt = DateTime.UtcNow;
+
+            // Save appointment date and schedule reminder
+            if (newStatus == 5 && appointmentDate.HasValue)
+            {
+                lead.AppointmentDate = appointmentDate.Value;
+
+                // Create follow-up reminder for the day before
+                var reminderDate = DateOnly.FromDateTime(appointmentDate.Value.AddDays(-1));
+                _context.FollowUpReminders.Add(new FollowUpReminder
+                {
+                    Id = Guid.NewGuid(),
+                    LeadId = leadId,
+                    AssignedToId = userId,
+                    CreatedById = userId,
+                    ReminderDate = reminderDate,
+                    Notes = $"تذكير: موعد {lead.FullName} غداً الساعة {appointmentDate.Value:HH:mm}",
+                    Status = 1,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                // Send immediate notification to confirm appointment was set
+                await _notifications.SendAsync(
+                    userId: userId,
+                    title: $"📅 تم تحديد موعد: {lead.FullName}",
+                    message: $"الموعد: {appointmentDate.Value:dd/MM/yyyy HH:mm} · ستصلك تذكرة يوم {reminderDate:dd/MM/yyyy}",
+                    link: $"/TeleSales/LeadDetail/{leadId}",
+                    type: NotificationType.General
+                );
+            }
 
             var statusNames = new Dictionary<byte, string>
             {
@@ -406,6 +445,18 @@ namespace RecruitmentSaaS.Controllers
 
             await _context.SaveChangesAsync();
 
+            // Notify telesales if they set a follow-up date
+            if (dto.NextFollowUpDate.HasValue && lead != null)
+            {
+                await _notifications.SendAsync(
+                    userId: userId,
+                    title: $"🔔 متابعة مجدولة: {lead.FullName}",
+                    message: $"تذكير متابعة بتاريخ {dto.NextFollowUpDate.Value:dd/MM/yyyy} · {lead.Phone}",
+                    link: $"/TeleSales/LeadDetail/{dto.LeadId}",
+                    type: NotificationType.General
+                );
+            }
+
             TempData["Success"] = "تم تسجيل المكالمة بنجاح";
             return RedirectToAction("LeadDetail", new { id = dto.LeadId });
         }
@@ -455,7 +506,25 @@ namespace RecruitmentSaaS.Controllers
                 CreatedAt = DateTime.UtcNow
             });
 
+            var reminderLead = await _context.Leads
+                .Where(l => l.Id == dto.LeadId)
+                .Select(l => new { l.FullName, l.Phone })
+                .FirstOrDefaultAsync();
+
             await _context.SaveChangesAsync();
+
+            // Notify telesales confirming the reminder was set
+            if (reminderLead != null)
+            {
+                await _notifications.SendAsync(
+                    userId: userId,
+                    title: $"🔔 تذكير مضاف: {reminderLead.FullName}",
+                    message: $"ستصلك تذكرة متابعة {reminderLead.FullName} ({reminderLead.Phone}) بتاريخ {dto.ReminderDate:dd/MM/yyyy}" +
+                             (string.IsNullOrEmpty(dto.Notes) ? "" : $" · {dto.Notes}"),
+                    link: $"/TeleSales/LeadDetail/{dto.LeadId}",
+                    type: NotificationType.General
+                );
+            }
 
             TempData["Success"] = "تم تعيين التذكير بنجاح";
             return RedirectToAction("LeadDetail", new { id = dto.LeadId });
