@@ -26,6 +26,10 @@ public partial class RecruitmentCrmContext : DbContext
 
     public virtual DbSet<Commission> Commissions { get; set; }
 
+    public virtual DbSet<Company> Companies { get; set; }
+
+    public virtual DbSet<CompanyJob> CompanyJobs { get; set; }
+
     public virtual DbSet<Document> Documents { get; set; }
 
     public virtual DbSet<FollowUpReminder> FollowUpReminders { get; set; }
@@ -198,6 +202,10 @@ public partial class RecruitmentCrmContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_demorecruitment_Cnd_Br");
 
+            entity.HasOne(d => d.Company).WithMany(p => p.Candidates)
+                .HasForeignKey(d => d.CompanyId)
+                .HasConstraintName("FK_demorecruitment_Candidates_Company");
+
             entity.HasOne(d => d.CurrentPackageStage).WithMany(p => p.Candidates)
                 .HasForeignKey(d => d.CurrentPackageStageId)
                 .HasConstraintName("FK_demo_Cand_Stage");
@@ -313,6 +321,52 @@ public partial class RecruitmentCrmContext : DbContext
                 .HasForeignKey(d => d.SalesUserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_demorecruitment_Com_Sa");
+        });
+
+        modelBuilder.Entity<Company>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_demorecruitment_Companies");
+
+            entity.ToTable("Companies", "demorecruitment");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.City).HasMaxLength(100);
+            entity.Property(e => e.ContactEmail).HasMaxLength(255);
+            entity.Property(e => e.ContactPhone).HasMaxLength(50);
+            entity.Property(e => e.Country).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.UpdatedAt).HasPrecision(0);
+
+            entity.HasOne(d => d.CreatedBy).WithMany(p => p.Companies)
+                .HasForeignKey(d => d.CreatedById)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_demorecruitment_Companies_User");
+        });
+
+        modelBuilder.Entity<CompanyJob>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_demorecruitment_CompanyJobs");
+
+            entity.ToTable("CompanyJobs", "demorecruitment");
+
+            entity.HasIndex(e => e.CompanyId, "IX_demorecruitment_CompanyJobs_CompanyId");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.CreatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.JobTitle).HasMaxLength(200);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            entity.Property(e => e.RequestedCount).HasDefaultValue(1);
+
+            entity.HasOne(d => d.Company).WithMany(p => p.CompanyJobs)
+                .HasForeignKey(d => d.CompanyId)
+                .HasConstraintName("FK_demorecruitment_CompanyJobs_Company");
         });
 
         modelBuilder.Entity<Document>(entity =>
