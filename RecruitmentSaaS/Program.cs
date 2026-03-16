@@ -27,6 +27,8 @@ builder.Services.AddScoped<RecruitmentSaaS.Services.INotificationService,
 builder.Services.AddScoped<RecruitmentSaaS.Services.IVisaParserService,
                            RecruitmentSaaS.Services.VisaParserService>();
 
+builder.Services.AddHostedService<RecruitmentSaaS.Services.AppointmentReminderService>();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
