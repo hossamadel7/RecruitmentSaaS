@@ -36,67 +36,52 @@ namespace RecruitmentSaaS.Controllers
             return View();
         }
 
-        // ── POST /Home/SubmitLead ─────────────────────────────────────────
+        // POST /Home/SubmitLead
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SubmitLead(
             string fullName,
             string phone,
-            Guid? branchId,
             string? interestedJobTitle,
             string? interestedCountry,
-            string? notes,
-            string? website_trap)   // honeypot — bots fill this, humans don't
+            string? notes)
         {
-            // ── 1. Honeypot: silently redirect bots ───────────────────────
-            if (!string.IsNullOrEmpty(website_trap))
-                return RedirectToAction("ThankYou");
-
-            // ── 2. Resolve branch ─────────────────────────────────────────
-            var activeBranches = await _context.Branches
-                .Where(b => b.IsActive)
-                .OrderBy(b => b.Name)
-                .ToListAsync();
-
-            var resolvedBranchId = activeBranches.Count == 1
-                ? activeBranches[0].Id
-                : branchId;
-
+            // 1. Find first active branch (for website, assume just one)
+            var activeBranches = await _context.Branches.Where(b => b.IsActive).OrderBy(b => b.Name).ToListAsync();
+            var resolvedBranchId = activeBranches.Count > 0 ? activeBranches[0].Id : (Guid?)null;
             if (resolvedBranchId == null)
             {
-                TempData["FormError"] = "يرجى اختيار الفرع";
+                TempData["FormError"] = "لا يوجد فرع متاح";
                 return RedirectToAction("Index");
             }
 
-            // ── 3. Resolve RegisteredById — use first admin as system user ─
+            // 2. Determine RegisteredById (first admin, system user)
             var systemUserId = await _context.Users
                 .Where(u => u.Role == 1 && u.IsActive)
                 .OrderBy(u => u.CreatedAt)
                 .Select(u => (Guid?)u.Id)
                 .FirstOrDefaultAsync();
-
             if (systemUserId == null)
             {
-                _logger.LogError("Landing page SubmitLead: no active admin user found for RegisteredById.");
-                TempData["FormError"] = "حدث خطأ في النظام، يرجى التواصل بنا مباشرة.";
+                TempData["FormError"] = "حدث خطأ في النظام";
                 return RedirectToAction("Index");
             }
 
-            // ── 4. Duplicate phone — silent success (don't leak info) ─────
-            phone = (phone ?? "").Trim();
+            // 3. Duplicate phone — silent success
+            phone = phone?.Trim() ?? "";
             if (await _context.Leads.AnyAsync(l => l.Phone == phone))
                 return RedirectToAction("ThankYou");
 
-            // ── 5. Save ───────────────────────────────────────────────────
+            // 4. Create Lead (fill other fields automatically)
             _context.Leads.Add(new Lead
             {
                 Id = Guid.NewGuid(),
                 BranchId = resolvedBranchId.Value,
                 RegisteredById = systemUserId.Value,
-                FullName = (fullName ?? "").Trim(),
+                FullName = fullName?.Trim() ?? "",
                 Phone = phone,
-                LeadSource = 7,   // 7 = موقع إلكتروني
-                Status = 1,   // جديد — يدخل بنك التيلي سيلز
+                LeadSource = 2, // "موقع إلكتروني"
+                Status = 1, // New
                 InterestedJobTitle = interestedJobTitle?.Trim(),
                 InterestedCountry = interestedCountry?.Trim(),
                 Notes = notes?.Trim(),

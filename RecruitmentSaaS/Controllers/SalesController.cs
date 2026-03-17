@@ -187,30 +187,30 @@ namespace RecruitmentSaaS.Controllers
 
                 var newCandidateId = (Guid)candidateIdParam.Value;
 
-                var candidate = await _context.Candidates.FindAsync(newCandidateId);
-                if (candidate != null)
-                {
-                    candidate.AssignedSalesId = userId;
-                    await _context.SaveChangesAsync();
-                }
+                // ── Fix 1: reload context before touching candidate ──
+                _context.ChangeTracker.Clear();
 
-                // Auto-create commission for this deal (Status=1 pending admin approval)
+                // ── Fix 2: commission with correct month format ──
                 var existingCommission = await _context.Commissions
                     .AnyAsync(c => c.CandidateId == newCandidateId);
 
                 if (!existingCommission)
                 {
-                    _context.Commissions.Add(new RecruitmentSaaS.Models.Entities.Commission
+                    var now = DateTime.UtcNow;
+                    var monthStart = new DateOnly(now.Year, now.Month, 1);
+
+                    _context.Commissions.Add(new Commission
                     {
                         Id = Guid.NewGuid(),
                         SalesUserId = userId,
                         CandidateId = newCandidateId,
-                        CommissionMonth = DateOnly.FromDateTime(DateTime.UtcNow),
-                        AmountEgp = 0, // Admin sets the actual amount when approving
+                        CommissionMonth = monthStart,
+                        AmountEgp = 0,
                         DealsThisMonth = 1,
-                        Status = 1, // Pending admin approval
-                        CreatedAt = DateTime.UtcNow
+                        Status = 1,
+                        CreatedAt = now
                     });
+
                     await _context.SaveChangesAsync();
                 }
 
@@ -219,11 +219,10 @@ namespace RecruitmentSaaS.Controllers
             }
             catch (Exception ex)
             {
-                TempData["Error"] = "حدث خطأ أثناء التحويل: " + ex.Message;
+                TempData["Error"] = "حدث خطأ أثناء التحويل: " + ex.InnerException?.Message ?? ex.Message;
                 return RedirectToAction("LeadDetail", new { id = leadId });
             }
         }
-
         // ── GET /Sales/Candidates ─────────────────────────────────────────────
         public async Task<IActionResult> Candidates(Guid? stageId)
         {

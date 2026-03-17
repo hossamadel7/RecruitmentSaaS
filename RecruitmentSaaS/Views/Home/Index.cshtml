@@ -628,94 +628,37 @@
 
                     <form method="post" action="/Home/SubmitLead" novalidate id="leadForm">
                         @Html.AntiForgeryToken()
-                        <div class="trap-field" aria-hidden="true">
-                            <input name="website_trap" type="text" tabindex="-1" autocomplete="off" />
-                        </div>
                         <div class="row g-3">
-                            @* الاسم *@
+                            <!-- Full Name -->
                             <div class="col-12 col-md-6">
                                 <label class="field-label">الاسم الكامل <span class="field-required">*</span></label>
-                                <div class="input-icon-wrap">
-                                    <input name="FullName" id="fullName" type="text" class="form-control" placeholder="أحمد محمد علي" required maxlength="200" />
-                                    <i class="bi bi-person input-icon"></i>
-                                </div>
+                                <input name="FullName" id="fullName" type="text" class="form-control" required maxlength="200" />
                             </div>
-                            @* الهاتف *@
+                            <!-- Phone -->
                             <div class="col-12 col-md-6">
                                 <label class="field-label">رقم الهاتف <span class="field-required">*</span></label>
-                                <div class="input-icon-wrap">
-                                    <input name="Phone" id="phone" type="tel" class="form-control" placeholder="01XXXXXXXXX" required pattern="[0-9]{10,15}" maxlength="30" title="أدخل رقم هاتف صحيح" dir="ltr" />
-                                    <i class="bi bi-telephone input-icon"></i>
-                                </div>
+                                <input name="Phone" id="phone" type="tel" class="form-control" required maxlength="30" pattern="[0-9]{10,15}" />
                             </div>
-                            @* الفرع *@
-                            @if (!singleBranch && branches.Count > 0)
-                            {
-                                <div class="col-12">
-                                    <label class="field-label">الفرع الذي تريد زيارته <span class="field-required">*</span></label>
-                                    <select name="BranchId" class="form-select" required>
-                                        <option value="">— اختر الفرع الأقرب إليك —</option>
-                                        @foreach (var b in branches)
-                                        {
-                                            <option value="@b.Id">@b.Name @(b.City != null ? $"— {b.City}" : "")</option>
-                                        }
-                                    </select>
-                                </div>
-                            }
-                            else if (singleBranch)
-                            {
-                                <input type="hidden" name="BranchId" value="@branches[0].Id" />
-                            }
-                            <div class="col-12"><div class="form-divider">تفاصيل اختيارية — تساعدنا على خدمتك بشكل أفضل</div></div>
-                            @* المسمى الوظيفي *@
+                            <!-- Job Title -->
                             <div class="col-12 col-md-6">
-                                <label class="field-label">المسمى الوظيفي المهتم به</label>
-                                @if (jobPackages.Any())
-                                {
-                                    <select name="InterestedJobTitle" class="form-select">
-                                        <option value="">— اختر أو اترك فارغاً —</option>
-                                        @foreach (var j in jobPackages)
-                                        {
-                                            <option value="@j.JobTitle">@j.JobTitle</option>
-                                        }
-                                    </select>
-                                }
-                                else
-                                {
-                                    <input name="InterestedJobTitle" type="text" class="form-control" placeholder="مثال: سائق، عامل مصنع..." maxlength="200" />
-                                }
+                                <label class="field-label">الوظيفة المطلوبة</label>
+                                <input name="InterestedJobTitle" type="text" class="form-control" maxlength="200" />
                             </div>
-                            @* الدولة *@
+                            <!-- Country -->
                             <div class="col-12 col-md-6">
-                                <label class="field-label">الدولة المهتم بالعمل فيها</label>
-                                @{
-                                    var countries = jobPackages.Select(j => j.DestinationCountry).Distinct().OrderBy(c => c).ToList();
-                                }
-                                @if (countries.Any())
-                                {
-                                    <select name="InterestedCountry" class="form-select">
-                                        <option value="">— اختر أو اترك فارغاً —</option>
-                                        @foreach (var c in countries)
-                                        {
-                                            <option value="@c">@c</option>
-                                        }
-                                    </select>
-                                }
-                                else
-                                {
-                                    <input name="InterestedCountry" type="text" class="form-control" placeholder="مثال: المملكة العربية السعودية" maxlength="100" />
-                                }
+                                <label class="field-label">الدولة المطلوبة</label>
+                                <input name="InterestedCountry" type="text" class="form-control" maxlength="100" />
                             </div>
-                            @* ملاحظات *@
+                            <!-- Notes -->
                             <div class="col-12">
-                                <label class="field-label">رسالتك <span style="color:var(--muted);font-weight:400;font-size:.73rem;">(اختياري)</span></label>
-                                <textarea name="Notes" id="notes" class="form-control" placeholder="أي معلومات إضافية تريد مشاركتها معنا..."></textarea>
+                                <label class="field-label">ملاحظات</label>
+                                <textarea name="Notes" class="form-control"></textarea>
                             </div>
+                            <!-- Submit -->
                             <div class="col-12" style="margin-top:4px;">
                                 <button type="submit" class="btn-submit" id="submitBtn">
                                     <i class="bi bi-send-fill"></i> أرسل طلبك الآن
                                 </button>
-                                <p class="form-note"><i class="bi bi-shield-lock-fill" style="color:#10b981;"></i> بياناتك محمية ولن تُشارَك مع أي جهة خارجية</p>
                             </div>
                         </div>
                     </form>

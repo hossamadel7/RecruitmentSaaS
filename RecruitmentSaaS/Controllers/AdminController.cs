@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
+using RecruitmentSaaS.Models.DTOs;
 using RecruitmentSaaS.Models.Entities;
 using System.Data;
 using System.IO.Compression;
@@ -1254,8 +1255,505 @@ namespace RecruitmentSaaS.Controllers
             return File(memoryStream.ToArray(), "application/zip", zipName);
         }
 
-        // ── GET /Admin/DownloadPassportsZip ───────────────────────────────────
-        // ── GET /Admin/DownloadPassportsZip ───────────────────────────────────
+        // ============================================================
+        // ACTIONS — paste inside AdminController class
+        // ============================================================
+
+        // GET /Admin/CommissionTiers
+        public async Task<IActionResult> CommissionTiers()
+        {
+            var tiers = await _context.CommissionTiers
+                .Where(t => t.IsActive)
+                .OrderBy(t => t.MinDeals)
+                .Select(t => new CommissionTierDto
+                {
+                    Id = t.Id,
+                    MinDeals = t.MinDeals,
+                    MaxDeals = t.MaxDeals,
+                    AmountPerDeal = t.AmountPerDeal,
+                    IsActive = t.IsActive
+                })
+                .ToListAsync();
+
+            // Validation: check for overlapping ranges
+            ViewBag.HasOverlap = false;
+            for (int i = 0; i < tiers.Count - 1; i++)
+            {
+                var current = tiers[i];
+                var next = tiers[i + 1];
+                if (current.MaxDeals.HasValue && current.MaxDeals >= next.MinDeals)
+                {
+                    ViewBag.HasOverlap = true;
+                    break;
+                }
+            }
+
+            // Check for gap between tiers
+            ViewBag.HasGap = false;
+            for (int i = 0; i < tiers.Count - 1; i++)
+            {
+                var current = tiers[i];
+                var next = tiers[i + 1];
+                if (current.MaxDeals.HasValue && current.MaxDeals + 1 < next.MinDeals)
+                {
+                    ViewBag.HasGap = true;
+                    break;
+                }
+            }
+
+            // Pending commissions count for badge
+            ViewBag.PendingCount = await _context.Commissions
+                .CountAsync(c => c.Status == 1);
+
+            return View(tiers);
+        }
+
+        // POST /Admin/AddCommissionTier
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddCommissionTier(
+            int minDeals, int? maxDeals, decimal amountPerDeal)
+        {
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            // Validate
+            if (minDeals < 1)
+            {
+                TempData["Error"] = "الحد الأدنى للصفقات يجب أن يكون 1 على الأقل";
+                return RedirectToAction("CommissionTiers");
+            }
+            if (amountPerDeal <= 0)
+            {
+                TempData["Error"] = "المبلغ يجب أن يكون أكبر من صفر";
+                return RedirectToAction("CommissionTiers");
+            }
+            if (maxDeals.HasValue && maxDeals < minDeals)
+            {
+                TempData["Error"] = "الحد الأقصى يجب أن يكون أكبر من أو يساوي الحد الأدنى";
+                return RedirectToAction("CommissionTiers");
+            }
+
+            // Check overlap with existing tiers
+            var overlapping = await _context.CommissionTiers
+                .Where(t => t.IsActive)
+                .AnyAsync(t =>
+                    t.MinDeals <= (maxDeals ?? int.MaxValue) &&
+                    (t.MaxDeals == null || t.MaxDeals >= minDeals));
+
+            if (overlapping)
+            {
+                TempData["Error"] = "هذا النطاق يتداخل مع شريحة موجودة. يرجى مراجعة النطاقات الحالية";
+                return RedirectToAction("CommissionTiers");
+            }
+
+            // Check: only one tier can have MaxDeals = null (unlimited)
+            if (!maxDeals.HasValue)
+            {
+                var hasUnlimited = await _context.CommissionTiers
+                    .AnyAsync(t => t.IsActive && t.MaxDeals == null);
+                if (hasUnlimited)
+                {
+                    TempData["Error"] = "يوجد بالفعل شريحة مفتوحة النهاية (بلا حد أقصى). يمكن أن تكون شريحة واحدة فقط بلا حد أقصى";
+                    return RedirectToAction("CommissionTiers");
+                }
+            }
+
+            _context.CommissionTiers.Add(new CommissionTier
+            {
+                Id = Guid.NewGuid(),
+                MinDeals = minDeals,
+                MaxDeals = maxDeals,
+                AmountPerDeal = amountPerDeal,
+                IsActive = true,
+                CreatedById = userId,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = $"تمت إضافة الشريحة بنجاح — {minDeals}{(maxDeals.HasValue ? $" إلى {maxDeals}" : "+")} صفقة = {amountPerDeal:N0} ج.م";
+            return RedirectToAction("CommissionTiers");
+        }
+
+        // POST /Admin/EditCommissionTier
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditCommissionTier(
+            Guid id, int minDeals, int? maxDeals, decimal amountPerDeal)
+        {
+            var tier = await _context.CommissionTiers.FindAsync(id);
+            if (tier == null) return NotFound();
+
+            if (minDeals < 1)
+            {
+                TempData["Error"] = "الحد الأدنى للصفقات يجب أن يكون 1 على الأقل";
+                return RedirectToAction("CommissionTiers");
+            }
+            if (amountPerDeal <= 0)
+            {
+                TempData["Error"] = "المبلغ يجب أن يكون أكبر من صفر";
+                return RedirectToAction("CommissionTiers");
+            }
+            if (maxDeals.HasValue && maxDeals < minDeals)
+            {
+                TempData["Error"] = "الحد الأقصى يجب أن يكون أكبر من أو يساوي الحد الأدنى";
+                return RedirectToAction("CommissionTiers");
+            }
+
+            // Check overlap with OTHER tiers (exclude current)
+            var overlapping = await _context.CommissionTiers
+                .Where(t => t.IsActive && t.Id != id)
+                .AnyAsync(t =>
+                    t.MinDeals <= (maxDeals ?? int.MaxValue) &&
+                    (t.MaxDeals == null || t.MaxDeals >= minDeals));
+
+            if (overlapping)
+            {
+                TempData["Error"] = "هذا النطاق يتداخل مع شريحة أخرى موجودة";
+                return RedirectToAction("CommissionTiers");
+            }
+
+            // Check unlimited constraint
+            if (!maxDeals.HasValue && tier.MaxDeals.HasValue)
+            {
+                var hasUnlimited = await _context.CommissionTiers
+                    .AnyAsync(t => t.IsActive && t.MaxDeals == null && t.Id != id);
+                if (hasUnlimited)
+                {
+                    TempData["Error"] = "يوجد بالفعل شريحة مفتوحة النهاية";
+                    return RedirectToAction("CommissionTiers");
+                }
+            }
+
+            tier.MinDeals = minDeals;
+            tier.MaxDeals = maxDeals;
+            tier.AmountPerDeal = amountPerDeal;
+            tier.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = "تم تعديل الشريحة بنجاح";
+            return RedirectToAction("CommissionTiers");
+        }
+
+        // POST /Admin/DeleteCommissionTier
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteCommissionTier(Guid id)
+        {
+            var tier = await _context.CommissionTiers.FindAsync(id);
+            if (tier == null) return NotFound();
+
+            // Soft delete — don't actually delete, just deactivate
+            tier.IsActive = false;
+            tier.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "تم حذف الشريحة بنجاح";
+            return RedirectToAction("CommissionTiers");
+        }
+
+        // GET /Admin/RecalculateCommissions
+        // Recalculates all PENDING commissions for current month based on current tiers
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RecalculateCommissions()
+        {
+            var now = DateTime.UtcNow;
+            var month = now.Month;
+            var year = now.Year;
+
+            // Get all active tiers ordered
+            var tiers = await _context.CommissionTiers
+                .Where(t => t.IsActive)
+                .OrderBy(t => t.MinDeals)
+                .ToListAsync();
+
+            if (!tiers.Any())
+            {
+                TempData["Error"] = "لا توجد شرائح عمولة نشطة. يرجى إضافة شرائح أولاً";
+                return RedirectToAction("CommissionTiers");
+            }
+
+            // Get all pending commissions this month grouped by sales user
+            var pendingCommissions = await _context.Commissions
+                .Where(c => c.Status == 1
+                         && c.CreatedAt.Month == month
+                         && c.CreatedAt.Year == year)
+                .ToListAsync();
+
+            // Group by sales user
+            var bySalesUser = pendingCommissions.GroupBy(c => c.SalesUserId);
+            int updated = 0;
+
+            foreach (var group in bySalesUser)
+            {
+                var salesUserId = group.Key;
+
+                // Count approved + paid + pending for this user this month
+                int totalDeals = await _context.Commissions
+                    .CountAsync(c => c.SalesUserId == salesUserId
+                                  && c.CreatedAt.Month == month
+                                  && c.CreatedAt.Year == year
+                                  && c.Status != 4); // exclude reversed
+
+                // Find the correct tier
+                var correctTier = tiers
+                    .Where(t => t.MinDeals <= totalDeals
+                             && (t.MaxDeals == null || t.MaxDeals >= totalDeals))
+                    .OrderByDescending(t => t.MinDeals)
+                    .FirstOrDefault();
+
+                if (correctTier == null) continue;
+
+                // Update all pending commissions for this user
+                foreach (var commission in group)
+                {
+                    commission.AmountEgp = correctTier.AmountPerDeal;
+                    commission.DealsThisMonth = totalDeals;
+                    updated++;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = $"تم إعادة حساب {updated} عمولة معلقة بناءً على الشرائح الحالية";
+            return RedirectToAction("CommissionTiers");
+        }
+        // GET /Admin/Salaries
+        public async Task<IActionResult> Salaries(int? month, int? year)
+        {
+            var now = DateTime.UtcNow;
+            var selMonth = month ?? now.Month;
+            var selYear = year ?? now.Year;
+            var monthStart = new DateOnly(selYear, selMonth, 1);
+
+            var adminId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            // Get all non-admin users with their salary payment for selected month
+            var users = await _context.Users
+                .Where(u => u.IsActive && u.Role != 1) // exclude Admin
+                .OrderBy(u => u.Role)
+                .ThenBy(u => u.FullName)
+                .ToListAsync();
+
+            var payments = await _context.SalaryPayments
+                .Where(sp => sp.SalaryMonth == monthStart)
+                .ToListAsync();
+
+            var dto = users.Select(u => {
+                var pay = payments.FirstOrDefault(p => p.UserId == u.Id);
+                return new SalaryUserDto
+                {
+                    UserId = u.Id,
+                    FullName = u.FullName,
+                    Email = u.Email,
+                    Role = u.Role,
+                    BaseSalary = u.BaseSalary,
+                    Adjustment = pay?.Adjustment ?? 0,
+                    AdjustmentNote = pay?.AdjustmentNote,
+                    PaymentId = pay?.Id,
+                    Status = pay?.Status ?? 0
+                };
+            }).ToList();
+
+            ViewBag.SelectedMonth = selMonth;
+            ViewBag.SelectedYear = selYear;
+            ViewBag.MonthStart = monthStart;
+            ViewBag.TotalBaseSalary = dto.Sum(d => d.BaseSalary);
+            ViewBag.TotalAdjustment = dto.Sum(d => d.Adjustment);
+            ViewBag.TotalPayroll = dto.Sum(d => d.TotalAmount);
+            ViewBag.PendingCount = dto.Count(d => d.Status == 1);
+            ViewBag.ApprovedCount = dto.Count(d => d.Status == 2);
+            ViewBag.PaidCount = dto.Count(d => d.Status == 3);
+            ViewBag.NotCreatedCount = dto.Count(d => d.Status == 0);
+
+            return View(dto);
+        }
+
+        // POST /Admin/SetBaseSalary
+        // Update a user's base salary permanently
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SetBaseSalary(Guid userId, decimal baseSalary)
+        {
+            if (baseSalary < 0)
+            {
+                TempData["Error"] = "المرتب الأساسي لا يمكن أن يكون سالباً";
+                return RedirectToAction("Salaries");
+            }
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+
+            user.BaseSalary = baseSalary;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"تم تحديث المرتب الأساسي لـ {user.FullName} إلى {baseSalary:N0} ج.م";
+            return RedirectToAction("Salaries");
+        }
+
+        // POST /Admin/AdjustSalary
+        // Add bonus or deduction for THIS month only
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AdjustSalary(
+            Guid userId, decimal adjustment, string? adjustmentNote,
+            int month, int year)
+        {
+            var adminId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var monthStart = new DateOnly(year, month, 1);
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+
+            // Get or create the payment record
+            var payment = await _context.SalaryPayments
+                .FirstOrDefaultAsync(sp => sp.UserId == userId && sp.SalaryMonth == monthStart);
+
+            if (payment == null)
+            {
+                payment = new SalaryPayment
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    SalaryMonth = monthStart,
+                    BaseSalary = user.BaseSalary,
+                    Adjustment = adjustment,
+                    AdjustmentNote = adjustmentNote,
+                    Status = 1, // Pending
+                    CreatedById = adminId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.SalaryPayments.Add(payment);
+            }
+            else
+            {
+                if (payment.Status == 3)
+                {
+                    TempData["Error"] = $"تم صرف مرتب {user.FullName} بالفعل هذا الشهر";
+                    return RedirectToAction("Salaries", new { month, year });
+                }
+                payment.Adjustment = adjustment;
+                payment.AdjustmentNote = adjustmentNote;
+                payment.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+
+            var sign = adjustment >= 0 ? "مكافأة" : "خصم";
+            var absVal = Math.Abs(adjustment);
+            TempData["Success"] = $"تم تسجيل {sign} {absVal:N0} ج.م لـ {user.FullName}";
+            return RedirectToAction("Salaries", new { month, year });
+        }
+
+        // POST /Admin/ApproveSalary
+        // Approve a single user's salary for the month
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveSalary(Guid userId, int month, int year)
+        {
+            var adminId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var monthStart = new DateOnly(year, month, 1);
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+
+            var payment = await _context.SalaryPayments
+                .FirstOrDefaultAsync(sp => sp.UserId == userId && sp.SalaryMonth == monthStart);
+
+            // Auto-create if doesn't exist
+            if (payment == null)
+            {
+                payment = new SalaryPayment
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    SalaryMonth = monthStart,
+                    BaseSalary = user.BaseSalary,
+                    Adjustment = 0,
+                    Status = 1,
+                    CreatedById = adminId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.SalaryPayments.Add(payment);
+            }
+
+            if (payment.Status == 3)
+            {
+                TempData["Error"] = $"تم صرف مرتب {user.FullName} بالفعل";
+                return RedirectToAction("Salaries", new { month, year });
+            }
+
+            payment.Status = 2; // Approved
+            payment.ApprovedById = adminId;
+            payment.ApprovedAt = DateTime.UtcNow;
+            payment.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = $"تمت الموافقة على مرتب {user.FullName} — {payment.TotalAmount:N0} ج.م";
+            return RedirectToAction("Salaries", new { month, year });
+        }
+
+        // POST /Admin/ApproveAllSalaries
+        // Approve ALL users' salaries for the month at once
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveAllSalaries(int month, int year)
+        {
+            var adminId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var monthStart = new DateOnly(year, month, 1);
+
+            var users = await _context.Users
+                .Where(u => u.IsActive && u.Role != 1)
+                .ToListAsync();
+
+            var existingPayments = await _context.SalaryPayments
+                .Where(sp => sp.SalaryMonth == monthStart)
+                .ToListAsync();
+
+            int approved = 0;
+
+            foreach (var user in users)
+            {
+                var payment = existingPayments.FirstOrDefault(p => p.UserId == user.Id);
+
+                if (payment == null)
+                {
+                    // Create and approve in one step
+                    payment = new SalaryPayment
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = user.Id,
+                        SalaryMonth = monthStart,
+                        BaseSalary = user.BaseSalary,
+                        Adjustment = 0,
+                        Status = 2, // Approved directly
+                        ApprovedById = adminId,
+                        ApprovedAt = DateTime.UtcNow,
+                        CreatedById = adminId,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.SalaryPayments.Add(payment);
+                    approved++;
+                }
+                else if (payment.Status == 1) // Only approve pending ones
+                {
+                    payment.Status = 2;
+                    payment.ApprovedById = adminId;
+                    payment.ApprovedAt = DateTime.UtcNow;
+                    payment.UpdatedAt = DateTime.UtcNow;
+                    approved++;
+                }
+                // Skip already approved (2) or paid (3)
+            }
+
+            await _context.SaveChangesAsync();
+
+            var monthName = new DateTime(year, month, 1).ToString("MMMM yyyy");
+            TempData["Success"] = $"تمت الموافقة على {approved} مرتب لشهر {monthName}";
+            return RedirectToAction("Salaries", new { month, year });
+        }
+
+
+     
         public async Task<IActionResult> DownloadPassportsZip(Guid? packageId, Guid? id, bool newOnly = false)
         {
             var pkgId = packageId ?? id;
@@ -1430,6 +1928,17 @@ namespace RecruitmentSaaS.Controllers
         }
     }
 
+    public class CommissionTierDto
+    {
+        public Guid Id { get; set; }
+        public int MinDeals { get; set; }
+        public int? MaxDeals { get; set; }
+        public decimal AmountPerDeal { get; set; }
+        public bool IsActive { get; set; }
+        public string RangeLabel => MaxDeals.HasValue
+            ? $"{MinDeals} - {MaxDeals} صفقة"
+            : $"{MinDeals}+ صفقة";
+    }
     public class StageOrderDto
     {
         public Guid StageId { get; set; }

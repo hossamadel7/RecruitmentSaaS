@@ -1,0 +1,430 @@
+@model List<RecruitmentSaaS.Controllers.CommissionTierDto>
+@{
+    ViewData["Title"] = "شرائح العمولة";
+    ViewData["Subtitle"] = "إدارة نظام العمولات حسب عدد الصفقات";
+    bool hasOverlap = (bool)(ViewBag.HasOverlap ?? false);
+    bool hasGap     = (bool)(ViewBag.HasGap ?? false);
+    int  pending    = (int)(ViewBag.PendingCount ?? 0);
+}
+
+<div style="padding:24px">
+
+    @* ── Alerts ── *@
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-3" style="font-size:13px">
+            <i class="bi bi-check-circle-fill me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3" style="font-size:13px">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (hasOverlap)
+    {
+        <div class="alert alert-warning mb-3" style="font-size:13px">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>تحذير:</strong> يوجد تداخل بين بعض الشرائح. يرجى المراجعة والتعديل.
+        </div>
+    }
+    @if (hasGap)
+    {
+        <div class="alert alert-warning mb-3" style="font-size:13px">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            <strong>ملاحظة:</strong> يوجد فجوة بين بعض الشرائح — صفقات في هذا النطاق لن تحصل على عمولة محسوبة.
+        </div>
+    }
+
+    @* ── Header ── *@
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="page-header-title">شرائح العمولة</h1>
+            <div class="page-header-sub">كلما أتم المندوب صفقات أكثر هذا الشهر، ارتفعت قيمة العمولة لكل صفقة</div>
+        </div>
+        <div class="d-flex gap-2">
+            @if (pending > 0)
+            {
+                <form asp-action="RecalculateCommissions" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-primary btn-sm"
+                            onclick="return confirm('هل تريد إعادة حساب كل العمولات المعلقة لهذا الشهر بناءً على الشرائح الحالية؟')">
+                        <i class="bi bi-arrow-clockwise me-1"></i>
+                        إعادة الحساب
+                        <span class="badge bg-primary ms-1">@pending</span>
+                    </button>
+                </form>
+            }
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addTierModal">
+                <i class="bi bi-plus-lg me-1"></i> إضافة شريحة
+            </button>
+        </div>
+    </div>
+
+    @* ── How it works explanation ── *@
+    <div class="card mb-4" style="background:var(--bg-secondary,#F8FAFC);border:1px dashed #CBD5E1">
+        <div class="card-body py-3">
+            <div class="d-flex align-items-start gap-3">
+                <i class="bi bi-lightbulb-fill text-warning" style="font-size:20px;margin-top:2px"></i>
+                <div>
+                    <div style="font-weight:600;font-size:13.5px;margin-bottom:4px">كيف تعمل الشرائح؟</div>
+                    <div style="font-size:12.5px;color:var(--text-muted,#64748b);line-height:1.7">
+                        عدد الصفقات يُحسب <strong>شهرياً</strong> لكل مندوب مبيعات ويبدأ من الصفر في أول كل شهر.
+                        عند إتمام صفقة جديدة، يتم تطبيق الشريحة المناسبة <strong>على كل صفقات الشهر</strong> — ليس فقط الأخيرة.
+                        مثلاً: إذا كانت الشريحة الأولى 300 ج.م (1-5 صفقات) والثانية 500 ج.م (6-10)،
+                        فعند إتمام الصفقة السادسة تصبح قيمة <em>كل</em> صفقاته في الشهر 500 ج.م.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Tiers Table ── *@
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center" style="padding:16px 20px">
+            <span style="font-weight:600;font-size:14px">
+                <i class="bi bi-bar-chart-steps me-2 text-primary"></i>
+                الشرائح الحالية
+                <span class="badge bg-primary ms-2">@Model.Count</span>
+            </span>
+        </div>
+
+        @if (!Model.Any())
+        {
+            <div class="card-body text-center py-5">
+                <i class="bi bi-bar-chart-steps" style="font-size:40px;color:#CBD5E1"></i>
+                <p class="mt-3 mb-1" style="font-weight:600;color:var(--text-muted)">لا توجد شرائح بعد</p>
+                <p style="font-size:12.5px;color:var(--text-muted)">أضف شريحة واحدة على الأقل حتى يعمل نظام العمولات</p>
+                <button class="btn btn-primary btn-sm mt-2" data-bs-toggle="modal" data-bs-target="#addTierModal">
+                    <i class="bi bi-plus-lg me-1"></i> إضافة أول شريحة
+                </button>
+            </div>
+        }
+        else
+        {
+            <div style="overflow-x:auto">
+                <table class="table mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:50px">#</th>
+                            <th>نطاق الصفقات</th>
+                            <th>قيمة العمولة للصفقة</th>
+                            <th>إجمالي عند الحد الأقصى</th>
+                            <th style="width:120px"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{int rowNum = 1;}
+                        @foreach (var tier in Model.OrderBy(t => t.MinDeals))
+                        {
+                            var isLast = !tier.MaxDeals.HasValue;
+                            var maxEarning = isLast ? (decimal?)null : tier.MaxDeals * tier.AmountPerDeal;
+
+                            <tr>
+                                <td>
+                                    <span style="display:inline-flex;align-items:center;justify-content:center;
+                                                 width:28px;height:28px;border-radius:50%;
+                                                 background:var(--primary,#1B4FD8);color:#fff;
+                                                 font-size:12px;font-weight:700">
+                                        @rowNum
+                                    </span>
+                                </td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <span style="font-weight:600;font-size:13.5px">
+                                            @tier.MinDeals
+                                            @if (tier.MaxDeals.HasValue)
+                                            {
+                                                <span style="color:var(--text-muted)">— @tier.MaxDeals</span>
+                                            }
+                                            else
+                                            {
+                                                <span style="color:var(--text-muted)">+</span>
+                                            }
+                                        </span>
+                                        @if (isLast)
+                                        {
+                                            <span class="badge" style="background:#ECFDF5;color:#059669;font-size:10.5px">
+                                                مفتوح النهاية
+                                            </span>
+                                        }
+                                        <span style="font-size:12px;color:var(--text-muted)">صفقة</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span style="font-weight:700;font-size:15px;color:var(--success,#16A34A)">
+                                        @tier.AmountPerDeal.ToString("N0")
+                                    </span>
+                                    <span style="font-size:12px;color:var(--text-muted)"> ج.م / صفقة</span>
+                                </td>
+                                <td>
+                                    @if (maxEarning.HasValue)
+                                    {
+                                        <span style="font-size:13px;color:var(--text-muted)">
+                                            حتى <strong>@maxEarning.Value.ToString("N0")</strong> ج.م
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size:13px;color:var(--text-muted)">غير محدود</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-2 justify-content-end">
+                                        <button class="btn btn-sm btn-outline-secondary"
+                                                style="padding:4px 10px;font-size:12px"
+                                                onclick="openEditTier('@tier.Id','@tier.MinDeals','@(tier.MaxDeals?.ToString() ?? "")','@tier.AmountPerDeal')">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <form asp-action="DeleteCommissionTier" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@tier.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                    style="padding:4px 10px;font-size:12px"
+                                                    onclick="return confirm('هل تريد حذف هذه الشريحة؟')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            rowNum++;
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @* ── Visual Preview ── *@
+            <div class="card-footer" style="background:var(--bg-secondary,#F8FAFC);padding:20px">
+                <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">
+                    معاينة مرئية للشرائح
+                </div>
+                <div style="display:flex;gap:0;border-radius:10px;overflow:hidden;height:36px">
+                    @{
+                        var sortedTiers = Model.OrderBy(t => t.MinDeals).ToList();
+                        var colors = new[] { "#1B4FD8","#2563EB","#3B82F6","#60A5FA","#93C5FD","#BFDBFE" };
+                        var totalMax = sortedTiers.LastOrDefault()?.MaxDeals ?? (sortedTiers.Any() ? sortedTiers.Max(t => t.MinDeals) + 10 : 20);
+                        var scale = sortedTiers.Any() ? 100.0 / (totalMax == 0 ? 1 : totalMax) : 0;
+                    }
+                    @for (int i = 0; i < sortedTiers.Count; i++)
+                    {
+                        var t = sortedTiers[i];
+                        var spanDeals = t.MaxDeals.HasValue ? (t.MaxDeals.Value - t.MinDeals + 1) : (totalMax - t.MinDeals + 1);
+                        var widthPct  = Math.Max(10, (double)spanDeals / (totalMax == 0 ? 1 : totalMax) * 100);
+                        var col = colors[i % colors.Length];
+
+                        <div style="background:@col;flex:@widthPct;display:flex;align-items:center;justify-content:center;
+                                    color:#fff;font-size:11px;font-weight:600;white-space:nowrap;padding:0 6px;
+                                    min-width:0;overflow:hidden"
+                             title="@t.RangeLabel = @t.AmountPerDeal.ToString("N0") ج.م">
+                            @t.AmountPerDeal.ToString("N0") ج.م
+                        </div>
+                    }
+                </div>
+                <div style="display:flex;gap:0;margin-top:4px">
+                    @foreach (var t in sortedTiers)
+                    {
+                        <div style="flex:1;font-size:10.5px;color:var(--text-muted);text-align:center">
+                            @t.MinDeals@(t.MaxDeals.HasValue ? $"-{t.MaxDeals}" : "+")
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    @* ── Simulator ── *@
+    <div class="card mt-4">
+        <div class="card-header" style="padding:16px 20px">
+            <span style="font-weight:600;font-size:14px">
+                <i class="bi bi-calculator me-2 text-primary"></i>
+                محاكي العمولة
+            </span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label" style="font-size:13px;font-weight:600">عدد الصفقات هذا الشهر</label>
+                    <input type="number" id="simDeals" class="form-control form-control-sm"
+                           min="1" value="1" oninput="runSimulator()" />
+                </div>
+                <div class="col-md-8">
+                    <div id="simResult" style="padding:12px 16px;border-radius:8px;background:#F0FDF4;
+                                                border:1px solid #BBF7D0;font-size:13.5px">
+                        أدخل عدد الصفقات لحساب العمولة
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@* ── Add Tier Modal ── *@
+<div class="modal fade" id="addTierModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="font-size:15px">إضافة شريحة جديدة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="AddCommissionTier" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;font-weight:600">
+                            الحد الأدنى للصفقات <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" name="minDeals" class="form-control form-control-sm"
+                               min="1" required placeholder="مثال: 6" />
+                        <div class="form-text" style="font-size:11.5px">الشريحة تبدأ من هذا العدد</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;font-weight:600">الحد الأقصى للصفقات</label>
+                        <input type="number" name="maxDeals" class="form-control form-control-sm"
+                               min="1" placeholder="اتركه فارغاً للشريحة المفتوحة (بلا حد)" />
+                        <div class="form-text" style="font-size:11.5px">اتركه فارغاً إذا كانت هذه الشريحة الأخيرة (مفتوحة النهاية)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;font-weight:600">
+                            العمولة لكل صفقة (ج.م) <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" name="amountPerDeal" class="form-control form-control-sm"
+                               min="1" step="0.01" required placeholder="مثال: 500" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i> إضافة
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* ── Edit Tier Modal ── *@
+<div class="modal fade" id="editTierModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="font-size:15px">تعديل الشريحة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="EditCommissionTier" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="editTierId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;font-weight:600">
+                            الحد الأدنى للصفقات <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" name="minDeals" id="editMinDeals"
+                               class="form-control form-control-sm" min="1" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;font-weight:600">الحد الأقصى للصفقات</label>
+                        <input type="number" name="maxDeals" id="editMaxDeals"
+                               class="form-control form-control-sm" min="1" />
+                        <div class="form-text" style="font-size:11.5px">اتركه فارغاً للشريحة المفتوحة</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;font-weight:600">
+                            العمولة لكل صفقة (ج.م) <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" name="amountPerDeal" id="editAmount"
+                               class="form-control form-control-sm" min="1" step="0.01" required />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-check-lg me-1"></i> حفظ التعديل
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+// Tier data for simulator
+const tiers = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+    Model.OrderBy(t => t.MinDeals).Select(t => new {
+        minDeals     = t.MinDeals,
+        maxDeals     = t.MaxDeals,
+        amountPerDeal = t.AmountPerDeal
+    })
+));
+
+function openEditTier(id, min, max, amount) {
+    document.getElementById('editTierId').value  = id;
+    document.getElementById('editMinDeals').value = min;
+    document.getElementById('editMaxDeals').value = max;
+    document.getElementById('editAmount').value   = amount;
+    new bootstrap.Modal(document.getElementById('editTierModal')).show();
+}
+
+function runSimulator() {
+    const deals  = parseInt(document.getElementById('simDeals').value) || 0;
+    const result = document.getElementById('simResult');
+
+    if (deals < 1 || tiers.length === 0) {
+        result.innerHTML = 'أدخل عدد الصفقات لحساب العمولة';
+        result.style.background = '#F0FDF4';
+        result.style.borderColor = '#BBF7D0';
+        return;
+    }
+
+    // Find matching tier
+    const tier = tiers.find(t =>
+        t.minDeals <= deals && (t.maxDeals === null || t.maxDeals >= deals)
+    );
+
+    if (!tier) {
+        result.innerHTML = `<i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+            عدد الصفقات (${deals}) لا يقع ضمن أي شريحة محددة`;
+        result.style.background = '#FFFBEB';
+        result.style.borderColor = '#FDE68A';
+        return;
+    }
+
+    const totalEarning = deals * tier.amountPerDeal;
+    result.innerHTML = `
+        <div class="d-flex align-items-center gap-4 flex-wrap">
+            <div>
+                <div style="font-size:11px;color:#64748b;margin-bottom:2px">عدد الصفقات</div>
+                <div style="font-size:18px;font-weight:700;color:#1B4FD8">${deals}</div>
+            </div>
+            <div style="font-size:20px;color:#CBD5E1">→</div>
+            <div>
+                <div style="font-size:11px;color:#64748b;margin-bottom:2px">الشريحة المطبقة</div>
+                <div style="font-size:13px;font-weight:600">
+                    ${tier.minDeals}${tier.maxDeals ? ` - ${tier.maxDeals}` : '+'} صفقة
+                </div>
+            </div>
+            <div style="font-size:20px;color:#CBD5E1">×</div>
+            <div>
+                <div style="font-size:11px;color:#64748b;margin-bottom:2px">العمولة / صفقة</div>
+                <div style="font-size:13px;font-weight:600">${tier.amountPerDeal.toLocaleString()} ج.م</div>
+            </div>
+            <div style="font-size:20px;color:#CBD5E1">=</div>
+            <div>
+                <div style="font-size:11px;color:#64748b;margin-bottom:2px">إجمالي العمولة</div>
+                <div style="font-size:20px;font-weight:700;color:#16A34A">${totalEarning.toLocaleString()} ج.م</div>
+            </div>
+        </div>
+    `;
+    result.style.background = '#F0FDF4';
+    result.style.borderColor = '#BBF7D0';
+}
+
+// Run simulator on page load with default value
+runSimulator();
+</script>
+}
