@@ -1,0 +1,399 @@
+@model List<RecruitmentSaaS.Controllers.SalaryUserDto>
+@{
+    ViewData["Title"] = "المرتبات";
+    int    selMonth      = (int)ViewBag.SelectedMonth;
+    int    selYear       = (int)ViewBag.SelectedYear;
+    decimal totalBase    = (decimal)ViewBag.TotalBaseSalary;
+    decimal totalAdj     = (decimal)ViewBag.TotalAdjustment;
+    decimal totalPayroll = (decimal)ViewBag.TotalPayroll;
+    int    pendingCount  = (int)ViewBag.PendingCount;
+    int    approvedCount = (int)ViewBag.ApprovedCount;
+    int    paidCount     = (int)ViewBag.PaidCount;
+    int    notCreated    = (int)ViewBag.NotCreatedCount;
+
+    var monthName = new DateTime(selYear, selMonth, 1).ToString("MMMM yyyy");
+
+    // Previous / next month navigation
+    var prev = new DateTime(selYear, selMonth, 1).AddMonths(-1);
+    var next = new DateTime(selYear, selMonth, 1).AddMonths(1);
+}
+
+<div style="padding:24px">
+
+    @* ── Alerts ── *@
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-3" style="font-size:13px">
+            <i class="bi bi-check-circle-fill me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3" style="font-size:13px">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @* ── Header with month navigation ── *@
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h1 class="page-header-title">المرتبات</h1>
+            <div class="page-header-sub">إدارة ومراجعة مرتبات الموظفين</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="/Admin/Salaries?month=@prev.Month&year=@prev.Year"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <span style="font-weight:700;font-size:15px;min-width:140px;text-align:center">
+                @monthName
+            </span>
+            <a href="/Admin/Salaries?month=@next.Month&year=@next.Year"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </div>
+    </div>
+
+    @* ── Summary Cards ── *@
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3">
+            <div class="card text-center" style="border-top:3px solid #1B4FD8">
+                <div class="card-body py-3">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">إجمالي الرواتب</div>
+                    <div style="font-size:22px;font-weight:700;color:#1B4FD8">@totalPayroll.ToString("N0")</div>
+                    <div style="font-size:11px;color:var(--text-muted)">ج.م</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card text-center" style="border-top:3px solid #F59E0B">
+                <div class="card-body py-3">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">إجمالي المكافآت/الخصومات</div>
+                    <div style="font-size:22px;font-weight:700;color:@(totalAdj >= 0 ? "#16A34A" : "#DC2626")">
+                        @(totalAdj >= 0 ? "+" : "")@totalAdj.ToString("N0")
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted)">ج.م</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card text-center" style="border-top:3px solid #16A34A">
+                <div class="card-body py-3">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">تم الصرف</div>
+                    <div style="font-size:22px;font-weight:700;color:#16A34A">@paidCount</div>
+                    <div style="font-size:11px;color:var(--text-muted)">موظف</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card text-center" style="border-top:3px solid #DC2626">
+                <div class="card-body py-3">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">في الانتظار</div>
+                    <div style="font-size:22px;font-weight:700;color:#DC2626">@(pendingCount + notCreated)</div>
+                    <div style="font-size:11px;color:var(--text-muted)">موظف</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Approve All Button ── *@
+    @{
+        bool canApproveAll = Model.Any(u => u.Status == 0 || u.Status == 1);
+    }
+    @if (canApproveAll)
+    {
+        <div class="d-flex justify-content-end mb-3">
+            <form asp-action="ApproveAllSalaries" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="month" value="@selMonth" />
+                <input type="hidden" name="year"  value="@selYear"  />
+                <button type="submit" class="btn btn-success"
+                        onclick="return confirm('هل تريد الموافقة على مرتبات كل الموظفين لشهر @monthName؟')">
+                    <i class="bi bi-check-all me-2"></i>
+                    الموافقة على مرتبات الجميع
+                    <span class="badge bg-white text-success ms-1">@(pendingCount + notCreated)</span>
+                </button>
+            </form>
+        </div>
+    }
+
+    @* ── Salary Table ── *@
+    <div class="card">
+        <div class="card-header" style="padding:16px 20px">
+            <span style="font-weight:600;font-size:14px">
+                <i class="bi bi-people-fill me-2 text-primary"></i>
+                الموظفون — @monthName
+            </span>
+        </div>
+        <div style="overflow-x:auto">
+            <table class="table mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>الموظف</th>
+                        <th>الوظيفة</th>
+                        <th>المرتب الأساسي</th>
+                        <th>مكافأة / خصم</th>
+                        <th>الإجمالي</th>
+                        <th>الحالة</th>
+                        <th style="width:200px">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in Model)
+                    {
+                        var rowBg = u.Status switch {
+                            3 => "background:#F0FDF4",
+                            2 => "background:#EFF6FF",
+                            _ => ""
+                        };
+
+                        <tr style="@rowBg">
+                            <td>
+                                <div style="font-weight:600;font-size:13.5px">@u.FullName</div>
+                                <div style="font-size:11.5px;color:var(--text-muted)">@u.Email</div>
+                            </td>
+                            <td>
+                                <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;
+                                             background:#EEF2FF;color:#1B4FD8">
+                                    @u.RoleName
+                                </span>
+                            </td>
+                            <td>
+                                <span style="font-weight:600">@u.BaseSalary.ToString("N0")</span>
+                                <span style="font-size:11px;color:var(--text-muted)"> ج.م</span>
+                                @if (u.Status != 3)
+                                {
+                                    <button class="btn btn-link btn-sm p-0 ms-1"
+                                            style="font-size:11px;color:var(--text-muted)"
+                                            onclick="openSetSalary('@u.UserId','@u.FullName','@u.BaseSalary')"
+                                            title="تعديل المرتب الأساسي">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                }
+                            </td>
+                            <td>
+                                @if (u.Adjustment != 0)
+                                {
+                                    <span style="font-weight:700;color:@(u.Adjustment > 0 ? "#16A34A" : "#DC2626")">
+                                        @(u.Adjustment > 0 ? "+" : "")@u.Adjustment.ToString("N0") ج.م
+                                    </span>
+                                    if (!string.IsNullOrEmpty(u.AdjustmentNote))
+                                    {
+                                        <div style="font-size:11px;color:var(--text-muted)">@u.AdjustmentNote</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-muted);font-size:12px">—</span>
+                                }
+                                @if (u.Status != 3)
+                                {
+                                    <button class="btn btn-link btn-sm p-0 ms-1"
+                                            style="font-size:11px;color:var(--text-muted)"
+                                            onclick="openAdjust('@u.UserId','@u.FullName','@u.Adjustment','@u.AdjustmentNote')">
+                                        <i class="bi bi-plus-slash-minus"></i>
+                                    </button>
+                                }
+                            </td>
+                            <td>
+                                <span style="font-weight:700;font-size:15px;
+                                             color:@(u.IsPaid ? "#16A34A" : "#1B4FD8")">
+                                    @u.TotalAmount.ToString("N0")
+                                </span>
+                                <span style="font-size:11px;color:var(--text-muted)"> ج.م</span>
+                            </td>
+                            <td>
+                                @{
+                                    var (badgeBg, badgeColor, badgeText) = u.Status switch {
+                                        3 => ("#ECFDF5", "#059669", "✓ مدفوع"),
+                                        2 => ("#EFF6FF", "#2563EB", "معتمد"),
+                                        1 => ("#FFFBEB", "#D97706", "معلق"),
+                                        _ => ("#F1F5F9", "#64748B", "لم يُعدّ")
+                                    };
+                                }
+                                <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:20px;
+                                             background:@badgeBg;color:@badgeColor">
+                                    @badgeText
+                                </span>
+                            </td>
+                            <td>
+                                @if (u.Status != 3)
+                                {
+                                    <form asp-action="ApproveSalary" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="userId" value="@u.UserId" />
+                                        <input type="hidden" name="month"  value="@selMonth"  />
+                                        <input type="hidden" name="year"   value="@selYear"   />
+                                        <button type="submit"
+                                                class="btn btn-sm @(u.Status == 2 ? "btn-outline-success" : "btn-success")"
+                                                style="font-size:12px;padding:4px 12px"
+                                                @(u.Status == 2 ? "disabled" : "")>
+                                            <i class="bi bi-check-lg me-1"></i>
+                                            @(u.Status == 2 ? "تم الاعتماد" : "اعتماد الصرف")
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span style="font-size:12px;color:#059669">
+                                        <i class="bi bi-check-circle-fill me-1"></i>تم الصرف
+                                    </span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <td colspan="2" style="font-weight:700;font-size:13px">الإجمالي</td>
+                        <td style="font-weight:700">@totalBase.ToString("N0") ج.م</td>
+                        <td style="font-weight:700;color:@(totalAdj >= 0 ? "#16A34A" : "#DC2626")">
+                            @(totalAdj >= 0 ? "+" : "")@totalAdj.ToString("N0") ج.م
+                        </td>
+                        <td style="font-weight:700;font-size:15px;color:#1B4FD8">
+                            @totalPayroll.ToString("N0") ج.م
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+@* ── Set Base Salary Modal ── *@
+<div class="modal fade" id="setSalaryModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="font-size:15px">تعديل المرتب الأساسي</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="SetBaseSalary" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" id="setSalaryUserId" />
+                <div class="modal-body">
+                    <p id="setSalaryName" style="font-weight:600;font-size:13.5px;margin-bottom:12px"></p>
+                    <div class="alert alert-info" style="font-size:12px;padding:8px 12px">
+                        <i class="bi bi-info-circle me-1"></i>
+                        هذا التعديل يغير المرتب الأساسي بشكل دائم للأشهر القادمة
+                    </div>
+                    <label class="form-label" style="font-size:13px;font-weight:600">
+                        المرتب الأساسي الجديد (ج.م) <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" name="baseSalary" id="setSalaryAmount"
+                           class="form-control form-control-sm" min="0" step="0.01" required />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-check-lg me-1"></i> حفظ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* ── Adjust (Bonus/Deduction) Modal ── *@
+<div class="modal fade" id="adjustModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="font-size:15px">مكافأة / خصم</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="AdjustSalary" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" id="adjustUserId" />
+                <input type="hidden" name="month"  value="@selMonth"  />
+                <input type="hidden" name="year"   value="@selYear"   />
+                <div class="modal-body">
+                    <p id="adjustName" style="font-weight:600;font-size:13.5px;margin-bottom:12px"></p>
+                    <div class="alert alert-warning" style="font-size:12px;padding:8px 12px">
+                        <i class="bi bi-info-circle me-1"></i>
+                        هذا التعديل لهذا الشهر فقط — المرتب الأساسي لا يتغير
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;font-weight:600">النوع</label>
+                        <div class="d-flex gap-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="adjType"
+                                       id="typeBonus" value="bonus" checked onchange="updateAdjSign()" />
+                                <label class="form-check-label" for="typeBonus" style="font-size:13px">
+                                    مكافأة ➕
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="adjType"
+                                       id="typeDeduct" value="deduct" onchange="updateAdjSign()" />
+                                <label class="form-check-label" for="typeDeduct" style="font-size:13px">
+                                    خصم ➖
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;font-weight:600">
+                            المبلغ (ج.م) <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" id="adjustAmountInput"
+                               class="form-control form-control-sm" min="0" step="0.01" required
+                               placeholder="مثال: 500" />
+                        <input type="hidden" name="adjustment" id="adjustmentFinal" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;font-weight:600">السبب</label>
+                        <input type="text" name="adjustmentNote" id="adjustNote"
+                               class="form-control form-control-sm"
+                               placeholder="مثال: مكافأة الأداء، غياب..." />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary btn-sm" onclick="prepareAdjustment()">
+                        <i class="bi bi-check-lg me-1"></i> حفظ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function openSetSalary(userId, name, current) {
+    document.getElementById('setSalaryUserId').value  = userId;
+    document.getElementById('setSalaryName').textContent = name;
+    document.getElementById('setSalaryAmount').value  = current;
+    new bootstrap.Modal(document.getElementById('setSalaryModal')).show();
+}
+
+function openAdjust(userId, name, currentAdj, currentNote) {
+    document.getElementById('adjustUserId').value = userId;
+    document.getElementById('adjustName').textContent = name;
+    document.getElementById('adjustNote').value   = currentNote || '';
+
+    const absVal = Math.abs(parseFloat(currentAdj) || 0);
+    document.getElementById('adjustAmountInput').value = absVal;
+
+    // Set radio based on current adjustment sign
+    if (parseFloat(currentAdj) < 0) {
+        document.getElementById('typeDeduct').checked = true;
+    } else {
+        document.getElementById('typeBonus').checked = true;
+    }
+
+    new bootstrap.Modal(document.getElementById('adjustModal')).show();
+}
+
+function prepareAdjustment() {
+    const amount  = parseFloat(document.getElementById('adjustAmountInput').value) || 0;
+    const isBonus = document.getElementById('typeBonus').checked;
+    document.getElementById('adjustmentFinal').value = isBonus ? amount : -amount;
+}
+</script>
+}

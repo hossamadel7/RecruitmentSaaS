@@ -344,6 +344,69 @@ namespace RecruitmentSaaS.Controllers
             return View(payments);
         }
 
+        // ── GET /Accountant/Salaries ──────────────────────────────────────────
+        public async Task<IActionResult> Salaries(int? month, int? year)
+        {
+            var now = DateTime.UtcNow;
+            var selMonth = month ?? now.Month;
+            var selYear = year ?? now.Year;
+            var monthStart = new DateOnly(selYear, selMonth, 1);
+
+            var payments = await _context.SalaryPayments
+                .Where(sp => sp.SalaryMonth == monthStart && sp.Status == 2)
+                .Include(sp => sp.User)
+                .OrderBy(sp => sp.User.Role)
+                .ThenBy(sp => sp.User.FullName)
+                .Select(sp => new SalaryUserDto
+                {
+                    UserId = sp.UserId,
+                    FullName = sp.User.FullName,
+                    Email = sp.User.Email,
+                    Role = sp.User.Role,
+                    BaseSalary = sp.BaseSalary,
+                    Adjustment = sp.Adjustment,
+                    AdjustmentNote = sp.AdjustmentNote,
+                    PaymentId = sp.Id,
+                    Status = sp.Status
+                })
+                .ToListAsync();
+
+            ViewBag.SelectedMonth = selMonth;
+            ViewBag.SelectedYear = selYear;
+            ViewBag.TotalPayroll = payments.Sum(p => p.TotalAmount);
+
+            return View(payments);
+        }
+
+        // ── POST /Accountant/FulfillSalary ────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> FulfillSalary(Guid paymentId, int month, int year)
+        {
+            var accountantId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var payment = await _context.SalaryPayments
+                .Include(sp => sp.User)
+                .FirstOrDefaultAsync(sp => sp.Id == paymentId);
+
+            if (payment == null) return NotFound();
+
+            if (payment.Status != 2)
+            {
+                TempData["Error"] = "هذا المرتب غير معتمد أو تم صرفه بالفعل";
+                return RedirectToAction("Salaries", new { month, year });
+            }
+
+            payment.Status = 3;
+            payment.PaidById = accountantId;
+            payment.PaidAt = DateTime.UtcNow;
+            payment.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = $"تم صرف مرتب {payment.User.FullName} — {payment.TotalAmount:N0} ج.م";
+            return RedirectToAction("Salaries", new { month, year });
+        }
+
         // ── GET /Accountant/AllCandidates ─────────────────────────────────────
         public async Task<IActionResult> AllCandidates(string? q, int page = 1)
         {
@@ -409,7 +472,6 @@ namespace RecruitmentSaaS.Controllers
                 .Include(r => r.ExecutedBy)
                 .AsQueryable();
 
-            // Default: Admin-approved (status=2) waiting for accountant execution
             if (status.HasValue)
                 query = query.Where(r => r.Status == status.Value);
             else
@@ -449,12 +511,11 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("Refunds");
             }
 
-            // Reduce TotalPaidEgp — never go below zero
             refund.Candidate.TotalPaidEgp =
                 Math.Max(0, refund.Candidate.TotalPaidEgp - refund.AmountEgp);
             refund.Candidate.UpdatedAt = DateTime.UtcNow;
 
-            refund.Status = 4; // Executed
+            refund.Status = 4;
             refund.ExecutedById = userId;
             refund.ExecutedAt = DateTime.UtcNow;
 
@@ -477,7 +538,6 @@ namespace RecruitmentSaaS.Controllers
                 .Include(c => c.PaidBy)
                 .AsQueryable();
 
-            // Default: Admin-approved (status=2) ready for accountant to pay
             if (status.HasValue)
                 query = query.Where(c => c.Status == status.Value);
             else
@@ -516,7 +576,7 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("Commissions");
             }
 
-            commission.Status = 3; // Paid
+            commission.Status = 3;
             commission.PaidById = userId;
             commission.PaidAt = DateTime.UtcNow;
 
@@ -577,5 +637,40 @@ namespace RecruitmentSaaS.Controllers
 
             return View();
         }
+
+    } // ← إغلاق AccountantController ✅
+
+    // ✅ SalaryUserDto خارج الـ class — هنا صح
+    public class SalaryUserDto
+    {
+        public Guid UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public byte Role { get; set; }
+        public string RoleName => Role switch
+        {
+            2 => "استقبال",
+            3 => "تيلي سيلز",
+            4 => "محاسب",
+            5 => "عمليات",
+            6 => "مبيعات مكتبية",
+            _ => "موظف"
+        };
+        public decimal BaseSalary { get; set; }
+        public decimal Adjustment { get; set; }
+        public string? AdjustmentNote { get; set; }
+        public decimal TotalAmount => BaseSalary + Adjustment;
+        public Guid? PaymentId { get; set; }
+        public byte Status { get; set; }
+        public string StatusLabel => Status switch
+        {
+            1 => "معلق",
+            2 => "معتمد",
+            3 => "مدفوع",
+            _ => "لم يُعدّ بعد"
+        };
+        public bool IsApproved => Status == 2;
+        public bool IsPaid => Status == 3;
     }
-}
+
+} // ← إغلاق namespace ✅
