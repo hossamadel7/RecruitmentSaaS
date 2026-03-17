@@ -1,0 +1,96 @@
+@{
+    ViewData["Title"] = "شكراً لك — الفهد العربي";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>شكراً لك — الفهد العربي</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(160deg, #0B1120 0%, #0D1B3E 100%);
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            padding: 24px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 24px;
+            padding: 56px 48px;
+            max-width: 520px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 32px 80px rgba(0,0,0,.3);
+        }
+        .icon-wrap {
+            width: 80px; height: 80px;
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.2rem;
+            margin: 0 auto 28px;
+        }
+        h1 { font-size: 1.9rem; font-weight: 900; color: #0F172A; margin-bottom: 12px; }
+        p  { color: #64748B; font-size: .95rem; line-height: 1.9; margin-bottom: 8px; }
+        .highlight { color: #1B4FD8; font-weight: 700; }
+        .divider { height: 1px; background: #e2e8f0; margin: 28px 0; }
+        .steps { text-align: right; }
+        .step { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+        .step-dot {
+            width: 28px; height: 28px; flex-shrink: 0;
+            background: #EEF2FF; color: #1B4FD8;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .78rem; font-weight: 800; margin-top: 2px;
+        }
+        .step-text { font-size: .85rem; color: #374151; line-height: 1.7; }
+        .btn-back {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: linear-gradient(135deg, #1B4FD8, #1440B5);
+            color: #fff; text-decoration: none;
+            font-weight: 700; font-size: .95rem;
+            padding: 13px 32px; border-radius: 12px;
+            margin-top: 32px;
+            transition: transform .15s, box-shadow .2s;
+            box-shadow: 0 4px 16px rgba(27,79,216,.3);
+        }
+        .btn-back:hover { transform: translateY(-2px); color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon-wrap">✅</div>
+        <h1>تم استلام طلبك!</h1>
+        <p>شكراً لك على تسجيلك مع <span class="highlight">الفهد العربي للتوظيف الدولي</span></p>
+        <p>سيتواصل معك أحد مستشارينا في أقرب وقت ممكن.</p>
+
+        <div class="divider"></div>
+
+        <div class="steps">
+            <div class="step">
+                <div class="step-dot">١</div>
+                <div class="step-text"><strong>احتفظ بهاتفك قريباً</strong> — سيتصل بك مستشارنا خلال ساعات العمل.</div>
+            </div>
+            <div class="step">
+                <div class="step-dot">٢</div>
+                <div class="step-text"><strong>جهّز أوراقك الأساسية</strong> — بطاقة الهوية وجواز السفر إن وُجد.</div>
+            </div>
+            <div class="step">
+                <div class="step-dot">٣</div>
+                <div class="step-text"><strong>يمكنك زيارة فرعنا</strong> مباشرةً إذا أردت التحدث مع أحد موظفينا.</div>
+            </div>
+        </div>
+
+        <a href="/" class="btn-back">
+            <i class="bi bi-arrow-right"></i>
+            العودة للصفحة الرئيسية
+        </a>
+    </div>
+</body>
+</html>

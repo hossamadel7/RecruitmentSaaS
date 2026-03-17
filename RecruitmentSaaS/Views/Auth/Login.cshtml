@@ -7,45 +7,492 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>تسجيل الدخول — نظام التوظيف</title>
+    <title>تسجيل الدخول — الفهد العربي</title>
+
+    <!-- Bootstrap 5 RTL -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+    <!-- Google Fonts: Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet" />
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+
+    <style>
+        * {
+            font-family: 'Cairo', sans-serif;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* ─── Animated Gradient Background ─── */
+        .bg-animated {
+            min-height: 100vh;
+            background: linear-gradient(-45deg, #0f2027, #1a3a4a, #1b6ca8, #0d3d6e, #164e63);
+            background-size: 400% 400%;
+            animation: gradientShift 12s ease infinite;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        @@keyframes gradientShift {
+            0%
+
+        {
+            background-position: 0% 50%;
+        }
+
+        50% {
+            background-position: 100% 50%;
+        }
+
+        100% {
+            background-position: 0% 50%;
+        }
+
+        }
+
+        /* ─── Floating Blobs ─── */
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.25;
+            animation: blobFloat 8s ease-in-out infinite alternate;
+        }
+
+        .blob-1 {
+            width: 420px;
+            height: 420px;
+            background: #38bdf8;
+            top: -100px;
+            left: -120px;
+            animation-duration: 9s;
+        }
+
+        .blob-2 {
+            width: 300px;
+            height: 300px;
+            background: #facc15;
+            bottom: -80px;
+            right: -80px;
+            animation-duration: 11s;
+        }
+
+        .blob-3 {
+            width: 200px;
+            height: 200px;
+            background: #818cf8;
+            top: 40%;
+            right: 10%;
+            animation-duration: 7s;
+        }
+
+        @@keyframes blobFloat {
+            0%
+
+        {
+            transform: translate(0, 0) scale(1);
+        }
+
+        100% {
+            transform: translate(30px, 40px) scale(1.1);
+        }
+
+        }
+
+        /* ─── Glass Card ─── */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 24px;
+            padding: 2.8rem 2.4rem;
+            width: 100%;
+            max-width: 430px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
+            animation: cardIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+            position: relative;
+            z-index: 10;
+        }
+
+        @@keyframes cardIn {
+            from
+
+        {
+            opacity: 0;
+            transform: translateY(40px) scale(0.97);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        }
+
+        /* ─── Brand ─── */
+        .brand-wrapper {
+            text-align: center;
+            margin-bottom: 1.8rem;
+        }
+
+        .brand-icon {
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.45);
+            animation: iconPulse 3s ease-in-out infinite;
+        }
+
+        @@keyframes iconPulse {
+            0%, 100%
+
+        {
+            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.45);
+        }
+
+        50% {
+            box-shadow: 0 8px 36px rgba(245, 158, 11, 0.75);
+        }
+
+        }
+
+        .brand-name {
+            font-size: 1.7rem;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 0.5px;
+            line-height: 1.2;
+        }
+
+        .brand-sub {
+            font-size: 0.82rem;
+            color: rgba(255, 255, 255, 0.55);
+            font-weight: 400;
+            margin-top: 2px;
+        }
+
+        /* ─── Divider ─── */
+        .section-title {
+            text-align: center;
+            color: rgba(255,255,255,0.9);
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 1.6rem;
+            position: relative;
+        }
+
+            .section-title::before,
+            .section-title::after {
+                content: '';
+                position: absolute;
+                top: 50%;
+                width: 28%;
+                height: 1px;
+                background: rgba(255,255,255,0.2);
+            }
+
+            .section-title::before {
+                right: 0;
+            }
+
+            .section-title::after {
+                left: 0;
+            }
+
+        /* ─── Form Inputs ─── */
+        .input-group-custom {
+            position: relative;
+            margin-bottom: 1.2rem;
+        }
+
+            .input-group-custom label {
+                display: block;
+                color: rgba(255,255,255,0.75);
+                font-size: 0.85rem;
+                font-weight: 600;
+                margin-bottom: 6px;
+            }
+
+        .input-icon-wrapper {
+            position: relative;
+        }
+
+            .input-icon-wrapper .field-icon {
+                position: absolute;
+                top: 50%;
+                right: 14px;
+                transform: translateY(-50%);
+                color: rgba(255,255,255,0.45);
+                font-size: 1rem;
+                pointer-events: none;
+                transition: color 0.3s;
+            }
+
+            .input-icon-wrapper .toggle-pw {
+                position: absolute;
+                top: 50%;
+                left: 14px;
+                transform: translateY(-50%);
+                color: rgba(255,255,255,0.45);
+                font-size: 1rem;
+                cursor: pointer;
+                pointer-events: all;
+                transition: color 0.3s;
+                background: none;
+                border: none;
+                padding: 0;
+            }
+
+        .form-field {
+            width: 100%;
+            padding: 0.75rem 2.6rem 0.75rem 2.6rem;
+            background: rgba(255,255,255,0.07);
+            border: 1.5px solid rgba(255,255,255,0.15);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 0.95rem;
+            font-family: 'Cairo', sans-serif;
+            transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+            outline: none;
+        }
+
+            .form-field::placeholder {
+                color: rgba(255,255,255,0.3);
+            }
+
+            .form-field:focus {
+                border-color: #f59e0b;
+                background: rgba(255,255,255,0.12);
+                box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+            }
+
+                .form-field:focus + .field-icon,
+                .input-icon-wrapper:focus-within .field-icon {
+                    color: #f59e0b;
+                }
+
+        .validation-msg {
+            color: #fca5a5;
+            font-size: 0.78rem;
+            margin-top: 4px;
+            display: block;
+        }
+
+        /* ─── Error Alert ─── */
+        .alert-glass {
+            background: rgba(239, 68, 68, 0.18);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            border-radius: 12px;
+            color: #fecaca;
+            font-size: 0.85rem;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.2rem;
+        }
+
+        /* ─── Submit Button ─── */
+        .btn-login {
+            width: 100%;
+            padding: 0.8rem;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border: none;
+            border-radius: 12px;
+            color: #1a1a1a;
+            font-size: 1rem;
+            font-weight: 700;
+            font-family: 'Cairo', sans-serif;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.3s, filter 0.3s;
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+            position: relative;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+            .btn-login::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: rgba(255,255,255,0);
+                transition: background 0.2s;
+            }
+
+            .btn-login:hover {
+                filter: brightness(1.1);
+                transform: translateY(-2px);
+                box-shadow: 0 10px 28px rgba(245, 158, 11, 0.55);
+            }
+
+            .btn-login:active {
+                transform: translateY(0);
+            }
+
+        /* ─── Footer text ─── */
+        .card-footer-text {
+            text-align: center;
+            color: rgba(255,255,255,0.45);
+            font-size: 0.78rem;
+            margin-top: 1.6rem;
+        }
+
+        /* ─── Responsive ─── */
+        @@media (max-width: 480px) {
+            .glass-card
+
+        {
+            padding: 2rem 1.4rem;
+            margin: 1rem;
+        }
+
+        .brand-name {
+            font-size: 1.4rem;
+        }
+
+        }
+    </style>
 </head>
-<body class="bg-light">
-    <div class="container">
-        <div class="row justify-content-center align-items-center min-vh-100">
-            <div class="col-md-4">
-                <div class="card shadow">
-                    <div class="card-body p-4">
-                        <h4 class="text-center mb-4">تسجيل الدخول</h4>
+<body>
+    <div class="bg-animated">
 
-                        @if (!ViewData.ModelState.IsValid)
-                        {
-                            <div class="alert alert-danger">
-                                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                                {
-                                    <div>@error.ErrorMessage</div>
-                                }
-                            </div>
-                        }
+        <!-- Decorative blobs -->
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
 
-                        <form asp-action="Login" method="post">
-                            @Html.AntiForgeryToken()
-                            <div class="mb-3">
-                                <label asp-for="Email" class="form-label">البريد الإلكتروني</label>
-                                <input asp-for="Email" class="form-control" placeholder="example@domain.com" />
-                                <span asp-validation-for="Email" class="text-danger small"></span>
-                            </div>
-                            <div class="mb-3">
-                                <label asp-for="Password" class="form-label">كلمة المرور</label>
-                                <input asp-for="Password" type="password" class="form-control" />
-                                <span asp-validation-for="Password" class="text-danger small"></span>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">دخول</button>
-                        </form>
-                    </div>
+        <div class="glass-card">
+
+            <!-- Brand -->
+            <div class="brand-wrapper">
+                <div class="brand-icon">🐆</div>
+                <div class="brand-name">الفهد العربي</div>
+                <div class="brand-sub">منصة التوظيف الذكية</div>
+            </div>
+
+            <!-- Section title -->
+            <div class="section-title">تسجيل الدخول</div>
+
+            <!-- Validation errors -->
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert-glass">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <div>⚠️ @error.ErrorMessage</div>
+                    }
                 </div>
+            }
+
+            <!-- Login Form -->
+            <form asp-action="Login" method="post" id="loginForm" novalidate>
+                @Html.AntiForgeryToken()
+
+                <!-- Email -->
+                <div class="input-group-custom">
+                    <label asp-for="Email">البريد الإلكتروني</label>
+                    <div class="input-icon-wrapper">
+                        <input asp-for="Email"
+                               class="form-field"
+                               placeholder="example@domain.com"
+                               autocomplete="email"
+                               dir="ltr" />
+                        <i class="bi bi-envelope field-icon"></i>
+                    </div>
+                    <span asp-validation-for="Email" class="validation-msg"></span>
+                </div>
+
+                <!-- Password -->
+                <div class="input-group-custom">
+                    <label asp-for="Password">كلمة المرور</label>
+                    <div class="input-icon-wrapper">
+                        <input asp-for="Password"
+                               type="password"
+                               id="passwordInput"
+                               class="form-field"
+                               placeholder="••••••••••"
+                               autocomplete="current-password" />
+                        <i class="bi bi-lock field-icon"></i>
+                        <button type="button" class="toggle-pw" onclick="togglePassword()" id="togglePwBtn" aria-label="إظهار كلمة المرور">
+                            <i class="bi bi-eye" id="eyeIcon"></i>
+                        </button>
+                    </div>
+                    <span asp-validation-for="Password" class="validation-msg"></span>
+                </div>
+
+                <!-- Submit -->
+                <button type="submit" class="btn-login">
+                    <i class="bi bi-box-arrow-in-right me-1"></i>
+                    دخول إلى حسابي
+                </button>
+            </form>
+
+            <div class="card-footer-text">
+                &copy; @DateTime.Now.Year الفهد العربي — جميع الحقوق محفوظة
             </div>
         </div>
+
     </div>
+
+    <script>
+        function togglePassword() {
+            const input = document.getElementById('passwordInput');
+            const icon  = document.getElementById('eyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('bi-eye', 'bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            }
+        }
+
+        // Subtle shake animation on failed submit
+        const form = document.getElementById('loginForm');
+        const hasErrors = document.querySelector('.alert-glass');
+        if (hasErrors) {
+            const card = document.querySelector('.glass-card');
+            card.style.animation = 'cardIn 0.7s cubic-bezier(0.22,1,0.36,1) both, shake 0.4s ease';
+        }
+    </script>
+
+    <style>
+        @@keyframes shake {
+            0%, 100%
+
+        {
+            transform: translateX(0);
+        }
+
+        20% {
+            transform: translateX(-8px);
+        }
+
+        40% {
+            transform: translateX(8px);
+        }
+
+        60% {
+            transform: translateX(-5px);
+        }
+
+        80% {
+            transform: translateX(5px);
+        }
+
+        }
+    </style>
 </body>
 </html>

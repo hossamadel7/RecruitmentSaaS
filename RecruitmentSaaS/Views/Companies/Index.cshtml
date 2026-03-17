@@ -1,0 +1,424 @@
+@{
+    ViewData["Title"] = "الشركات";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div style="padding:24px">
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-3" style="font-size:13px">
+            <i class="bi bi-check-circle-fill me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3" style="font-size:13px">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+        <div>
+            <h1 style="font-size:22px;font-weight:800;margin:0">🏢 الشركات</h1>
+            <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0">
+                إدارة الشركات الطالبة للموظفين وتتبع حالة التوظيف
+            </p>
+        </div>
+        <button onclick="openAddModal()"
+                style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+            <i class="bi bi-plus-lg me-2"></i> إضافة شركة
+        </button>
+    </div>
+
+    <!-- Filters -->
+    <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
+        <select name="country" class="form-select form-select-sm" style="width:180px;font-size:13px">
+            <option value="">كل الدول</option>
+            @foreach (var c in ViewBag.Countries ?? new List<string>())
+            {
+                if ((string?)ViewBag.FilterCountry == c)
+                {
+                    <option value="@c" selected="selected">@c</option>
+                }
+                else
+                {
+                    <option value="@c">@c</option>
+                }
+            }
+        </select>
+        <select name="field" class="form-select form-select-sm" style="width:180px;font-size:13px">
+            <option value="">كل المسميات</option>
+            @foreach (var f in ViewBag.Fields ?? new List<string>())
+            {
+                if ((string?)ViewBag.FilterField == f)
+                {
+                    <option value="@f" selected="selected">@f</option>
+                }
+                else
+                {
+                    <option value="@f">@f</option>
+                }
+            }
+        </select>
+        <select name="active" class="form-select form-select-sm" style="width:140px;font-size:13px">
+            <option value="">الكل</option>
+            @if (ViewBag.FilterActive == true)
+            {
+                <option value="true" selected="selected">نشطة</option>
+            }
+            else
+            {
+                <option value="true">نشطة</option>
+            }
+            @if (ViewBag.FilterActive == false)
+            {
+                <option value="false" selected="selected">غير نشطة</option>
+            }
+            else
+            {
+                <option value="false">غير نشطة</option>
+            }
+        </select>
+        <button type="submit" class="btn btn-sm btn-outline-secondary" style="font-size:13px">
+            <i class="bi bi-funnel me-1"></i> فلتر
+        </button>
+        <a href="/Companies/Index" class="btn btn-sm btn-outline-secondary" style="font-size:13px">إعادة تعيين</a>
+    </form>
+
+    <!-- Companies Table -->
+    <div style="background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden">
+        @{
+            var companies = ViewBag.Companies as dynamic;
+            bool hasCompanies = false;
+            if (companies != null) foreach (var _ in companies) { hasCompanies = true; break; }
+        }
+        @if (!hasCompanies)
+        {
+            <div style="padding:60px;text-align:center">
+                <div style="font-size:40px;margin-bottom:12px">🏢</div>
+                <div style="font-weight:700;font-size:15px;margin-bottom:6px">لا يوجد شركات بعد</div>
+                <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">ابدأ بإضافة أول شركة</div>
+                <button onclick="openAddModal()"
+                        style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                    <i class="bi bi-plus-lg me-2"></i> إضافة شركة
+                </button>
+            </div>
+        }
+        else
+        {
+            <table class="table mb-0" style="font-size:13px">
+                <thead style="background:#f8fafc">
+                    <tr>
+                        <th style="padding:12px 20px;font-weight:700;color:var(--text-muted);font-size:12px">الشركة</th>
+                        <th style="font-weight:700;color:var(--text-muted);font-size:12px">الدولة</th>
+                        <th style="font-weight:700;color:var(--text-muted);font-size:12px">المسميات الوظيفية</th>
+                        <th style="font-weight:700;color:var(--text-muted);font-size:12px">التواصل</th>
+                        <th style="font-weight:700;color:var(--text-muted);font-size:12px">بداية العقد</th>
+                        <th style="font-weight:700;color:var(--text-muted);font-size:12px;text-align:center">المطلوب</th>
+                        <th style="font-weight:700;color:var(--text-muted);font-size:12px;text-align:center">المُعيَّن</th>
+                        <th style="font-weight:700;color:var(--text-muted);font-size:12px;text-align:center">تم السفر</th>
+                        <th style="font-weight:700;color:var(--text-muted);font-size:12px;text-align:center">المتبقي</th>
+                        <th style="font-weight:700;color:var(--text-muted);font-size:12px">الحالة</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var co in ViewBag.Companies)
+                    {
+                        int requested = (int)co.RequestedCount;
+                        int assigned = (int)co.AssignedCount;
+                        int completed = (int)co.CompletedCount;
+                        int remaining = requested - assigned;
+                        int fillPct = requested > 0 ? Math.Min(100, assigned * 100 / requested) : 0;
+
+                        <tr style="border-top:1px solid var(--border)" onclick="window.location='/Companies/Detail/@co.Id'" style="cursor:pointer">
+                            <td style="padding:14px 20px">
+                                <div style="font-weight:700">@co.Name</div>
+                                @if (!string.IsNullOrEmpty((string?)co.City))
+                                {
+                                    <div style="font-size:11px;color:var(--text-muted)">@co.City</div>
+                                }
+                            </td>
+                            <td style="padding:14px 20px">
+                                <span style="background:#eff6ff;color:#1d4ed8;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600">
+                                    @co.Country
+                                </span>
+                            </td>
+                            <td style="padding:14px 20px">
+                                <div style="display:flex;flex-wrap:wrap;gap:4px">
+                                    @foreach (var job in co.Jobs)
+                                    {
+                                        <span style="background:#f1f5f9;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600">
+                                            @job.JobTitle <span style="color:var(--primary)">×@job.RequestedCount</span>
+                                        </span>
+                                    }
+                                </div>
+                            </td>
+                            <td style="padding:14px 20px">
+                                @if (!string.IsNullOrEmpty((string?)co.ContactPhone))
+                                {
+                                    <div style="font-size:12px"><i class="bi bi-telephone me-1" style="color:var(--text-muted)"></i>@co.ContactPhone</div>
+                                }
+                                @if (!string.IsNullOrEmpty((string?)co.ContactEmail))
+                                {
+                                    <div style="font-size:11px;color:var(--text-muted)"><i class="bi bi-envelope me-1"></i>@co.ContactEmail</div>
+                                }
+                            </td>
+                            <td style="padding:14px 20px;font-size:12px;color:var(--text-muted)">
+                                @if (co.ContractStartDate != null)
+                                {
+                                    @(((DateOnly)co.ContractStartDate).ToString("dd/MM/yyyy"))
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </td>
+                            <td style="padding:14px 20px;text-align:center;font-weight:700">@requested</td>
+                            <td style="padding:14px 20px;text-align:center">
+                                <div style="font-weight:700;color:var(--primary)">@assigned</div>
+                                <!-- Progress bar -->
+                                @if (requested > 0)
+                                {
+                                    <div style="background:#e2e8f0;border-radius:4px;height:4px;margin-top:4px;width:60px;margin:4px auto 0">
+                                        <div style="background:var(--primary);height:4px;border-radius:4px;width:@(fillPct)%"></div>
+                                    </div>
+                                }
+                            </td>
+                            <td style="padding:14px 20px;text-align:center">
+                                <span style="color:#16a34a;font-weight:700">@completed</span>
+                            </td>
+                            <td style="padding:14px 20px;text-align:center">
+                                @if (remaining > 0)
+                                {
+                                    <span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700">
+                                        @remaining
+                                    </span>
+                                }
+                                else if (remaining == 0 && requested > 0)
+                                {
+                                    <span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700">
+                                        <i class="bi bi-check-circle-fill me-1"></i>مكتمل
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-muted)">—</span>
+                                }
+                            </td>
+                            <td style="padding:14px 20px">
+                                @if ((bool)co.IsActive)
+                                {
+                                    <span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">● نشطة</span>
+                                }
+                                else
+                                {
+                                    <span style="background:#f8fafc;color:var(--text-muted);padding:2px 8px;border-radius:20px;font-size:11px">غير نشطة</span>
+                                }
+                            </td>
+                            <td style="padding:14px 20px">
+                                <button onclick="event.stopPropagation(); openEditModal(@Json.Serialize(new {
+                                id=co.Id.ToString(), name=co.Name, country=co.Country,
+                                city=(string?)co.City, contactPhone=(string?)co.ContactPhone,
+                                contactEmail=(string?)co.ContactEmail,
+                                contractStartDate=co.ContractStartDate != null ? ((DateOnly)co.ContractStartDate).ToString("yyyy-MM-dd") : "",
+                                notes=(string?)co.Notes, isActive=(bool)co.IsActive
+                            }))"
+                                        style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--text-muted)">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<!-- ── Add Company Modal ──────────────────────────────────────────────────────── -->
+<div id="addModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border-radius:var(--radius);width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
+        <div style="padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card-bg);z-index:1">
+            <h5 style="margin:0;font-weight:800;font-size:15px">
+                <i class="bi bi-building-add me-2" style="color:var(--primary)"></i>إضافة شركة جديدة
+            </h5>
+            <button onclick="closeAddModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>
+        </div>
+        <form method="post" action="/Companies/Create" style="padding:22px">
+            @Html.AntiForgeryToken()
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label fw-bold" style="font-size:13px">اسم الشركة <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="name" class="form-control" style="font-size:13px" required />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold" style="font-size:13px">الدولة <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="country" class="form-control" style="font-size:13px" required />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold" style="font-size:13px">المدينة</label>
+                    <input type="text" name="city" class="form-control" style="font-size:13px" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-bold" style="font-size:13px">
+                        المسميات الوظيفية <span style="color:var(--danger)">*</span>
+                    </label>
+                    <div id="addJobsList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">
+                        <div class="job-row" style="display:flex;gap:8px;align-items:center">
+                            <input type="text" name="jobTitles" class="form-control" style="font-size:13px;flex:1"
+                                   placeholder="مثال: سائق" required />
+                            <input type="number" name="jobCounts" class="form-control" style="font-size:13px;width:90px"
+                                   placeholder="العدد" min="1" value="1" />
+                            <button type="button" onclick="removeJobRow(this)"
+                                    style="background:none;border:none;color:#ef4444;font-size:18px;cursor:pointer;padding:0 4px">
+                                ×
+                            </button>
+                        </div>
+                    </div>
+                    <button type="button" onclick="addJobRow()"
+                            style="background:none;border:1px dashed var(--border);border-radius:var(--radius-sm);padding:6px 14px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--text-muted);width:100%">
+                        <i class="bi bi-plus me-1"></i> إضافة مسمى وظيفي آخر
+                    </button>
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold" style="font-size:13px">تليفون التواصل</label>
+                    <input type="text" name="contactPhone" class="form-control" style="font-size:13px" dir="ltr" />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold" style="font-size:13px">إيميل التواصل</label>
+                    <input type="email" name="contactEmail" class="form-control" style="font-size:13px" dir="ltr" />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold" style="font-size:13px">تاريخ بداية العقد</label>
+                    <input type="date" name="contractStartDate" class="form-control" style="font-size:13px" />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold" style="font-size:13px">عدد الموظفين المطلوبين</label>
+                    <input type="number" name="requestedCount" class="form-control" style="font-size:13px" min="0" value="0" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-bold" style="font-size:13px">ملاحظات</label>
+                    <textarea name="notes" class="form-control" style="font-size:13px" rows="3"></textarea>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+                <button type="button" onclick="closeAddModal()"
+                        style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit">
+                    إلغاء
+                </button>
+                <button type="submit"
+                        style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                    <i class="bi bi-plus-lg me-1"></i> إضافة
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── Edit Company Modal ─────────────────────────────────────────────────────── -->
+<div id="editModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border-radius:var(--radius);width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
+        <div style="padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card-bg);z-index:1">
+            <h5 style="margin:0;font-weight:800;font-size:15px">
+                <i class="bi bi-pencil-fill me-2" style="color:var(--primary)"></i>تعديل بيانات الشركة
+            </h5>
+            <button onclick="closeEditModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>
+        </div>
+        <form method="post" action="/Companies/Edit" style="padding:22px" id="editForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="editId" />
+
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label fw-bold" style="font-size:13px">اسم الشركة <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="name" id="editName" class="form-control" style="font-size:13px" required />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold" style="font-size:13px">الدولة <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="country" id="editCountry" class="form-control" style="font-size:13px" required />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold" style="font-size:13px">المدينة</label>
+                    <input type="text" name="city" id="editCity" class="form-control" style="font-size:13px" />
+                </div>
+                <div class="col-12">
+                    <div style="background:#eff6ff;border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--primary)">
+                        <i class="bi bi-info-circle me-1"></i>
+                        لإدارة المسميات الوظيفية — افتح صفحة تفاصيل الشركة
+                    </div>
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold" style="font-size:13px">تليفون التواصل</label>
+                    <input type="text" name="contactPhone" id="editPhone" class="form-control" style="font-size:13px" dir="ltr" />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold" style="font-size:13px">إيميل التواصل</label>
+                    <input type="email" name="contactEmail" id="editEmail" class="form-control" style="font-size:13px" dir="ltr" />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold" style="font-size:13px">تاريخ بداية العقد</label>
+                    <input type="date" name="contractStartDate" id="editContractDate" class="form-control" style="font-size:13px" />
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-bold" style="font-size:13px">ملاحظات</label>
+                    <textarea name="notes" id="editNotes" class="form-control" style="font-size:13px" rows="3"></textarea>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input type="checkbox" name="isActive" id="editActive" class="form-check-input" value="true" />
+                        <label class="form-check-label" for="editActive" style="font-size:13px">شركة نشطة</label>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+                <button type="button" onclick="closeEditModal()"
+                        style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit">
+                    إلغاء
+                </button>
+                <button type="submit"
+                        style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                    <i class="bi bi-check-lg me-1"></i> حفظ
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openAddModal() {
+            document.getElementById('addModal').style.display = 'flex';
+        }
+        function closeAddModal() {
+            document.getElementById('addModal').style.display = 'none';
+        }
+        function openEditModal(data) {
+            document.getElementById('editId').value           = data.id;
+            document.getElementById('editName').value         = data.name || '';
+            document.getElementById('editCountry').value      = data.country || '';
+            document.getElementById('editCity').value         = data.city || '';
+            document.getElementById('editPhone').value        = data.contactPhone || '';
+            document.getElementById('editEmail').value        = data.contactEmail || '';
+            document.getElementById('editContractDate').value = data.contractStartDate || '';
+            document.getElementById('editNotes').value        = data.notes || '';
+            document.getElementById('editActive').checked     = data.isActive;
+            document.getElementById('editModal').style.display = 'flex';
+        }
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+        document.addEventListener('click', function(e) {
+            if (e.target === document.getElementById('addModal'))  closeAddModal();
+            if (e.target === document.getElementById('editModal')) closeEditModal();
+        });
+    </script>
+}

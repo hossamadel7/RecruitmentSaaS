@@ -1,8 +1,1122 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
-}
+﻿@using RecruitmentSaaS
+@using RecruitmentSaaS.Models.Entities
+@{
+    ViewData["Title"] = "الفهد العربي — سجّل الآن";
+    Layout = null;
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+    var branches = ViewBag.Branches as List<RecruitmentSaaS.Models.Entities.Branch> ?? new List<RecruitmentSaaS.Models.Entities.Branch>();
+    var jobPackages = ViewBag.JobPackages as List<RecruitmentSaaS.Models.Entities.JobPackage> ?? new List<RecruitmentSaaS.Models.Entities.JobPackage>();
+    bool singleBranch = branches.Count == 1;
+
+    string formError = TempData["FormError"]?.ToString() ?? "";
+    var wpNumber = (ViewBag.WhatsAppNumber as string) ?? "201000000000";
+    var wpLabel = (ViewBag.WhatsAppLabel as string) ?? "تحدث معنا عبر واتساب";
+}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>الفهد العربي — بوابتك للعمل في الخارج</title>
+    <meta name="description" content="شركة الفهد العربي للتوظيف الدولي — فرص عمل حقيقية في الخارج مع دعم كامل من التسجيل حتى السفر" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+
+    <style>
+        /* ══════════════════════════════════════════════════
+           TOKENS
+        ══════════════════════════════════════════════════ */
+        :root {
+            --gold:          #C9A84C;
+            --gold-light:    #F0D080;
+            --gold-dim:      rgba(201,168,76,.12);
+            --dark:          #080E1E;
+            --dark2:         #0E1628;
+            --blue:          #1B4FD8;
+            --blue-dark:     #1440B5;
+            --blue-glow:     rgba(27,79,216,.16);
+            --text:          #0F172A;
+            --muted:         #64748B;
+            --border:        #E2E8F0;
+            --bg:            #F4F7FF;
+            --white:         #ffffff;
+            --radius:        20px;
+            --shadow:        0 24px 64px rgba(27,79,216,.11), 0 4px 16px rgba(0,0,0,.06);
+            --ease:          cubic-bezier(.4,0,.2,1);
+            --t:             .22s;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Cairo', sans-serif; color: var(--text); background: var(--white); overflow-x: hidden; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--dark); }
+        ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 3px; }
+
+        /* ══════════════════════════════════════════════════
+           UTILITY
+        ══════════════════════════════════════════════════ */
+        .section-label {
+            display: inline-flex; align-items: center; gap: 7px;
+            background: rgba(27,79,216,.07); color: var(--blue);
+            border: 1px solid rgba(27,79,216,.18);
+            font-size: .7rem; font-weight: 700; padding: 4px 14px;
+            border-radius: 99px; margin-bottom: 14px; letter-spacing: .5px;
+        }
+        .section-label.gold { background: rgba(201,168,76,.1); color: var(--gold); border-color: rgba(201,168,76,.25); }
+        .section-label.white { background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); border-color: rgba(255,255,255,.2); }
+        .section-heading {
+            font-size: clamp(1.6rem,3vw,2.2rem); font-weight: 900; line-height: 1.2; margin-bottom: 10px;
+        }
+        .section-sub { color: var(--muted); font-size: .9rem; line-height: 1.85; max-width: 520px; }
+        .section-intro { margin-bottom: 54px; }
+
+        /* ══════════════════════════════════════════════════
+           SCROLL REVEAL
+        ══════════════════════════════════════════════════ */
+        .reveal { opacity: 0; transform: translateY(28px); transition: opacity .65s var(--ease), transform .65s var(--ease); }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
+        .reveal-scale { opacity: 0; transform: scale(.96); transition: opacity .6s var(--ease), transform .6s var(--ease); }
+        .reveal-scale.visible { opacity: 1; transform: scale(1); }
+
+        /* ══════════════════════════════════════════════════
+           BUTTON BASE — 3D lift micro-interaction
+        ══════════════════════════════════════════════════ */
+        .btn-lift {
+            display: inline-flex; align-items: center; gap: 9px;
+            font-family: 'Cairo', sans-serif; font-weight: 800; font-size: .95rem;
+            padding: 13px 30px; border-radius: 12px; border: none;
+            cursor: pointer; text-decoration: none;
+            transition: transform var(--t) var(--ease),
+                        box-shadow var(--t) var(--ease),
+                        filter var(--t) var(--ease);
+            will-change: transform;
+        }
+        .btn-lift:hover {
+            transform: translateY(-4px) scale(1.015);
+        }
+        .btn-lift:active { transform: translateY(-1px) scale(.99); }
+
+        .btn-gold {
+            background: linear-gradient(135deg, var(--gold), #B8922E);
+            color: var(--dark);
+            box-shadow: 0 6px 24px rgba(201,168,76,.38), 0 2px 6px rgba(201,168,76,.2);
+        }
+        .btn-gold:hover {
+            box-shadow: 0 12px 36px rgba(201,168,76,.52), 0 4px 12px rgba(201,168,76,.25);
+            color: var(--dark);
+        }
+        .btn-blue {
+            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            color: var(--white);
+            box-shadow: 0 6px 24px rgba(27,79,216,.32), 0 2px 6px rgba(27,79,216,.15);
+        }
+        .btn-blue:hover {
+            box-shadow: 0 12px 36px rgba(27,79,216,.46), 0 4px 12px rgba(27,79,216,.2);
+            color: var(--white);
+        }
+        .btn-ghost-white {
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.2);
+            color: rgba(255,255,255,.85);
+        }
+        .btn-ghost-white:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.35); color: #fff; }
+        .btn-white {
+            background: var(--white); color: var(--blue);
+            box-shadow: 0 8px 32px rgba(0,0,0,.14);
+        }
+        .btn-white:hover { box-shadow: 0 14px 40px rgba(0,0,0,.2); color: var(--blue); }
+
+        /* ══════════════════════════════════════════════════
+           NAVBAR
+        ══════════════════════════════════════════════════ */
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+            height: 70px; padding: 0 5%;
+            display: flex; align-items: center; justify-content: space-between;
+            background: transparent;
+            transition: background .35s, box-shadow .35s;
+        }
+        .navbar.scrolled {
+            background: rgba(8,14,30,.97);
+            backdrop-filter: blur(18px);
+            box-shadow: 0 1px 0 rgba(201,168,76,.18);
+        }
+        .nav-brand { display: flex; align-items: center; gap: 11px; text-decoration: none; }
+        .nav-logo {
+            width: 42px; height: 42px;
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            border-radius: 11px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem;
+            box-shadow: 0 4px 14px rgba(201,168,76,.32);
+            transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease);
+        }
+        .nav-logo:hover { transform: rotate(-6deg) scale(1.08); box-shadow: 0 8px 22px rgba(201,168,76,.45); }
+        .nav-name { font-size: 1.05rem; font-weight: 900; color: #fff; line-height: 1.1; letter-spacing: -.3px; }
+        .nav-name small { font-size: .58rem; color: var(--gold); font-weight: 500; display: block; letter-spacing: .5px; }
+        .nav-right { display: flex; align-items: center; gap: 9px; }
+
+        /* ★ Sticky CTA in navbar */
+        .nav-cta {
+            display: inline-flex; align-items: center; gap: 7px;
+            background: linear-gradient(135deg, var(--gold), #B8922E);
+            color: var(--dark); font-size: .8rem; font-weight: 800;
+            padding: 8px 18px; border-radius: 9px; text-decoration: none;
+            box-shadow: 0 4px 14px rgba(201,168,76,.4);
+            transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease);
+            opacity: 0; pointer-events: none;
+            transform: translateY(-4px) scale(.95);
+        }
+        .navbar.scrolled .nav-cta {
+            opacity: 1; pointer-events: auto;
+            transform: translateY(0) scale(1);
+        }
+        .nav-cta:hover { transform: translateY(-3px) scale(1.02) !important; box-shadow: 0 8px 22px rgba(201,168,76,.5); color: var(--dark); }
+
+        .nav-wp {
+            display: flex; align-items: center; gap: 6px;
+            background: rgba(37,211,102,.14); border: 1px solid rgba(37,211,102,.28);
+            color: #4ade80; font-size: .76rem; font-weight: 700;
+            padding: 7px 14px; border-radius: 8px; text-decoration: none;
+            transition: background var(--t), transform var(--t) var(--ease);
+        }
+        .nav-wp:hover { background: rgba(37,211,102,.24); color: #4ade80; transform: translateY(-2px); }
+        .nav-staff {
+            font-size: .76rem; color: rgba(255,255,255,.4);
+            text-decoration: none; font-weight: 600;
+            padding: 7px 13px; border: 1px solid rgba(255,255,255,.11);
+            border-radius: 8px;
+            transition: color var(--t), border-color var(--t), transform var(--t) var(--ease);
+            display: flex; align-items: center; gap: 5px;
+        }
+        .nav-staff:hover { color: var(--gold); border-color: var(--gold); transform: translateY(-2px); }
+
+        /* ══════════════════════════════════════════════════
+           HERO
+        ══════════════════════════════════════════════════ */
+        .hero {
+            position: relative; min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            text-align: center; overflow: hidden;
+            padding: 120px 5% 80px;
+        }
+        .hero-video-wrap {
+            position: absolute; inset: 0; z-index: 0; overflow: hidden;
+        }
+        .hero-video-wrap video { width: 100%; height: 100%; object-fit: cover; opacity: .22; filter: saturate(1.3); }
+        .hero-video-wrap::before {
+            content: ''; position: absolute; inset: 0; z-index: 1;
+            background: linear-gradient(160deg, var(--dark) 0%, #0B1736 50%, #111C3F 100%);
+        }
+        .hero-video-wrap::after {
+            content: ''; position: absolute; inset: 0; z-index: 2;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            opacity: .6; pointer-events: none;
+        }
+        .hero-orb { position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 1; }
+        .hero-orb-1 { width: 520px; height: 520px; background: radial-gradient(circle, rgba(201,168,76,.18) 0%, transparent 70%); top: -100px; right: -100px; animation: orbFloat 8s ease-in-out infinite; }
+        .hero-orb-2 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(27,79,216,.2) 0%, transparent 70%); bottom: -150px; left: -150px; animation: orbFloat 10s ease-in-out infinite reverse; }
+        @@keyframes orbFloat { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(28px,-28px) scale(1.06); } }
+
+        .hero-inner { position: relative; z-index: 3; max-width: 760px; margin: 0 auto; }
+        .hero-eyebrow {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(201,168,76,.1); color: var(--gold);
+            border: 1px solid rgba(201,168,76,.3);
+            padding: 6px 18px; border-radius: 99px;
+            font-size: .75rem; font-weight: 700; margin-bottom: 28px; letter-spacing: .4px;
+            animation: fadeInDown .7s ease both;
+        }
+        .hero-eyebrow .dot { width: 7px; height: 7px; background: var(--gold); border-radius: 50%; animation: blink 2s infinite; }
+        @@keyframes blink { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .3; transform: scale(1.5); } }
+
+        .hero h1 {
+            font-size: clamp(2.1rem,5.5vw,3.8rem); font-weight: 900; color: #fff;
+            line-height: 1.22; margin-bottom: 20px;
+            animation: fadeInUp .8s .1s ease both;
+        }
+        .hero h1 .highlight {
+            background: linear-gradient(90deg, var(--gold), var(--gold-light), var(--gold));
+            background-size: 200%;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            animation: shimmer 3s infinite linear;
+        }
+        @@keyframes shimmer { 0% { background-position: 0%; } 100% { background-position: 200%; } }
+
+        .hero-sub { font-size: 1.04rem; color: rgba(255,255,255,.62); max-width: 520px; margin: 0 auto 36px; line-height: 2; animation: fadeInUp .8s .2s ease both; }
+        .hero-actions { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; animation: fadeInUp .8s .3s ease both; }
+
+        .scroll-hint { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 6px; color: rgba(255,255,255,.28); font-size: .65rem; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; animation: fadeIn 1.5s 1s ease both; }
+        .scroll-hint-line { width: 1px; height: 38px; background: linear-gradient(to bottom, rgba(255,255,255,.3), transparent); animation: scrollLine 1.8s ease-in-out infinite; }
+        @@keyframes scrollLine { 0%,100% { transform: scaleY(0); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } }
+
+        .hero-stats { display: flex; justify-content: center; flex-wrap: wrap; margin-top: 60px; border-top: 1px solid rgba(255,255,255,.07); animation: fadeInUp .8s .4s ease both; }
+        .hero-stat { padding: 22px 32px; border-left: 1px solid rgba(255,255,255,.07); text-align: center; }
+        .hero-stat:last-child { border-left: none; }
+        .hero-stat-num { font-size: 2rem; font-weight: 900; color: var(--gold); line-height: 1; }
+        .hero-stat-label { font-size: .7rem; color: rgba(255,255,255,.38); margin-top: 5px; }
+
+        /* ══════════════════════════════════════════════════
+           TRUST STRIP
+        ══════════════════════════════════════════════════ */
+        .trust-strip { background: var(--white); border-bottom: 1px solid var(--border); padding: 16px 5%; display: flex; align-items: center; justify-content: center; gap: 28px; flex-wrap: wrap; }
+        .trust-item { display: flex; align-items: center; gap: 7px; font-size: .76rem; color: var(--muted); font-weight: 600; }
+        .trust-item i { color: var(--blue); font-size: .95rem; }
+
+        /* ══════════════════════════════════════════════════
+           FORM SECTION — scale-in entrance
+        ══════════════════════════════════════════════════ */
+        .form-section { background: var(--bg); padding: 80px 5%; }
+        .form-card {
+            background: var(--white); border-radius: var(--radius);
+            box-shadow: var(--shadow); overflow: hidden;
+            margin-top: 40px;
+            /* entrance handled by reveal-scale class */
+        }
+        .form-card-header {
+            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            padding: 28px 36px; display: flex; align-items: center; gap: 16px;
+            position: relative; overflow: hidden;
+        }
+        .form-card-header::after { content: ''; position: absolute; top: -40px; left: -40px; width: 160px; height: 160px; background: rgba(255,255,255,.05); border-radius: 50%; }
+        .form-card-icon { width: 54px; height: 54px; background: rgba(255,255,255,.12); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; flex-shrink: 0; position: relative; z-index: 1; }
+        .form-card-title { position: relative; z-index: 1; }
+        .form-card-title h2 { color: #fff; font-size: 1.18rem; font-weight: 800; margin: 0; }
+        .form-card-title p  { color: rgba(255,255,255,.62); font-size: .8rem; margin: 5px 0 0; }
+        .form-body { padding: 36px; }
+        .field-label { font-size: .82rem; font-weight: 700; color: #374151; margin-bottom: 7px; display: block; }
+        .field-required { color: #ef4444; margin-right: 2px; }
+        .form-control, .form-select {
+            border: 1.5px solid var(--border); border-radius: 10px;
+            padding: 12px 14px; font-family: 'Cairo', sans-serif; font-size: .9rem;
+            width: 100%; background: #fff; color: var(--text); outline: none; appearance: none;
+            transition: border-color var(--t), box-shadow var(--t), transform var(--t) var(--ease);
+        }
+        .form-control:focus, .form-select:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(27,79,216,.09); transform: translateY(-1px); }
+        .form-control::placeholder { color: #b0bec5; }
+        textarea.form-control { resize: vertical; min-height: 88px; }
+        .input-icon-wrap { position: relative; }
+        .input-icon-wrap .form-control { padding-right: 40px; }
+        .input-icon-wrap .input-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: .9rem; pointer-events: none; transition: color var(--t); }
+        .input-icon-wrap .form-control:focus ~ .input-icon { color: var(--blue); }
+        .form-divider { display: flex; align-items: center; gap: 12px; color: #94a3b8; font-size: .7rem; margin: 4px 0; font-weight: 600; letter-spacing: .4px; }
+        .form-divider::before, .form-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+        .error-banner { background: #fff5f5; border: 1.5px solid #fecaca; border-radius: 10px; padding: 12px 16px; color: #c0392b; font-size: .84rem; font-weight: 700; display: flex; align-items: center; gap: 9px; margin-bottom: 22px; }
+        .trap-field { display: none !important; visibility: hidden !important; }
+        .btn-submit {
+            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            color: #fff; border: none; border-radius: 12px; padding: 15px;
+            width: 100%; font-family: 'Cairo', sans-serif; font-size: 1rem; font-weight: 800;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 9px;
+            transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease);
+            box-shadow: 0 6px 20px rgba(27,79,216,.28);
+        }
+        .btn-submit:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 12px 34px rgba(27,79,216,.38); }
+        .btn-submit:active { transform: translateY(-1px) scale(.99); }
+        .btn-submit:disabled { opacity: .7; cursor: not-allowed; transform: none; }
+        .form-note { text-align: center; font-size: .71rem; color: #94a3b8; margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+
+        /* ══════════════════════════════════════════════════
+           WHY US
+        ══════════════════════════════════════════════════ */
+        .why-section { background: var(--white); padding: 100px 5%; }
+        .why-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; max-width: 1100px; margin: 0 auto; }
+        .why-card {
+            border: 1.5px solid var(--border); border-radius: 16px; padding: 28px 22px;
+            position: relative; overflow: hidden; background: var(--white);
+            transition: border-color var(--t), box-shadow var(--t), transform var(--t) var(--ease);
+        }
+        .why-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--blue-glow), transparent 60%); opacity: 0; transition: opacity .3s; }
+        .why-card:hover { border-color: rgba(27,79,216,.28); box-shadow: 0 14px 40px rgba(27,79,216,.1); transform: translateY(-5px) scale(1.01); }
+        .why-card:hover::before { opacity: 1; }
+        .why-card-icon { width: 52px; height: 52px; background: linear-gradient(135deg, #EEF2FF, #C7D7FD); border-radius: 13px; display: flex; align-items: center; justify-content: center; font-size: 1.55rem; margin-bottom: 16px; position: relative; z-index: 1; }
+        .why-card-title { font-weight: 800; font-size: .93rem; margin-bottom: 8px; position: relative; z-index: 1; }
+        .why-card-desc  { font-size: .81rem; color: var(--muted); line-height: 1.85; position: relative; z-index: 1; }
+
+        /* ══════════════════════════════════════════════════
+           LOGOS / SOCIAL PROOF
+        ══════════════════════════════════════════════════ */
+        .logos-section { background: var(--bg); padding: 64px 5%; border-top: 1px solid var(--border); }
+        .logos-heading { text-align: center; font-size: .78rem; color: var(--muted); font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 36px; }
+        .logos-track-wrap { overflow: hidden; position: relative; }
+        .logos-track-wrap::before, .logos-track-wrap::after { content: ''; position: absolute; top: 0; bottom: 0; width: 60px; z-index: 2; pointer-events: none; }
+        .logos-track-wrap::before { right: 0; background: linear-gradient(to left, var(--bg), transparent); }
+        .logos-track-wrap::after  { left:  0; background: linear-gradient(to right, var(--bg), transparent); }
+        .logos-track { display: flex; gap: 28px; width: max-content; align-items: center; animation: marquee 30s linear infinite; }
+        .logos-track:hover { animation-play-state: paused; }
+        @@keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        .logo-pill {
+            display: flex; align-items: center; gap: 10px;
+            background: var(--white); border: 1.5px solid var(--border);
+            border-radius: 12px; padding: 12px 22px;
+            font-weight: 800; font-size: .82rem; color: var(--text);
+            white-space: nowrap;
+            transition: border-color var(--t), box-shadow var(--t), transform var(--t) var(--ease);
+            flex-shrink: 0;
+        }
+        .logo-pill:hover { border-color: rgba(27,79,216,.3); box-shadow: 0 6px 20px rgba(27,79,216,.08); transform: translateY(-3px); }
+        .logo-pill .pill-icon { font-size: 1.3rem; }
+        .logo-verified { display: inline-block; background: rgba(16,185,129,.1); color: #10b981; font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 99px; margin-right: 4px; }
+
+        /* ══════════════════════════════════════════════════
+           DESTINATIONS
+        ══════════════════════════════════════════════════ */
+        .dest-section { background: var(--white); padding: 100px 5%; }
+        .dest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; margin-top: 48px; }
+        .dest-card {
+            background: var(--bg); border: 1.5px solid var(--border); border-radius: 14px;
+            padding: 24px 14px; text-align: center; position: relative; overflow: hidden;
+            transition: border-color var(--t), box-shadow var(--t), transform var(--t) var(--ease);
+        }
+        .dest-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--gold), var(--gold-light)); transform: scaleX(0); transform-origin: left; transition: transform .3s var(--ease); }
+        .dest-card:hover { border-color: rgba(201,168,76,.38); box-shadow: 0 8px 26px rgba(201,168,76,.12); transform: translateY(-5px); }
+        .dest-card:hover::after { transform: scaleX(1); }
+        .dest-flag { font-size: 2.4rem; margin-bottom: 10px; }
+        .dest-country { font-weight: 800; font-size: .86rem; margin-bottom: 4px; }
+        .dest-count { font-size: .7rem; color: var(--muted); }
+
+        /* ══════════════════════════════════════════════════
+           STEPS
+        ══════════════════════════════════════════════════ */
+        .steps-section { background: var(--dark2); padding: 100px 5%; position: relative; overflow: hidden; }
+        .steps-section::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 70% 60% at 80% 50%, rgba(201,168,76,.06), transparent 70%); pointer-events: none; }
+        .steps-section .section-heading { color: var(--white); }
+        .steps-section .section-sub { color: rgba(255,255,255,.42); }
+        .steps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-top: 54px; position: relative; z-index: 1; }
+        .step-card { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-radius: 16px; padding: 28px 20px; transition: background var(--t), border-color var(--t), transform var(--t) var(--ease); }
+        .step-card:hover { background: rgba(255,255,255,.06); border-color: rgba(201,168,76,.22); transform: translateY(-4px); }
+        .step-num { width: 36px; height: 36px; background: linear-gradient(135deg, var(--gold), #A07830); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: .88rem; color: var(--dark); margin-bottom: 16px; }
+        .step-title { font-weight: 800; color: var(--white); font-size: .9rem; margin-bottom: 8px; }
+        .step-desc  { font-size: .77rem; color: rgba(255,255,255,.38); line-height: 1.9; }
+
+        /* ══════════════════════════════════════════════════
+           TESTIMONIALS — marquee + manual arrows on mobile
+        ══════════════════════════════════════════════════ */
+        .testimonials-section { background: var(--bg); padding: 100px 5%; overflow: hidden; }
+        .testimonials-wrapper { position: relative; margin-top: 54px; }
+
+        /* desktop: auto-scroll marquee */
+        .t-marquee-wrap { overflow: hidden; position: relative; display: block; }
+        .t-marquee-wrap::before, .t-marquee-wrap::after { content: ''; position: absolute; top: 0; bottom: 0; width: 80px; z-index: 2; pointer-events: none; }
+        .t-marquee-wrap::before { right: 0; background: linear-gradient(to left, var(--bg), transparent); }
+        .t-marquee-wrap::after  { left:  0; background: linear-gradient(to right, var(--bg), transparent); }
+        .t-marquee-track { display: flex; gap: 18px; width: max-content; animation: tMarquee 48s linear infinite; }
+        .t-marquee-track:hover { animation-play-state: paused; }
+        @@keyframes tMarquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+        /* mobile: snap carousel */
+        .t-carousel-wrap { display: none; position: relative; }
+        .t-carousel-track { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 4px; }
+        .t-carousel-track::-webkit-scrollbar { display: none; }
+        .t-carousel-arrows { display: flex; justify-content: center; gap: 12px; margin-top: 18px; }
+        .t-arrow {
+            width: 38px; height: 38px; border-radius: 50%;
+            background: var(--white); border: 1.5px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: .95rem; color: var(--blue);
+            transition: background var(--t), border-color var(--t), transform var(--t) var(--ease);
+        }
+        .t-arrow:hover { background: var(--blue); border-color: var(--blue); color: var(--white); transform: scale(1.1); }
+
+        /* shared card */
+        .tcard {
+            width: 288px; flex-shrink: 0;
+            background: var(--white); border: 1.5px solid var(--border); border-radius: 16px; padding: 24px 20px;
+            scroll-snap-align: start;
+            transition: border-color var(--t), box-shadow var(--t), transform var(--t) var(--ease);
+        }
+        .tcard:hover { border-color: rgba(27,79,216,.22); box-shadow: 0 8px 28px rgba(27,79,216,.08); transform: translateY(-4px); }
+        .tcard-stars { color: var(--gold); font-size: .82rem; margin-bottom: 12px; letter-spacing: 2px; }
+        .tcard-text  { font-size: .83rem; color: #374151; line-height: 1.9; margin-bottom: 18px; }
+        .tcard-author { display: flex; align-items: center; gap: 10px; }
+        .tcard-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .95rem; font-weight: 800; color: var(--white); flex-shrink: 0; }
+        .tcard-name { font-weight: 800; font-size: .8rem; }
+        .tcard-dest { display: inline-block; background: rgba(27,79,216,.08); color: var(--blue); font-size: .65rem; font-weight: 700; padding: 2px 9px; border-radius: 99px; margin-top: 2px; }
+
+        /* ══════════════════════════════════════════════════
+           FAQ
+        ══════════════════════════════════════════════════ */
+        .faq-section { background: var(--white); padding: 100px 5%; }
+        .faq-list { max-width: 760px; margin: 54px auto 0; display: flex; flex-direction: column; gap: 12px; }
+        .faq-item {
+            border: 1.5px solid var(--border); border-radius: 14px; overflow: hidden;
+            transition: border-color var(--t), box-shadow var(--t);
+        }
+        .faq-item.open { border-color: rgba(27,79,216,.28); box-shadow: 0 6px 24px rgba(27,79,216,.08); }
+        .faq-question {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 18px 22px; cursor: pointer;
+            font-weight: 800; font-size: .92rem; color: var(--text);
+            user-select: none;
+            transition: background var(--t);
+        }
+        .faq-question:hover { background: var(--bg); }
+        .faq-icon {
+            width: 28px; height: 28px; flex-shrink: 0;
+            background: rgba(27,79,216,.08); border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--blue); font-size: .75rem;
+            transition: transform .3s var(--ease), background var(--t);
+        }
+        .faq-item.open .faq-icon { transform: rotate(45deg); background: var(--blue); color: #fff; }
+        .faq-answer {
+            max-height: 0; overflow: hidden;
+            transition: max-height .38s var(--ease), padding .38s var(--ease);
+            padding: 0 22px;
+        }
+        .faq-item.open .faq-answer { max-height: 300px; padding: 0 22px 18px; }
+        .faq-answer p { font-size: .86rem; color: var(--muted); line-height: 1.9; }
+        .faq-answer .highlight-ans { color: var(--blue); font-weight: 700; }
+
+        /* ══════════════════════════════════════════════════
+           FINAL CTA
+        ══════════════════════════════════════════════════ */
+        .cta-section {
+            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            padding: 100px 5%; text-align: center; position: relative; overflow: hidden;
+        }
+        .cta-section::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 70% 80% at 50% -20%, rgba(201,168,76,.18), transparent 60%); pointer-events: none; }
+        .cta-section h2 { font-size: clamp(1.7rem,3vw,2.4rem); font-weight: 900; color: var(--white); margin-bottom: 14px; position: relative; }
+        .cta-section p { color: rgba(255,255,255,.62); font-size: .95rem; margin-bottom: 36px; position: relative; }
+
+        /* ══════════════════════════════════════════════════
+           FOOTER
+        ══════════════════════════════════════════════════ */
+        .footer { background: var(--dark); border-top: 1px solid rgba(255,255,255,.06); padding: 36px 5%; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+        .footer-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .footer-brand-name { font-size: .88rem; font-weight: 800; color: rgba(255,255,255,.45); }
+        .footer-links { display: flex; gap: 18px; flex-wrap: wrap; }
+        .footer-links a { font-size: .76rem; color: rgba(255,255,255,.28); text-decoration: none; transition: color var(--t); }
+        .footer-links a:hover { color: var(--gold); }
+        .footer-copy { font-size: .7rem; color: rgba(255,255,255,.18); }
+
+        /* ══════════════════════════════════════════════════
+           WHATSAPP FAB
+        ══════════════════════════════════════════════════ */
+        .wp-fab {
+            position: fixed; left: 20px; bottom: 20px; z-index: 400;
+            background: #25D366; color: var(--white);
+            border-radius: 999px; padding: 13px 18px;
+            box-shadow: 0 8px 32px rgba(37,211,102,.32);
+            display: flex; align-items: center; gap: 9px;
+            text-decoration: none; font-weight: 700; font-size: .86rem;
+            transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease);
+        }
+        .wp-fab:hover { transform: translateY(-4px) scale(1.04); box-shadow: 0 14px 42px rgba(37,211,102,.42); color: var(--white); }
+        .wp-fab .wp-icon { font-size: 1.28rem; flex-shrink: 0; }
+        .wp-fab .wp-text { white-space: nowrap; }
+
+        /* ══════════════════════════════════════════════════
+           KEYFRAMES
+        ══════════════════════════════════════════════════ */
+        @@keyframes fadeInUp   { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
+        @@keyframes fadeInDown { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: translateY(0); } }
+        @@keyframes fadeIn     { from { opacity: 0; } to { opacity: 1; } }
+
+        /* ══════════════════════════════════════════════════
+           RESPONSIVE
+        ══════════════════════════════════════════════════ */
+        @@media (max-width: 768px) {
+            .hero { padding: 100px 5% 80px; min-height: auto; }
+            .hero h1 { font-size: 2rem; }
+            .hero-stat { padding: 16px 18px; }
+            .form-body { padding: 22px; }
+            .form-card-header { padding: 20px 22px; }
+            .why-section, .dest-section, .steps-section,
+            .testimonials-section, .cta-section, .faq-section,
+            .logos-section { padding: 72px 5%; }
+            .nav-wp .wp-text, .wp-fab .wp-text { display: none; }
+            .wp-fab { padding: 13px; }
+            /* switch testimonials from marquee to carousel on mobile */
+            .t-marquee-wrap  { display: none; }
+            .t-carousel-wrap { display: block; }
+            .footer { flex-direction: column; text-align: center; align-items: center; }
+            .nav-cta span { display: none; }
+        }
+        @@media (max-width: 480px) {
+            .hero-actions { flex-direction: column; align-items: stretch; }
+            .btn-lift { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ══════════════════ NAVBAR ══════════════════ -->
+    <nav class="navbar" id="navbar">
+        <a href="/" class="nav-brand">
+            <div class="nav-logo">🐆</div>
+            <div class="nav-name">الفهد العربي<small>للتوظيف الدولي</small></div>
+        </a>
+        <div class="nav-right">
+            <!-- sticky register CTA — appears after scroll -->
+            <a href="#register" class="nav-cta btn-lift" id="navCta">
+                <i class="bi bi-pencil-square"></i>
+                <span>سجّل الآن</span>
+            </a>
+            <a href="https://wa.me/@wpNumber" target="_blank" rel="noopener" class="nav-wp btn-lift" id="navWp">
+                <i class="bi bi-whatsapp"></i>
+                <span class="wp-text">واتساب</span>
+            </a>
+            <a href="/Auth/Login" class="nav-staff">
+                <i class="bi bi-lock-fill"></i> موظفين
+            </a>
+        </div>
+    </nav>
+
+    <!-- ══════════════════ HERO ══════════════════ -->
+    <section class="hero" id="home">
+        <div class="hero-video-wrap">
+            <video autoplay muted loop playsinline>
+                <source src="" type="video/mp4" />
+                @* Replace src with a Pexels/Coverr MP4 — search "city skyline night" or "airport terminal" *@
+            </video>
+        </div>
+        <div class="hero-orb hero-orb-1"></div>
+        <div class="hero-orb hero-orb-2"></div>
+        <div class="hero-inner">
+            <div class="hero-eyebrow"><span class="dot"></span>🇸🇦 🇰🇼 🇶🇦 🇦🇪 🇩🇪 🇷🇴 — وجهات عمل متعددة</div>
+            <h1>ابدأ مستقبلك المهني<br />مع <span class="highlight">الفهد العربي</span></h1>
+            <p class="hero-sub">بوابتك الموثوقة للحصول على فرص عمل حقيقية في الخارج. فريقنا يرافقك من أول خطوة حتى توقيع العقد وسفرك بسلام.</p>
+            <div class="hero-actions">
+                <a href="#register" class="btn-lift btn-gold"><i class="bi bi-pencil-square"></i> سجّل بياناتك — مجاناً</a>
+                <a href="https://wa.me/@wpNumber" target="_blank" rel="noopener" class="btn-lift btn-ghost-white" id="heroWp"><i class="bi bi-whatsapp"></i> تواصل معنا الآن</a>
+            </div>
+            <div class="hero-stats">
+                <div class="hero-stat"><div class="hero-stat-num">+٥٠٠٠</div><div class="hero-stat-label">موظف تم تشغيلهم</div></div>
+                <div class="hero-stat"><div class="hero-stat-num">+١٢</div><div class="hero-stat-label">دولة استقبال</div></div>
+                <div class="hero-stat"><div class="hero-stat-num">+١٥</div><div class="hero-stat-label">سنة خبرة</div></div>
+                <div class="hero-stat"><div class="hero-stat-num">٩٨٪</div><div class="hero-stat-label">رضا العملاء</div></div>
+            </div>
+        </div>
+        <div class="scroll-hint"><span>scroll</span><div class="scroll-hint-line"></div></div>
+    </section>
+
+    <!-- ══════════════════ TRUST STRIP ══════════════════ -->
+    <div class="trust-strip">
+        <div class="trust-item"><i class="bi bi-patch-check-fill"></i> شركة مرخصة ومعتمدة</div>
+        <div class="trust-item"><i class="bi bi-shield-fill-check"></i> عقود موثقة رسمياً</div>
+        <div class="trust-item"><i class="bi bi-headset"></i> دعم على مدار الساعة</div>
+        <div class="trust-item"><i class="bi bi-airplane-fill"></i> ترتيب السفر الكامل</div>
+        <div class="trust-item"><i class="bi bi-currency-exchange"></i> رواتب وصرف منتظم</div>
+    </div>
+
+    <!-- ══════════════════ FORM ══════════════════ -->
+    <section class="form-section" id="register">
+        <div style="max-width:700px;margin:0 auto;">
+            <div class="reveal">
+                <div class="section-label"><i class="bi bi-person-plus-fill"></i> التسجيل</div>
+                <h2 class="section-heading">سجّل بياناتك الآن</h2>
+                <p class="section-sub">أدخل معلوماتك وسيتواصل معك أحد مستشارينا خلال ٢٤ ساعة — مجاناً تماماً</p>
+            </div>
+
+            <div class="form-card reveal-scale">
+                <div class="form-card-header">
+                    <div class="form-card-icon">📋</div>
+                    <div class="form-card-title">
+                        <h2>نموذج التسجيل</h2>
+                        <p>جميع الحقول المُعلّمة بـ * مطلوبة</p>
+                    </div>
+                </div>
+                <div class="form-body">
+                    @if (!string.IsNullOrEmpty(formError))
+                    {
+                        <div class="error-banner"><i class="bi bi-exclamation-circle-fill"></i> @formError</div>
+                    }
+
+                    <form method="post" action="/Home/SubmitLead" novalidate id="leadForm">
+                        @Html.AntiForgeryToken()
+                        <div class="trap-field" aria-hidden="true">
+                            <input name="website_trap" type="text" tabindex="-1" autocomplete="off" />
+                        </div>
+                        <div class="row g-3">
+                            @* الاسم *@
+                            <div class="col-12 col-md-6">
+                                <label class="field-label">الاسم الكامل <span class="field-required">*</span></label>
+                                <div class="input-icon-wrap">
+                                    <input name="FullName" id="fullName" type="text" class="form-control" placeholder="أحمد محمد علي" required maxlength="200" />
+                                    <i class="bi bi-person input-icon"></i>
+                                </div>
+                            </div>
+                            @* الهاتف *@
+                            <div class="col-12 col-md-6">
+                                <label class="field-label">رقم الهاتف <span class="field-required">*</span></label>
+                                <div class="input-icon-wrap">
+                                    <input name="Phone" id="phone" type="tel" class="form-control" placeholder="01XXXXXXXXX" required pattern="[0-9]{10,15}" maxlength="30" title="أدخل رقم هاتف صحيح" dir="ltr" />
+                                    <i class="bi bi-telephone input-icon"></i>
+                                </div>
+                            </div>
+                            @* الفرع *@
+                            @if (!singleBranch && branches.Count > 0)
+                            {
+                                <div class="col-12">
+                                    <label class="field-label">الفرع الذي تريد زيارته <span class="field-required">*</span></label>
+                                    <select name="BranchId" class="form-select" required>
+                                        <option value="">— اختر الفرع الأقرب إليك —</option>
+                                        @foreach (var b in branches)
+                                        {
+                                            <option value="@b.Id">@b.Name @(b.City != null ? $"— {b.City}" : "")</option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+                            else if (singleBranch)
+                            {
+                                <input type="hidden" name="BranchId" value="@branches[0].Id" />
+                            }
+                            <div class="col-12"><div class="form-divider">تفاصيل اختيارية — تساعدنا على خدمتك بشكل أفضل</div></div>
+                            @* المسمى الوظيفي *@
+                            <div class="col-12 col-md-6">
+                                <label class="field-label">المسمى الوظيفي المهتم به</label>
+                                @if (jobPackages.Any())
+                                {
+                                    <select name="InterestedJobTitle" class="form-select">
+                                        <option value="">— اختر أو اترك فارغاً —</option>
+                                        @foreach (var j in jobPackages)
+                                        {
+                                            <option value="@j.JobTitle">@j.JobTitle</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input name="InterestedJobTitle" type="text" class="form-control" placeholder="مثال: سائق، عامل مصنع..." maxlength="200" />
+                                }
+                            </div>
+                            @* الدولة *@
+                            <div class="col-12 col-md-6">
+                                <label class="field-label">الدولة المهتم بالعمل فيها</label>
+                                @{
+                                    var countries = jobPackages.Select(j => j.DestinationCountry).Distinct().OrderBy(c => c).ToList();
+                                }
+                                @if (countries.Any())
+                                {
+                                    <select name="InterestedCountry" class="form-select">
+                                        <option value="">— اختر أو اترك فارغاً —</option>
+                                        @foreach (var c in countries)
+                                        {
+                                            <option value="@c">@c</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input name="InterestedCountry" type="text" class="form-control" placeholder="مثال: المملكة العربية السعودية" maxlength="100" />
+                                }
+                            </div>
+                            @* ملاحظات *@
+                            <div class="col-12">
+                                <label class="field-label">رسالتك <span style="color:var(--muted);font-weight:400;font-size:.73rem;">(اختياري)</span></label>
+                                <textarea name="Notes" id="notes" class="form-control" placeholder="أي معلومات إضافية تريد مشاركتها معنا..."></textarea>
+                            </div>
+                            <div class="col-12" style="margin-top:4px;">
+                                <button type="submit" class="btn-submit" id="submitBtn">
+                                    <i class="bi bi-send-fill"></i> أرسل طلبك الآن
+                                </button>
+                                <p class="form-note"><i class="bi bi-shield-lock-fill" style="color:#10b981;"></i> بياناتك محمية ولن تُشارَك مع أي جهة خارجية</p>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ══════════════════ WHY US ══════════════════ -->
+    <section class="why-section">
+        <div style="max-width:1100px;margin:0 auto;">
+            <div class="section-intro reveal">
+                <div class="section-label"><i class="bi bi-award-fill"></i> مميزاتنا</div>
+                <h2 class="section-heading">لماذا تختار الفهد العربي؟</h2>
+                <p class="section-sub">نرافقك في كل خطوة — من أول اتصال حتى استقرارك في بلد العمل</p>
+            </div>
+            <div class="why-grid reveal">
+                <div class="why-card"><div class="why-card-icon">🏆</div><div class="why-card-title">خبرة أكثر من ١٥ سنة</div><div class="why-card-desc">شركة رائدة في مجال التوظيف الدولي بسجل حافل وسمعة موثوقة عبر السنوات.</div></div>
+                <div class="why-card"><div class="why-card-icon">🌍</div><div class="why-card-title">شبكة واسعة في الخارج</div><div class="why-card-desc">علاقات مباشرة مع أصحاب عمل معتمدين في أكثر من ١٢ دولة حول العالم.</div></div>
+                <div class="why-card"><div class="why-card-icon">📋</div><div class="why-card-title">إجراءات شفافة وسريعة</div><div class="why-card-desc">متابعة كاملة لجميع المعاملات من التوثيق والفحوصات إلى تأشيرة السفر.</div></div>
+                <div class="why-card"><div class="why-card-icon">🤝</div><div class="why-card-title">دعم ما بعد السفر</div><div class="why-card-desc">فريق دعم متاح لمساعدتك بعد وصولك لضمان استقرارك في بلد العمل.</div></div>
+                <div class="why-card"><div class="why-card-icon">💰</div><div class="why-card-title">رواتب ومزايا تنافسية</div><div class="why-card-desc">نتفاوض نيابةً عنك للحصول على أفضل عروض العمل والمزايا المالية.</div></div>
+                <div class="why-card"><div class="why-card-icon">🔒</div><div class="why-card-title">عقود موثقة وآمنة</div><div class="why-card-desc">جميع العقود موثقة رسمياً وتضمن حقوقك القانونية كاملةً قبل السفر.</div></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ══════════════════ LOGOS / SOCIAL PROOF ══════════════════ -->
+    <section class="logos-section">
+        <p class="logos-heading reveal">جهات الاعتماد والشراكة</p>
+        <div class="logos-track-wrap reveal">
+            <div class="logos-track" id="logosTrack">
+                @{
+                    var logos = new[]
+                    {
+                new { icon = "🏛️", name = "وزارة القوى العاملة",    tag = "جهة حكومية" },
+                new { icon = "✈️", name = "الخطوط المصرية",          tag = "شريك سفر" },
+                new { icon = "🏗️", name = "شركة بن لادن السعودية",  tag = "صاحب عمل" },
+                new { icon = "🏥", name = "مستشفيات الخليج",         tag = "صاحب عمل" },
+                new { icon = "🚛", name = "شركة DHL الشرق الأوسط",   tag = "صاحب عمل" },
+                new { icon = "🏢", name = "مجموعة الفطيم",           tag = "صاحب عمل" },
+                new { icon = "⚙️", name = "Siemens Middle East",     tag = "شريك تقني" },
+                new { icon = "🌐", name = "IOM المنظمة الدولية",     tag = "منظمة دولية" },
+                new { icon = "📜", name = "هيئة تنمية الصادرات",    tag = "جهة حكومية" },
+                new { icon = "🏦", name = "بنك مصر",                tag = "شريك مالي" },
+                };
+                }
+                @* doubled for seamless loop *@
+                @for (int p = 0; p < 2; p++)
+                {
+                    @foreach (var logo in logos)
+                    {
+                        <div class="logo-pill">
+                            <span class="pill-icon">@logo.icon</span>
+                            @logo.name
+                            <span class="logo-verified">@logo.tag</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </section>
+
+    <!-- ══════════════════ DESTINATIONS ══════════════════ -->
+    @if (jobPackages.Any())
+    {
+        <section class="dest-section">
+            <div style="max-width:1100px;margin:0 auto;">
+                <div class="section-intro reveal">
+                    <div class="section-label"><i class="bi bi-geo-alt-fill"></i> الوجهات</div>
+                    <h2 class="section-heading">وجهاتنا الحالية</h2>
+                    <p class="section-sub">نُحدّث قائمة الوجهات والوظائف باستمرار</p>
+                </div>
+                <div class="dest-grid reveal">
+                    @{
+                        var countryGroups = jobPackages.GroupBy(j => j.DestinationCountry).OrderBy(g => g.Key);
+                        var countryFlags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["المملكة العربية السعودية"] = "🇸🇦",
+                    ["الكويت"] = "🇰🇼",
+                    ["قطر"] = "🇶🇦",
+                    ["الإمارات"] = "🇦🇪",
+                    ["البحرين"] = "🇧🇭",
+                    ["عُمان"] = "🇴🇲",
+                    ["ألمانيا"] = "🇩🇪",
+                    ["رومانيا"] = "🇷🇴",
+                    ["بولندا"] = "🇵🇱",
+                    ["المجر"] = "🇭🇺",
+                    ["ليبيا"] = "🇱🇾",
+                    ["الأردن"] = "🇯🇴",
+                };
+                    }
+                    @foreach (var group in countryGroups)
+                    {
+                        var flag = countryFlags.TryGetValue(group.Key, out var f) ? f : "🌍";
+                        <div class="dest-card">
+                            <div class="dest-flag">@flag</div>
+                            <div class="dest-country">@group.Key</div>
+                            <div class="dest-count">@group.Count() وظيفة متاحة</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+    }
+
+    <!-- ══════════════════ STEPS ══════════════════ -->
+    <section class="steps-section">
+        <div style="max-width:1100px;margin:0 auto;position:relative;z-index:1;">
+            <div class="section-intro reveal">
+                <div class="section-label gold"><i class="bi bi-diagram-3-fill"></i> كيف نعمل؟</div>
+                <h2 class="section-heading">٥ خطوات بسيطة للسفر</h2>
+                <p class="section-sub">رحلتك منظمة ومتابعة بالكامل من أول يوم</p>
+            </div>
+            <div class="steps-grid reveal">
+                <div class="step-card"><div class="step-num">١</div><div class="step-title">سجّل بياناتك</div><div class="step-desc">أدخل معلوماتك في النموذج أعلاه أو زُر أحد فروعنا مباشرة.</div></div>
+                <div class="step-card"><div class="step-num">٢</div><div class="step-title">مقابلة المستشار</div><div class="step-desc">يتواصل معك مستشار متخصص لفهم احتياجاتك واختيار الوظيفة المناسبة.</div></div>
+                <div class="step-card"><div class="step-num">٣</div><div class="step-title">إتمام الأوراق</div><div class="step-desc">نساعدك في استكمال جميع المستندات والفحوصات الطبية المطلوبة.</div></div>
+                <div class="step-card"><div class="step-num">٤</div><div class="step-title">توقيع العقد</div><div class="step-desc">عقد عمل رسمي موثق يضمن راتبك وحقوقك كاملةً قبل السفر.</div></div>
+                <div class="step-card"><div class="step-num">٥</div><div class="step-title">السفر والاستقرار</div><div class="step-desc">نرتب سفرك ونتابع معك بعد الوصول حتى تستقر في عملك الجديد.</div></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ══════════════════ TESTIMONIALS ══════════════════ -->
+    <section class="testimonials-section">
+        <div style="max-width:1100px;margin:0 auto;">
+            <div class="section-intro reveal">
+                <div class="section-label"><i class="bi bi-chat-quote-fill"></i> شهادات العملاء</div>
+                <h2 class="section-heading">ماذا يقول من سافروا معنا؟</h2>
+                <p class="section-sub">آلاف الموظفين وثّقوا في الفهد العربي وحققوا أحلامهم</p>
+            </div>
+        </div>
+
+        @{
+            var testimonials = new[]
+            {
+        new { name="محمد السيد",  role="سائق — المملكة العربية السعودية", text="الفهد العربي غيّر حياتي. من أول اتصال حتى وصولي للرياض كان الفريق معي في كل خطوة. الراتب منتظم والمعاملة محترمة.", avatar="م", color="#1B4FD8" },
+        new { name="أحمد رمضان", role="عامل مصنع — ألمانيا",             text="صراحة ما توقعت إن الأوراق تتم بسرعة كده. في أقل من شهرين كنت على الطيارة. شركة محترمة ومتعاونة جداً.",         avatar="أ", color="#C9A84C" },
+        new { name="كريم عبدالله",role="فني كهرباء — قطر",               text="كنت خايف من التجارب اللي بتتكلم عنها الناس بس الفهد العربي مختلف. عقد واضح وحقوقي محفوظة من اليوم الأول.",    avatar="ك", color="#10B981" },
+        new { name="عمر حسن",    role="ممرض — الكويت",                   text="فريق التيلي سيلز بتاعهم محترفين جداً. ردوا على كل أسئلتي بصبر وأنا أنصح كل واحد بيدور على فرصة خارج مصر.",    avatar="ع", color="#8B5CF6" },
+        new { name="إسلام فاروق",role="سائق شاحنة — الإمارات",          text="ثلاث سنين وأنا بأجدد العقد معهم. ده مش بس كلام — ده دليل على إنهم ناس تقدر تثق فيهم وتبني عليهم مستقبلك.",   avatar="إ", color="#EF4444" },
+        new { name="مصطفى علي", role="عامل بناء — رومانيا",              text="الراتب أحسن بكتير والأكل والسكن متوفرين. الفهد العربي ما خانوش الأمانة ووفّوا بكل وعد قالوه.",               avatar="م", color="#F59E0B" },
+        new { name="يوسف محمود",role="مهندس ميكانيكي — البحرين",        text="تعاملت مع شركات تانية بس مفيش زي الفهد. كل حاجة شفافة ومحترمة وما فيش مصاريف مخفية خالص.",                  avatar="ي", color="#06B6D4" },
+        new { name="طارق نصر",  role="نجار — بولندا",                    text="أول مرة أسافر برا مصر وكانت تجربة رائعة بفضل الفهد العربي. شركة بجد بتهتم بالعمال مش بس بالمصلحة.",         avatar="ط", color="#84CC16" },
+        };
+        }
+
+        <div class="testimonials-wrapper">
+            @* DESKTOP: auto-scroll marquee *@
+            <div class="t-marquee-wrap">
+                <div class="t-marquee-track" id="tMarqueeTrack">
+                    @for (int p = 0; p < 2; p++)
+                    {
+                        @foreach (var t in testimonials)
+                        {
+                            <div class="tcard">
+                                <div class="tcard-stars">★★★★★</div>
+                                <p class="tcard-text">"@t.text"</p>
+                                <div class="tcard-author">
+                                    <div class="tcard-avatar" style="background:@t.color;">@t.avatar</div>
+                                    <div><div class="tcard-name">@t.name</div><div class="tcard-dest">@t.role</div></div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            @* MOBILE: snap carousel with arrows *@
+            <div class="t-carousel-wrap">
+                <div class="t-carousel-track" id="tCarouselTrack">
+                    @foreach (var t in testimonials)
+                    {
+                        <div class="tcard" style="width:82vw;max-width:300px;">
+                            <div class="tcard-stars">★★★★★</div>
+                            <p class="tcard-text">"@t.text"</p>
+                            <div class="tcard-author">
+                                <div class="tcard-avatar" style="background:@t.color;">@t.avatar</div>
+                                <div><div class="tcard-name">@t.name</div><div class="tcard-dest">@t.role</div></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="t-carousel-arrows">
+                    <button class="t-arrow" id="tPrev" aria-label="السابق"><i class="bi bi-chevron-right"></i></button>
+                    <button class="t-arrow" id="tNext" aria-label="التالي"><i class="bi bi-chevron-left"></i></button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ══════════════════ FAQ ══════════════════ -->
+    <section class="faq-section">
+        <div style="max-width:1100px;margin:0 auto;">
+            <div class="section-intro reveal" style="text-align:center;">
+                <div class="section-label" style="margin:0 auto 14px;"><i class="bi bi-question-circle-fill"></i> أسئلة شائعة</div>
+                <h2 class="section-heading">كل ما تريد معرفته</h2>
+                <p class="section-sub" style="margin:0 auto;">نجاوب على أكثر الأسئلة التي يسألها المتقدمون قبل التسجيل</p>
+            </div>
+        </div>
+        <div class="faq-list reveal">
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    هل الوظائف حقيقية ١٠٠٪ وموثوقة؟
+                    <div class="faq-icon"><i class="bi bi-plus-lg"></i></div>
+                </div>
+                <div class="faq-answer">
+                    <p>نعم. جميع الوظائف التي نعرضها مرتبطة بعقود عمل رسمية مع أصحاب عمل معتمدين لدى وزارة القوى العاملة وسفارات الدول المستقبِلة. <span class="highlight-ans">لا نتعامل مع وسطاء غير رسميين</span>، ولا نُسوّق لأي وظيفة دون التحقق من المُشغِّل مسبقاً. يمكنك الاطلاع على نماذج العقود في أي وقت قبل اتخاذ قرارك.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    كيف يستلم المتقدم راتبه والمقابل المادي؟
+                    <div class="faq-icon"><i class="bi bi-plus-lg"></i></div>
+                </div>
+                <div class="faq-answer">
+                    <p>يُحدَّد الراتب بدقة في العقد قبل السفر ويُصرف مباشرةً من صاحب العمل عبر حساب بنكي أو بطاقة صرف في بلد العمل. <span class="highlight-ans">لا توجد أي خصومات مخفية</span> من الراتب. في حالة تأخر الراتب لأي سبب، فريق علاقات العمل لدينا يتدخل فوراً للمتابعة مع صاحب العمل.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    متى يتم التواصل معي بعد تسجيل بياناتي؟
+                    <div class="faq-icon"><i class="bi bi-plus-lg"></i></div>
+                </div>
+                <div class="faq-answer">
+                    <p>يتواصل معك أحد مستشارينا <span class="highlight-ans">خلال ٢٤ ساعة كحد أقصى</span> من تسجيلك — وغالباً خلال ساعات قليلة في أيام العمل الرسمية. تأكد من أن رقم هاتفك صحيح وأن الهاتف متاح. إذا لم تتلقَّ اتصالاً، يمكنك التواصل معنا مباشرة عبر واتساب.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    هل هناك رسوم على التسجيل أو الخدمة؟
+                    <div class="faq-icon"><i class="bi bi-plus-lg"></i></div>
+                </div>
+                <div class="faq-answer">
+                    <p>التسجيل والاستشارة الأولى <span class="highlight-ans">مجانية تماماً</span>. الرسوم الوحيدة المطلوبة هي تكاليف الأوراق الرسمية كالفحوصات الطبية والتأشيرة — وهي رسوم حكومية موحدة يتم إبلاغك بها بشفافية كاملة قبل البدء. لا توجد أي رسوم إدارية أو خفية لصالح الشركة.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    ماذا يحدث لو واجهت مشكلة بعد وصولي لبلد العمل؟
+                    <div class="faq-icon"><i class="bi bi-plus-lg"></i></div>
+                </div>
+                <div class="faq-answer">
+                    <p>لديك خط دعم مباشر مع فريقنا حتى بعد السفر. إذا كانت المشكلة مع صاحب العمل، نتدخل للوساطة وحل النزاع. <span class="highlight-ans">في الحالات الحرجة</span> التي تستوجب الإعادة، نُنسّق مع السفارة ونضمن عودتك بأمان. سمعتنا مبنية على حماية العمال وليس فقط تشغيلهم.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    ما شروط السن والمؤهل للتقديم؟
+                    <div class="faq-icon"><i class="bi bi-plus-lg"></i></div>
+                </div>
+                <div class="faq-answer">
+                    <p>تتفاوت الشروط حسب الوظيفة والدولة، لكن بشكل عام: <span class="highlight-ans">من ٢٢ إلى ٤٥ سنة</span> للغالبية العظمى من الوظائف، ولا يُشترط مؤهل عالٍ لكثير من المجالات (بناء، سياقة، صناعة). المستشار سيوضح لك المتطلبات الدقيقة للوظيفة التي تناسبك بعد التواصل.</p>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ══════════════════ FINAL CTA ══════════════════ -->
+    <section class="cta-section">
+        <h2>هل أنت مستعد للخطوة الأولى؟</h2>
+        <p>سجّل الآن مجاناً — سيتواصل معك مستشارنا خلال ٢٤ ساعة</p>
+        <a href="#register" class="btn-lift btn-white"><i class="bi bi-arrow-up-circle-fill"></i> سجّل بياناتك الآن</a>
+    </section>
+
+    <!-- ══════════════════ FOOTER ══════════════════ -->
+    <footer class="footer">
+        <a href="/" class="footer-brand">
+            <div class="nav-logo" style="width:34px;height:34px;font-size:1rem;">🐆</div>
+            <span class="footer-brand-name">الفهد العربي للتوظيف الدولي</span>
+        </a>
+        <div class="footer-links">
+            <a href="#register">التسجيل</a>
+            <a href="#home">الرئيسية</a>
+            <a href="/Auth/Login">دخول الموظفين</a>
+        </div>
+        <span class="footer-copy">© @DateTime.Now.Year جميع الحقوق محفوظة</span>
+    </footer>
+
+    <!-- ══════════════════ WHATSAPP FAB ══════════════════ -->
+    <a class="wp-fab" href="https://wa.me/@wpNumber?text=مرحباً" id="wpFab" target="_blank" rel="noopener noreferrer" aria-label="@wpLabel">
+        <i class="bi bi-whatsapp wp-icon"></i>
+        <span class="wp-text">@wpLabel</span>
+    </a>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function () {
+            'use strict';
+
+            /* ── Navbar scroll effect + sticky CTA ──────────────── */
+            const navbar = document.getElementById('navbar');
+            window.addEventListener('scroll', () => {
+                navbar.classList.toggle('scrolled', window.scrollY > 60);
+            }, { passive: true });
+
+            /* ── Scroll reveal (translate + scale variants) ─────── */
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(e => {
+                    if (e.isIntersecting) {
+                        e.target.classList.add('visible');
+                        observer.unobserve(e.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.reveal, .reveal-scale').forEach(el => observer.observe(el));
+
+            /* ── WhatsApp dynamic prefill ────────────────────────── */
+            const wpNumber   = '@wpNumber';
+            const wpFab      = document.getElementById('wpFab');
+            const navWp      = document.getElementById('navWp');
+            const heroWp     = document.getElementById('heroWp');
+            const nameInput  = document.getElementById('fullName');
+            const phoneInput = document.getElementById('phone');
+            const notesInput = document.getElementById('notes');
+
+            function buildWpUrl() {
+                const name  = nameInput  ? nameInput.value.trim()  : '';
+                const phone = phoneInput ? phoneInput.value.trim() : '';
+                const note  = notesInput ? notesInput.value.trim() : '';
+                let msg = 'مرحباً، أرغب في الاستفسار عن فرص العمل عبر الفهد العربي';
+                if (name)  msg += ' — الاسم: ' + name;
+                if (phone) msg += ' — الهاتف: ' + phone;
+                if (note)  msg += ' — ' + (note.length > 60 ? note.substring(0, 60) + '...' : note);
+                return 'https://wa.me/' + wpNumber + '?text=' + encodeURIComponent(msg);
+            }
+            function updateWpLinks() {
+                const url = buildWpUrl();
+                [wpFab, navWp, heroWp].forEach(el => { if (el) el.setAttribute('href', url); });
+            }
+            [nameInput, phoneInput, notesInput].forEach(el => { if (el) el.addEventListener('input', updateWpLinks); });
+            updateWpLinks();
+
+            /* ── Prevent double submit ───────────────────────────── */
+            const leadForm  = document.getElementById('leadForm');
+            const submitBtn = document.getElementById('submitBtn');
+            if (leadForm && submitBtn) {
+                leadForm.addEventListener('submit', function () {
+                    if (!leadForm.checkValidity()) return;
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>جارٍ الإرسال...';
+                });
+            }
+
+            /* ── Smooth scroll anchors ───────────────────────────── */
+            document.querySelectorAll('a[href^="#"]').forEach(a => {
+                a.addEventListener('click', function (e) {
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+                });
+            });
+
+            /* ── Testimonials mobile carousel arrows ─────────────── */
+            const carouselTrack = document.getElementById('tCarouselTrack');
+            const prevBtn = document.getElementById('tPrev');
+            const nextBtn = document.getElementById('tNext');
+            if (carouselTrack && prevBtn && nextBtn) {
+                function getCardWidth() {
+                    const card = carouselTrack.querySelector('.tcard');
+                    if (!card) return 300;
+                    const gap = 16;
+                    return card.offsetWidth + gap;
+                }
+                prevBtn.addEventListener('click', () => {
+                    carouselTrack.scrollBy({ left: getCardWidth(), behavior: 'smooth' });
+                });
+                nextBtn.addEventListener('click', () => {
+                    carouselTrack.scrollBy({ left: -getCardWidth(), behavior: 'smooth' });
+                });
+            }
+
+            /* ── FAQ accordion ───────────────────────────────────── */
+            document.querySelectorAll('.faq-question').forEach(q => {
+                q.addEventListener('click', function () {
+                    const item = this.closest('.faq-item');
+                    const isOpen = item.classList.contains('open');
+                    // close all
+                    document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+                    // open this one if it was closed
+                    if (!isOpen) item.classList.add('open');
+                });
+            });
+
+            /* ── Input focus: animate icon colour ───────────────── */
+            document.querySelectorAll('.input-icon-wrap .form-control').forEach(input => {
+                const icon = input.parentElement.querySelector('.input-icon');
+                if (!icon) return;
+                input.addEventListener('focus',  () => { icon.style.color = 'var(--blue)'; });
+                input.addEventListener('blur',   () => { icon.style.color = ''; });
+            });
+
+        })();
+    </script>
+
+</body>
+</html>
