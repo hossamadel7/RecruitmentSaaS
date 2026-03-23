@@ -4,12 +4,56 @@
     ViewData["Title"] = "العمولات";
     Layout = "~/Views/Shared/_Layout.cshtml";
 
-    int  page         = ViewBag.Page;
-    int  totalPages   = ViewBag.TotalPages;
-    int  total        = ViewBag.Total;
+    int page = ViewBag.Page;
+    int totalPages = ViewBag.TotalPages;
+    int total = ViewBag.Total;
     byte statusFilter = ViewBag.StatusFilter;
 
+    var tiers = ViewBag.CommissionTiers as List<RecruitmentSaaS.Models.Entities.CommissionTier>
+                ?? new List<RecruitmentSaaS.Models.Entities.CommissionTier>();
+
     string[] statusLabels = { "", "انتظار الإدارة", "معتمدة — جاهزة للصرف", "مصروفة", "مُعكوسة" };
+
+    string GetTierLabel(int deals)
+    {
+        var tier = tiers
+            .Where(t => t.IsActive && t.MinDeals <= deals && (t.MaxDeals == null || t.MaxDeals >= deals))
+            .OrderByDescending(t => t.MinDeals)
+            .FirstOrDefault();
+        if (tier == null) return "—";
+        return tier.MaxDeals.HasValue
+            ? $"شريحة {tier.MinDeals}-{tier.MaxDeals} ({tier.AmountPerDeal:N0} ج.م/صفقة)"
+            : $"شريحة {tier.MinDeals}+ ({tier.AmountPerDeal:N0} ج.م/صفقة)";
+    }
+
+    string GetTierColor(int deals)
+    {
+        var tier = tiers
+            .Where(t => t.IsActive && t.MinDeals <= deals && (t.MaxDeals == null || t.MaxDeals >= deals))
+            .OrderByDescending(t => t.MinDeals)
+            .FirstOrDefault();
+        if (tier == null) return "#64748b";
+        var idx = tiers.Where(t => t.IsActive).OrderBy(t => t.MinDeals).ToList().IndexOf(tier);
+        return idx switch { 0 => "#2563eb", 1 => "#d97706", 2 => "#7c3aed", _ => "#16a34a" };
+    }
+
+    // Group by sales user
+    var grouped = Model
+        .GroupBy(c => c.SalesUserId)
+        .Select(g => new
+        {
+            SalesUserId = g.Key,
+            SalesName = g.First().SalesUser?.FullName ?? "—",
+            TotalDeals = g.Max(x => x.DealsThisMonth),
+            TotalAmount = g.Sum(x => x.AmountEgp),
+            Count = g.Count(),
+            Month = g.First().CommissionMonth,
+            Status = g.First().Status,
+            ApprovedAt = g.First().ApprovedAt,
+            PaidAt = g.First().PaidAt,
+            ReversedReason = g.First().ReversedReason
+        })
+        .ToList();
 }
 
 <div class="page-header">
@@ -17,7 +61,7 @@
         <div class="page-header-icon" style="background:linear-gradient(135deg,#fffbeb,#fde68a);">🏆</div>
         <div>
             <h1 class="page-title">العمولات</h1>
-            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@total عمولة</p>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@grouped.Count موظف</p>
         </div>
     </div>
 </div>
@@ -31,15 +75,49 @@
     <div class="alert alert-danger mb-4" data-auto-dismiss="4000">❌ @TempData["Error"]</div>
 }
 
+@* ── Summary cards ── *@
+@if (statusFilter == 1 && grouped.Any())
+{
+    <div class="row g-3 mb-4">
+        @foreach (var grp in grouped)
+        {
+            var tierLabel = GetTierLabel(grp.TotalDeals);
+            var tierColor = GetTierColor(grp.TotalDeals);
+            <div class="col-md-4">
+                <div class="card" style="border-right:4px solid @tierColor">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div style="font-weight:700;font-size:13.5px">@grp.SalesName</div>
+                            <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;
+                                         background:@(tierColor + "22");color:@tierColor;border:1px solid @(tierColor + "44")">
+                                @grp.TotalDeals صفقة
+                            </span>
+                        </div>
+                        <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:8px">
+                            <i class="bi bi-bar-chart-steps me-1"></i>@tierLabel
+                        </div>
+                        <div style="font-weight:800;font-size:18px;color:#b45309">
+                            @grp.TotalAmount.ToString("N0") <span style="font-size:12px">ج.م</span>
+                        </div>
+                        <div style="font-size:11px;color:var(--text-muted)">
+                            @grp.Count عمولة معلقة
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
 @* Status tabs *@
 <div class="d-flex gap-2 mb-4 flex-wrap">
     @{
         var tabs = new[] {
-            ("في انتظار موافقتي", (byte)1, "#3b82f6"),
-            ("معتمدة — إحالة للمحاسب", (byte)2, "#f59e0b"),
-            ("مصروفة", (byte)3, "#16a34a"),
-            ("مُعكوسة", (byte)4, "#dc2626"),
-        };
+    ("في انتظار موافقتي", (byte)1, "#3b82f6"),
+    ("معتمدة — إحالة للمحاسب", (byte)2, "#f59e0b"),
+    ("مصروفة", (byte)3, "#16a34a"),
+    ("مُعكوسة", (byte)4, "#dc2626"),
+    };
     }
     @foreach (var (label, val, color) in tabs)
     {
@@ -55,7 +133,7 @@
 </div>
 
 <div class="card">
-    @if (!Model.Any())
+    @if (!grouped.Any())
     {
         <div class="empty-state" style="padding:48px;">
             <div class="empty-state-icon">🏆</div>
@@ -85,94 +163,99 @@
                 <thead>
                     <tr>
                         <th>موظف المبيعات</th>
-                        <th>المرشح / الصفقة</th>
                         <th>شهر العمولة</th>
-                        <th>عدد الصفقات</th>
-                        <th>مبلغ العمولة</th>
+                        <th>إجمالي الصفقات</th>
+                        <th>الشريحة</th>
+                        <th>إجمالي العمولة</th>
                         <th>الحالة</th>
                         <th>إجراء</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var c in Model)
+                    @foreach (var grp in grouped)
                     {
+                        var tierLabel = GetTierLabel(grp.TotalDeals);
+                        var tierColor = GetTierColor(grp.TotalDeals);
+
+                        var (bg, col, border) = grp.Status switch
+                        {
+                            1 => ("#eff6ff", "#2563eb", "#bfdbfe"),
+                            2 => ("#fffbeb", "#b45309", "#fde68a"),
+                            3 => ("#f0fdf4", "#16a34a", "#bbf7d0"),
+                            4 => ("#fef2f2", "#dc2626", "#fecaca"),
+                            _ => ("#f1f5f9", "#64748b", "#e2e8f0")
+                        };
+
                         <tr>
                             <td>
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="avatar avatar-sm" style="background:#f5f3ff;color:#7c3aed;border:1.5px solid #e9d5ff;">
-                                        @(c.SalesUser?.FullName?.FirstOrDefault() ?? '؟')
+                                        @(grp.SalesName.FirstOrDefault())
                                     </div>
-                                    <div style="font-weight:700;">@c.SalesUser?.FullName</div>
+                                    <div style="font-weight:700;">@grp.SalesName</div>
                                 </div>
                             </td>
-                            <td style="font-size:.82rem;">
-                                <div style="font-weight:600;">@c.Candidate?.FullName</div>
-                                <div style="color:var(--text-faint);">@c.Candidate?.JobPackage?.Name</div>
-                            </td>
                             <td style="font-size:.82rem;white-space:nowrap;">
-                                @c.CommissionMonth.ToString("MM/yyyy")
+                                @grp.Month.ToString("MM/yyyy")
                             </td>
-                            <td style="text-align:center;font-weight:700;">@c.DealsThisMonth</td>
+                            <td style="text-align:center;">
+                                <span style="font-weight:800;font-size:16px;color:@tierColor">
+                                    @grp.TotalDeals
+                                </span>
+                            </td>
+                            <td>
+                                <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:99px;
+                                             background:@(tierColor + "18");color:@tierColor;border:1px solid @(tierColor + "33")">
+                                    @tierLabel
+                                </span>
+                            </td>
                             <td>
                                 <span style="font-weight:800;color:#b45309;font-size:.95rem;">
-                                    @c.AmountEgp.ToString("N0") ج.م
+                                    @grp.TotalAmount.ToString("N0") ج.م
                                 </span>
-                            </td>
-                            <td>
-                                @{
-                                    var (bg, col, border) = c.Status switch {
-                                        1 => ("#eff6ff", "#2563eb", "#bfdbfe"),
-                                        2 => ("#fffbeb", "#b45309", "#fde68a"),
-                                        3 => ("#f0fdf4", "#16a34a", "#bbf7d0"),
-                                        4 => ("#fef2f2", "#dc2626", "#fecaca"),
-                                        _ => ("#f1f5f9", "#64748b", "#e2e8f0")
-                                    };
+                                @if (grp.Count > 1)
+                                {
+                                    <div style="font-size:11px;color:var(--text-muted)">@grp.Count صفقة</div>
                                 }
+                            </td>
+                            <td>
                                 <span class="badge-pill" style="background:@bg;color:@col;border:1px solid @border;">
-                                    @(c.Status < statusLabels.Length ? statusLabels[c.Status] : "—")
+                                    @(grp.Status < statusLabels.Length ? statusLabels[grp.Status] : "—")
                                 </span>
                             </td>
                             <td>
-                                @if (c.Status == 1)
+                                @if (grp.Status == 1)
                                 {
                                     <div class="d-flex gap-1 flex-wrap">
-                                        @* Approve *@
-                                        <form method="post" action="/Admin/ApproveCommission" class="d-inline">
+                                        <form method="post" action="/Admin/ApproveAllUserCommissions" class="d-inline">
                                             @Html.AntiForgeryToken()
-                                            <input type="hidden" name="commissionId" value="@c.Id" />
+                                            <input type="hidden" name="salesUserId" value="@grp.SalesUserId" />
                                             <button type="submit" class="btn btn-sm"
                                                     style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;"
-                                                    data-confirm
-                                                    data-confirm-title="اعتماد العمولة"
-                                                    data-confirm-message="اعتماد عمولة @c.AmountEgp.ToString("N0") ج.م لـ @c.SalesUser?.FullName؟"
-                                                    data-confirm-ok="اعتماد"
-                                                    data-confirm-class="btn-success"
-                                                    data-confirm-icon="✅">
+                                                    onclick="return confirm('اعتماد @grp.TotalAmount.ToString("N0") ج.م لـ @grp.SalesName؟')">
                                                 اعتماد
                                             </button>
                                         </form>
-
-                                        @* Reject *@
                                         <button class="btn btn-sm"
                                                 style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;"
-                                                onclick="openRejectCommission('@c.Id', '@c.AmountEgp.ToString("N0")', '@(c.SalesUser?.FullName ?? "")')">
+                                                onclick="openRejectUser('@grp.SalesUserId', '@grp.TotalAmount.ToString("N0")', '@grp.SalesName')">
                                             رفض
                                         </button>
                                     </div>
                                 }
-                                else if (c.Status == 2)
+                                else if (grp.Status == 2)
                                 {
                                     <span style="font-size:.78rem;color:var(--text-faint);">بانتظار المحاسب</span>
                                 }
-                                else if (c.Status == 3)
+                                else if (grp.Status == 3)
                                 {
                                     <span style="font-size:.78rem;color:var(--text-faint);">
-                                        صُرفت @c.PaidAt?.ToString("dd/MM")
+                                        صُرفت @grp.PaidAt?.ToString("dd/MM")
                                     </span>
                                 }
-                                else if (c.Status == 4)
+                                else if (grp.Status == 4)
                                 {
-                                    <span style="font-size:.78rem;color:#dc2626;">@c.ReversedReason</span>
+                                    <span style="font-size:.78rem;color:#dc2626;">@grp.ReversedReason</span>
                                 }
                             </td>
                         </tr>
@@ -181,83 +264,56 @@
             </table>
         </div>
 
-        @if (statusFilter == 1 && Model.Any())
+        @if (statusFilter == 1 && grouped.Any())
         {
             <div class="card-footer d-flex align-items-center justify-content-between">
                 <div style="font-weight:700;color:#b45309;">
-                    إجمالي العمولات المعلقة:
-                    @Model.Sum(c => c.AmountEgp).ToString("N0") ج.م
+                    إجمالي العمولات المعلقة: @Model.Sum(c => c.AmountEgp).ToString("N0") ج.م
                 </div>
-                <div style="font-size:.8rem;color:var(--text-muted);">@total عمولة</div>
-            </div>
-        }
-
-        @if (totalPages > 1)
-        {
-            <div class="card-footer d-flex justify-content-center">
-                <nav>
-                    <ul class="pagination pagination-sm mb-0">
-                        @if (page > 1)
-                        {
-                            <li class="page-item">
-                                <a class="page-link" href="?status=@statusFilter&page=@(page-1)">
-                                    <i class="bi bi-chevron-right"></i>
-                                </a>
-                            </li>
-                        }
-                        @for (int p = Math.Max(1, page - 2); p <= Math.Min(totalPages, page + 2); p++)
-                        {
-                            <li class="page-item @(p == page ? "active" : "")">
-                                <a class="page-link" href="?status=@statusFilter&page=@p">@p</a>
-                            </li>
-                        }
-                        @if (page < totalPages)
-                        {
-                            <li class="page-item">
-                                <a class="page-link" href="?status=@statusFilter&page=@(page+1)">
-                                    <i class="bi bi-chevron-left"></i>
-                                </a>
-                            </li>
-                        }
-                    </ul>
-                </nav>
+                <div style="font-size:.8rem;color:var(--text-muted);">@grouped.Count موظف</div>
             </div>
         }
     }
 </div>
 
-@* Reject commission modal *@
-<div id="rejectCommissionModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
-    <div class="modal-card" style="width:400px;max-width:95vw;">
-        <div class="modal-header">
-            <h5 class="modal-title">رفض العمولة</h5>
-            <button class="btn-close" onclick="document.getElementById('rejectCommissionModal').style.display='none'"></button>
-        </div>
-        <form method="post" action="/Admin/RejectCommission">
-            @Html.AntiForgeryToken()
-            <input type="hidden" name="commissionId" id="rejectCommId" />
-            <div class="modal-body">
-                <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;">
-                    رفض عمولة <strong id="rejectCommAmount"></strong> ج.م لـ <strong id="rejectCommSales"></strong>
-                </p>
-                <div class="mb-3">
-                    <label class="form-label">سبب الرفض</label>
-                    <textarea name="reversedReason" class="form-control" rows="3" required placeholder="اذكر سبب رفض العمولة..."></textarea>
+@* Reject user commissions modal *@
+<div class="modal fade" id="rejectUserModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">رفض عمولات الموظف</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="/Admin/RejectAllUserCommissions">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="salesUserId" id="rejectUserId" />
+                <div class="modal-body">
+                    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;">
+                        رفض عمولات <strong id="rejectUserSales"></strong>
+                        بإجمالي <strong id="rejectUserAmount"></strong> ج.م
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label">سبب الرفض <span class="text-danger">*</span></label>
+                        <textarea name="reversedReason" class="form-control" rows="3" required
+                                  placeholder="اذكر سبب رفض العمولة..."></textarea>
+                    </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-ghost" onclick="document.getElementById('rejectCommissionModal').style.display='none'">إلغاء</button>
-                <button type="submit" class="btn btn-danger">رفض العمولة</button>
-            </div>
-        </form>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger">رفض العمولات</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
-<script>
-function openRejectCommission(id, amount, salesName) {
-    document.getElementById('rejectCommId').value = id;
-    document.getElementById('rejectCommAmount').textContent = amount;
-    document.getElementById('rejectCommSales').textContent = salesName;
-    document.getElementById('rejectCommissionModal').style.display = 'flex';
+@section Scripts {
+    <script>
+        function openRejectUser(salesUserId, amount, salesName) {
+            document.getElementById('rejectUserId').value = salesUserId;
+            document.getElementById('rejectUserAmount').textContent = amount;
+            document.getElementById('rejectUserSales').textContent = salesName;
+            new bootstrap.Modal(document.getElementById('rejectUserModal')).show();
+        }
+    </script>
 }
-</script>

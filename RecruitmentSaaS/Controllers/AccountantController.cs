@@ -585,6 +585,36 @@ namespace RecruitmentSaaS.Controllers
             TempData["Success"] = $"تم تسجيل صرف العمولة بمبلغ {commission.AmountEgp:N0} ج.م";
             return RedirectToAction("Commissions");
         }
+        // POST /Accountant/PayAllUserCommissions
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PayAllUserCommissions(Guid salesUserId)
+        {
+            var userId = CurrentUserId;
+
+            var commissions = await _context.Commissions
+                .Where(c => c.SalesUserId == salesUserId && c.Status == 2)
+                .ToListAsync();
+
+            if (!commissions.Any())
+            {
+                TempData["Error"] = "لا توجد عمولات معتمدة لهذا الموظف";
+                return RedirectToAction("Commissions");
+            }
+
+            foreach (var c in commissions)
+            {
+                c.Status = 3;
+                c.PaidById = userId;
+                c.PaidAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+
+            var user = await _context.Users.FindAsync(salesUserId);
+            TempData["Success"] = $"تم صرف عمولات {user?.FullName} بنجاح";
+            return RedirectToAction("Commissions");
+        }
 
         // ── GET /Accountant/Reports ───────────────────────────────────────────
         public async Task<IActionResult> Reports(int? month, int? year)

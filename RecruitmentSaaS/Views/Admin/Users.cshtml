@@ -19,7 +19,7 @@
             <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@Model.Count() مستخدم</p>
         </div>
     </div>
-    <button class="btn btn-primary" onclick="document.getElementById('createUserModal').style.display='flex'">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createUserModal">
         <i class="bi bi-plus-lg me-1"></i> مستخدم جديد
     </button>
 </div>
@@ -64,7 +64,7 @@
             @if (!string.IsNullOrWhiteSpace(q) || role.HasValue)
             {
                 <div class="col-md-2">
-                    <a href="/Admin/Users" class="btn btn-ghost btn-sm w-100">مسح</a>
+                    <a href="/Admin/Users" class="btn btn-outline-secondary btn-sm w-100">مسح</a>
                 </div>
             }
         </form>
@@ -133,23 +133,16 @@
                             </td>
                             <td>
                                 <div class="d-flex gap-1">
-                                    @* Toggle active *@
                                     <form method="post" action="/Admin/ToggleUser" class="d-inline">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="userId" value="@u.Id" />
-                                        <button type="submit" class="btn btn-ghost btn-sm"
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm"
                                                 title="@(u.IsActive ? "تعطيل" : "تفعيل")"
-                                                data-confirm
-                                                data-confirm-title="@(u.IsActive ? "تعطيل المستخدم" : "تفعيل المستخدم")"
-                                                data-confirm-message="هل أنت متأكد؟"
-                                                data-confirm-ok="نعم"
-                                                data-confirm-class="@(u.IsActive ? "btn-danger" : "btn-success")">
+                                                onclick="return confirm('هل أنت متأكد؟')">
                                             <i class="bi @(u.IsActive ? "bi-person-slash" : "bi-person-check")"></i>
                                         </button>
                                     </form>
-
-                                    @* Reset password *@
-                                    <button class="btn btn-ghost btn-sm" title="تغيير كلمة المرور"
+                                    <button class="btn btn-outline-secondary btn-sm" title="تغيير كلمة المرور"
                                             onclick="openResetPwd('@u.Id', '@u.FullName')">
                                         <i class="bi bi-key"></i>
                                     </button>
@@ -163,77 +156,84 @@
     </div>
 </div>
 
-@* ── CREATE USER MODAL ──────────────────────────────────────────── *@
-<div id="createUserModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
-    <div class="modal-card" style="width:460px;max-width:95vw;">
-        <div class="modal-header">
-            <h5 class="modal-title">مستخدم جديد</h5>
-            <button class="btn-close" onclick="document.getElementById('createUserModal').style.display='none'"></button>
+@* ── CREATE USER MODAL (Bootstrap) ──────────────────────────────── *@
+<div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createUserModalLabel">مستخدم جديد</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="/Admin/CreateUser">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">الاسم الكامل <span class="text-danger">*</span></label>
+                        <input name="fullName" class="form-control" required placeholder="مثال: أحمد محمد" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">البريد الإلكتروني <span class="text-danger">*</span></label>
+                        <input name="email" type="email" class="form-control" required placeholder="example@domain.com" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">كلمة المرور <span class="text-danger">*</span></label>
+                        <input name="password" type="password" class="form-control" required minlength="6" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">الدور <span class="text-danger">*</span></label>
+                        <select name="role" class="form-select" required>
+                            @for (int i = 1; i < roleNames.Length; i++)
+                            {
+                                <option value="@i">@roleNames[i]</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">إنشاء المستخدم</button>
+                </div>
+            </form>
         </div>
-        <form method="post" action="/Admin/CreateUser">
-            @Html.AntiForgeryToken()
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">الاسم الكامل</label>
-                    <input name="fullName" class="form-control" required />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">البريد الإلكتروني</label>
-                    <input name="email" type="email" class="form-control" required />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">كلمة المرور</label>
-                    <input name="password" type="password" class="form-control" required />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">الدور</label>
-                    <select name="role" class="form-select" required>
-                        @for (int i = 1; i < roleNames.Length; i++)
-                        {
-                            <option value="@i">@roleNames[i]</option>
-                        }
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-ghost" onclick="document.getElementById('createUserModal').style.display='none'">إلغاء</button>
-                <button type="submit" class="btn btn-primary">إنشاء المستخدم</button>
-            </div>
-        </form>
     </div>
 </div>
 
-@* ── RESET PASSWORD MODAL ──────────────────────────────────────── *@
-<div id="resetPwdModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
-    <div class="modal-card" style="width:380px;max-width:95vw;">
-        <div class="modal-header">
-            <h5 class="modal-title">تغيير كلمة المرور</h5>
-            <button class="btn-close" onclick="document.getElementById('resetPwdModal').style.display='none'"></button>
-        </div>
-        <form method="post" action="/Admin/ResetPassword">
-            @Html.AntiForgeryToken()
-            <input type="hidden" name="userId" id="resetUserId" />
-            <div class="modal-body">
-                <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;">
-                    تغيير كلمة المرور لـ <strong id="resetUserName"></strong>
-                </p>
-                <div class="mb-3">
-                    <label class="form-label">كلمة المرور الجديدة</label>
-                    <input name="newPassword" type="password" class="form-control" required minlength="6" />
+@* ── RESET PASSWORD MODAL (Bootstrap) ────────────────────────────── *@
+<div class="modal fade" id="resetPwdModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تغيير كلمة المرور</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="/Admin/ResetPassword">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" id="resetUserId" />
+                <div class="modal-body">
+                    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;">
+                        تغيير كلمة المرور لـ <strong id="resetUserName"></strong>
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label">كلمة المرور الجديدة <span class="text-danger">*</span></label>
+                        <input name="newPassword" type="password" class="form-control" required minlength="6" />
+                    </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-ghost" onclick="document.getElementById('resetPwdModal').style.display='none'">إلغاء</button>
-                <button type="submit" class="btn btn-primary">تغيير</button>
-            </div>
-        </form>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">تغيير</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
-<script>
-    function openResetPwd(userId, userName) {
-        document.getElementById('resetUserId').value = userId;
-        document.getElementById('resetUserName').textContent = userName;
-        document.getElementById('resetPwdModal').style.display = 'flex';
-    }
-</script>
+@section Scripts {
+    <script>
+        function openResetPwd(userId, userName) {
+            document.getElementById('resetUserId').value = userId;
+            document.getElementById('resetUserName').textContent = userName;
+            var modal = new bootstrap.Modal(document.getElementById('resetPwdModal'));
+            modal.show();
+        }
+    </script>
+}
