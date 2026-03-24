@@ -187,10 +187,10 @@ namespace RecruitmentSaaS.Controllers
 
                 var newCandidateId = (Guid)candidateIdParam.Value;
 
-                // ── Fix 1: reload context before touching candidate ──
+                // reload context before touching any entities
                 _context.ChangeTracker.Clear();
 
-                // ── Fix 2: commission with correct month format ──
+                // ── Auto-calculate commission from tiers ──────────────────────
                 var existingCommission = await _context.Commissions
                     .AnyAsync(c => c.CandidateId == newCandidateId);
 
@@ -199,15 +199,31 @@ namespace RecruitmentSaaS.Controllers
                     var now = DateTime.UtcNow;
                     var monthStart = new DateOnly(now.Year, now.Month, 1);
 
+                    // Count deals this month for this sales user (pending/approved/paid — exclude reversed)
+                    int dealsThisMonth = await _context.Commissions
+                        .CountAsync(c => c.SalesUserId == userId
+                                      && c.CommissionMonth == monthStart
+                                      && c.Status != 4) + 1; // +1 for current deal
+
+                    // Find the correct tier based on deal count
+                    var tier = await _context.CommissionTiers
+                        .Where(t => t.IsActive
+                                 && t.MinDeals <= dealsThisMonth
+                                 && (t.MaxDeals == null || t.MaxDeals >= dealsThisMonth))
+                        .OrderByDescending(t => t.MinDeals)
+                        .FirstOrDefaultAsync();
+
+                    decimal commissionAmount = tier?.AmountPerDeal ?? 0;
+
                     _context.Commissions.Add(new Commission
                     {
                         Id = Guid.NewGuid(),
                         SalesUserId = userId,
                         CandidateId = newCandidateId,
                         CommissionMonth = monthStart,
-                        AmountEgp = 0,
-                        DealsThisMonth = 1,
-                        Status = 1,
+                        AmountEgp = commissionAmount,  // ✅ محسوب من الشرائح تلقائياً
+                        DealsThisMonth = dealsThisMonth,
+                        Status = 1, // Pending admin approval
                         CreatedAt = now
                     });
 
@@ -219,7 +235,7 @@ namespace RecruitmentSaaS.Controllers
             }
             catch (Exception ex)
             {
-                TempData["Error"] = "حدث خطأ أثناء التحويل: " + ex.InnerException?.Message ?? ex.Message;
+                TempData["Error"] = "حدث خطأ أثناء التحويل: " + (ex.InnerException?.Message ?? ex.Message);
                 return RedirectToAction("LeadDetail", new { id = leadId });
             }
         }
