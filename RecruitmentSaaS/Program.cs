@@ -21,6 +21,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddControllersWithViews();
 
+builder.Services.AddHttpClient();
+
 builder.Services.AddScoped<RecruitmentSaaS.Services.INotificationService,
                            RecruitmentSaaS.Services.NotificationService>();
 
