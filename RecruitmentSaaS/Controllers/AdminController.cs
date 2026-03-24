@@ -136,7 +136,7 @@ namespace RecruitmentSaaS.Controllers
                 Email = email,
                 PasswordHash = password, // plain text for now
                 Role = (byte)role,
-                BranchId = branchId ?? Guid.Empty,
+                BranchId = branchId ?? Guid.Parse("00000000-0000-0000-0000-000000000020"),
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             };
@@ -374,7 +374,6 @@ namespace RecruitmentSaaS.Controllers
                 .Include(c => c.PaidBy)
                 .AsQueryable();
 
-            // Default: show pending (status=1)
             if (status.HasValue)
                 query = query.Where(c => c.Status == status.Value);
             else
@@ -392,10 +391,40 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.Page = page;
             ViewBag.Total = total;
             ViewBag.TotalPages = (int)Math.Ceiling(total / (double)pageSize);
+            ViewBag.CommissionTiers = await _context.CommissionTiers
+                .Where(t => t.IsActive)
+                .OrderBy(t => t.MinDeals)
+                .ToListAsync();
 
             return View(commissions);
         }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveAllUserCommissions(Guid salesUserId)
+        {
+            var commissions = await _context.Commissions
+                .Where(c => c.SalesUserId == salesUserId && c.Status == 1)
+                .ToListAsync();
 
+            if (!commissions.Any())
+            {
+                TempData["Error"] = "لا توجد عمولات معلقة لهذا الموظف";
+                return RedirectToAction("Commissions");
+            }
+
+            foreach (var c in commissions)
+            {
+                c.Status = 2;
+                c.ApprovedById = CurrentUserId;
+                c.ApprovedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+
+            var salesUser = await _context.Users.FindAsync(salesUserId);
+            TempData["Success"] = $"تم اعتماد {commissions.Count} عمولة لـ {salesUser?.FullName}";
+            return RedirectToAction("Commissions");
+        }
         // ── POST /Admin/ApproveCommission ───────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
