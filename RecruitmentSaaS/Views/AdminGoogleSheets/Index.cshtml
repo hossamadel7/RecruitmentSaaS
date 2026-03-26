@@ -1,0 +1,272 @@
+@model List<RecruitmentSaaS.Models.Entities.SalesGoogleSheet>
+@{
+    ViewData["Title"] = "Google Sheets - إدارة الاستيراد";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var isAdmin = User.IsInRole("1");
+}
+
+<style>
+    :root {
+        --gs-bg:      #0d0f14;
+        --gs-card:    #171c27;
+        --gs-border:  #1e2330;
+        --gs-accent:  #10b981;
+        --gs-text:    #e2e8f0;
+        --gs-muted:   #64748b;
+        --gs-red:     #ef4444;
+        --gs-yellow:  #f59e0b;
+    }
+    body { background: var(--gs-bg); color: var(--gs-text); font-family: 'Tajawal', sans-serif; }
+
+    .gs-header {
+        padding: 2rem 0 1.5rem;
+        border-bottom: 1px solid var(--gs-border);
+        margin-bottom: 2rem;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .gs-header h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+    .gs-header p  { color: var(--gs-muted); margin: .2rem 0 0; font-size: .88rem; }
+
+    .btn-add {
+        background: var(--gs-accent); color: #fff;
+        border: none; padding: .6rem 1.2rem;
+        border-radius: 8px; font-size: .88rem; font-weight: 600;
+        text-decoration: none; font-family: 'Tajawal', sans-serif;
+    }
+    .btn-add:hover { opacity: .9; color: #fff; text-decoration: none; }
+
+    .sheets-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        gap: 1.25rem;
+    }
+
+    .sheet-card {
+        background: var(--gs-card);
+        border: 1px solid var(--gs-border);
+        border-radius: 14px; padding: 1.5rem;
+        display: flex; flex-direction: column; gap: 1rem;
+    }
+    .sheet-card.inactive { opacity: .55; }
+
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .sheet-name { font-size: 1rem; font-weight: 700; margin-bottom: .2rem; }
+    .sheet-meta { font-size: .78rem; color: var(--gs-muted); }
+
+    .active-badge {
+        display: inline-block; padding: .2rem .65rem;
+        border-radius: 999px; font-size: .72rem; font-weight: 600;
+    }
+    .badge-active   { background: #10b98120; color: #10b981; border: 1px solid #10b98140; }
+    .badge-inactive { background: #ef444420; color: #ef4444; border: 1px solid #ef444440; }
+
+    .stats-row {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        background: #0d0f1450; border-radius: 10px; padding: .75rem; gap: .5rem;
+    }
+    .stat { text-align: center; }
+    .stat .sv { font-size: 1.2rem; font-weight: 700; color: var(--gs-accent); }
+    .stat .sl { font-size: .7rem; color: var(--gs-muted); margin-top: .1rem; }
+
+    .users-row { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .user-chip {
+        background: #6366f115; color: #818cf8;
+        border: 1px solid #6366f130;
+        border-radius: 999px; padding: .2rem .6rem; font-size: .75rem;
+    }
+    .no-users { font-size: .78rem; color: var(--gs-muted); }
+
+    .camp-chip {
+        display: inline-block;
+        background: #f59e0b15; color: #f59e0b;
+        border: 1px solid #f59e0b30;
+        border-radius: 6px; padding: .2rem .6rem; font-size: .75rem;
+    }
+
+    .actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .btn-sm-gs {
+        padding: .4rem .85rem; border-radius: 7px;
+        font-size: .78rem; font-weight: 600;
+        border: none; cursor: pointer;
+        font-family: 'Tajawal', sans-serif;
+        text-decoration: none; display: inline-block;
+    }
+    .btn-import  { background: #6366f1; color: #fff; }
+    .btn-import:hover { background: #4f46e5; color: #fff; }
+    .btn-toggle  { background: var(--gs-border); color: var(--gs-text); }
+    .btn-toggle:hover { background: #2a3040; }
+    .btn-reset   { background: #f59e0b20; color: #f59e0b; border: 1px solid #f59e0b40; }
+    .btn-delete  { background: #ef444420; color: #ef4444; border: 1px solid #ef444440; }
+    .btn-delete:hover { background: #ef444430; }
+
+    .last-import { font-size: .75rem; color: var(--gs-muted); }
+    .last-import span { color: var(--gs-text); }
+
+    .empty { text-align: center; padding: 4rem; color: var(--gs-muted); }
+    .empty i { font-size: 2.5rem; opacity: .3; margin-bottom: 1rem; display: block; }
+
+    .alert-success {
+        background: #10b98120; border: 1px solid #10b98140; color: #10b981;
+        padding: .75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: .88rem;
+    }
+    .alert-error {
+        background: #ef444420; border: 1px solid #ef444440; color: #ef4444;
+        padding: .75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: .88rem;
+    }
+</style>
+
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+<div class="container-fluid" dir="rtl">
+    <div class="gs-header">
+        <div>
+            <h1><i class="fas fa-table me-2" style="color:var(--gs-accent)"></i> Google Sheets</h1>
+            <p>ربط شيتات Facebook Lead Ads باستيراد العملاء تلقائياً</p>
+        </div>
+        <a href="/AdminGoogleSheets/Create" class="btn-add">
+            <i class="fas fa-plus me-1"></i> ربط شيت جديد
+        </a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert-success"><i class="fas fa-check-circle me-1"></i> @TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert-error"><i class="fas fa-exclamation-circle me-1"></i> @TempData["Error"]</div>
+    }
+
+    @if (!Model.Any())
+    {
+        <div class="empty">
+            <i class="fas fa-file-spreadsheet"></i>
+            <p>لا توجد شيتات مربوطة حتى الآن</p>
+            <a href="/AdminGoogleSheets/Create" class="btn-add">ربط أول شيت</a>
+        </div>
+    }
+    else
+    {
+        <div class="sheets-grid">
+            @foreach (var sheet in Model)
+            {
+                var activeUsers = sheet.SalesGoogleSheetUsers.Where(su => su.IsActive).ToList();
+
+                <div class="sheet-card @(sheet.IsActive ? "" : "inactive")">
+
+                    <div class="card-top">
+                        <div>
+                            <div class="sheet-name">@sheet.Name</div>
+                            <div class="sheet-meta">
+                                <i class="fas fa-table me-1"></i> @sheet.SheetName
+                                &nbsp;·&nbsp;
+                                <i class="fas fa-calendar me-1"></i> أُضيف @sheet.CreatedAt.ToString("dd MMM yyyy")
+                            </div>
+                        </div>
+                        <span class="active-badge @(sheet.IsActive ? "badge-active" : "badge-inactive")">
+                            @(sheet.IsActive ? "نشط" : "متوقف")
+                        </span>
+                    </div>
+
+                    <!-- Campaign -->
+                    <div>
+                        <div class="sheet-meta mb-1">الحملة المرتبطة</div>
+                        @if (sheet.Campaign != null)
+                        {
+                            <span class="camp-chip"><i class="fas fa-bullhorn me-1"></i>@sheet.Campaign.Name</span>
+                        }
+                        else
+                        {
+                            <span class="no-users">غير مرتبط بحملة</span>
+                        }
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="stats-row">
+                        <div class="stat">
+                            <div class="sv">@sheet.TotalImported</div>
+                            <div class="sl">مستورد</div>
+                        </div>
+                        <div class="stat">
+                            <div class="sv">@sheet.LastImportedRow</div>
+                            <div class="sl">آخر صف</div>
+                        </div>
+                        <div class="stat">
+                            <div class="sv">@activeUsers.Count</div>
+                            <div class="sl">موظف معيّن</div>
+                        </div>
+                    </div>
+
+                    <!-- Assigned sales users -->
+                    <div>
+                        <div class="sheet-meta mb-1">موظفو المبيعات المعيّنون</div>
+                        @if (activeUsers.Any())
+                        {
+                            <div class="users-row">
+                                @foreach (var su in activeUsers)
+                                {
+                                    <span class="user-chip">@su.SalesUser.FullName</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <span class="no-users">لم يُعيَّن أحد — العملاء يذهبون للبنك العام</span>
+                        }
+                    </div>
+
+                    <!-- Last import -->
+                    <div class="last-import">
+                        آخر استيراد:
+                        <span>
+                            @(sheet.LastImportedAt.HasValue
+                                ? sheet.LastImportedAt.Value.ToString("dd MMM yyyy — hh:mm tt")
+                                : "لم يتم الاستيراد بعد")
+                        </span>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="actions">
+                        <form method="post" action="/AdminGoogleSheets/RunImport" style="display:inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@sheet.Id"/>
+                            <button type="submit" class="btn-sm-gs btn-import">
+                                <i class="fas fa-download me-1"></i> استيراد الآن
+                            </button>
+                        </form>
+
+                        <form method="post" action="/AdminGoogleSheets/ToggleActive" style="display:inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@sheet.Id"/>
+                            <button type="submit" class="btn-sm-gs btn-toggle">
+                                @(sheet.IsActive ? "إيقاف" : "تفعيل")
+                            </button>
+                        </form>
+
+                        @if (isAdmin)
+                        {
+                            <form method="post" action="/AdminGoogleSheets/ResetRow" style="display:inline"
+                                  onsubmit="return confirm('سيتم إعادة استيراد كل الصفوف. متأكد؟')">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@sheet.Id"/>
+                                <button type="submit" class="btn-sm-gs btn-reset">
+                                    <i class="fas fa-redo me-1"></i> إعادة تعيين
+                                </button>
+                            </form>
+
+                            <form method="post" action="/AdminGoogleSheets/Delete" style="display:inline"
+                                  onsubmit="return confirm('سيتم حذف الشيت. العملاء المستوردة لن تُحذف. متأكد؟')">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@sheet.Id"/>
+                                <button type="submit" class="btn-sm-gs btn-delete">
+                                    <i class="fas fa-trash me-1"></i> حذف
+                                </button>
+                            </form>
+                        }
+                    </div>
+
+                </div>
+            }
+        </div>
+    }
+</div>
