@@ -46,6 +46,7 @@ namespace RecruitmentSaaS.Controllers
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         // ── GET /Admin/Index ────────────────────────────────────────────────
+        // ── GET /Admin/Index ────────────────────────────────────────────────
         public async Task<IActionResult> Index()
         {
             var totalLeads = await _context.Leads.CountAsync();
@@ -56,6 +57,7 @@ namespace RecruitmentSaaS.Controllers
             var pendingRefunds = await _context.Refunds.CountAsync(r => r.Status == 1);
             var pendingCommissions = await _context.Commissions.CountAsync(c => c.Status == 1);
             var pendingPayments = await _context.Payments.CountAsync(p => p.Status == 1);
+            var pendingApprovals = await _context.StageApprovalRequests.CountAsync(r => r.Status == 1);
 
             var totalCollected = await _context.Payments
                 .Where(p => p.Status == 2 && p.TransactionType == 1)
@@ -91,6 +93,7 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.PendingRefunds = pendingRefunds;
             ViewBag.PendingCommissions = pendingCommissions;
             ViewBag.PendingPayments = pendingPayments;
+            ViewBag.PendingApprovals = pendingApprovals;
             ViewBag.TotalCollected = totalCollected;
             ViewBag.LeadsByStatus = leadsByStatus;
             ViewBag.CandidatesByStage = candidatesByStage;
@@ -98,7 +101,6 @@ namespace RecruitmentSaaS.Controllers
 
             return View();
         }
-
         // ── GET /Admin/Users ────────────────────────────────────────────────
         public async Task<IActionResult> Users(string? q, int? role)
         {
@@ -1289,6 +1291,7 @@ namespace RecruitmentSaaS.Controllers
         // ============================================================
 
         // GET /Admin/CommissionTiers
+        // GET /Admin/CommissionTiers
         public async Task<IActionResult> CommissionTiers()
         {
             var tiers = await _context.CommissionTiers
@@ -1334,9 +1337,73 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.PendingCount = await _context.Commissions
                 .CountAsync(c => c.Status == 1);
 
+            // ── Commission Settings (Reset Day) ───────────────────────────────
+            var settings = await _context.CommissionSettings.FirstOrDefaultAsync();
+            ViewBag.ResetDayOfMonth = settings?.ResetDayOfMonth ?? 1;
+            ViewBag.SettingsId = settings?.Id;
+
+            // Calculate next reset date for display
+            var now = DateTime.UtcNow;
+            byte resetDay = settings?.ResetDayOfMonth ?? 1;
+            DateOnly nextReset;
+            if (now.Day < resetDay)
+                nextReset = new DateOnly(now.Year, now.Month, resetDay);
+            else
+            {
+                var next = now.AddMonths(1);
+                nextReset = new DateOnly(next.Year, next.Month, resetDay);
+            }
+            ViewBag.NextResetDate = nextReset;
+
+            // Calculate current period start for display
+            DateOnly periodStart;
+            if (now.Day >= resetDay)
+                periodStart = new DateOnly(now.Year, now.Month, resetDay);
+            else
+            {
+                var prev = now.AddMonths(-1);
+                periodStart = new DateOnly(prev.Year, prev.Month, resetDay);
+            }
+            ViewBag.CurrentPeriodStart = periodStart;
+
             return View(tiers);
         }
 
+        // POST /Admin/UpdateCommissionSettings
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateCommissionSettings(byte resetDayOfMonth)
+        {
+            if (resetDayOfMonth < 1 || resetDayOfMonth > 28)
+            {
+                TempData["Error"] = "يوم الـ Reset يجب أن يكون بين 1 و 28";
+                return RedirectToAction("CommissionTiers");
+            }
+
+            var settings = await _context.CommissionSettings.FirstOrDefaultAsync();
+
+            if (settings == null)
+            {
+                _context.CommissionSettings.Add(new CommissionSetting
+                {
+                    Id = Guid.NewGuid(),
+                    ResetDayOfMonth = resetDayOfMonth,
+                    UpdatedAt = DateTime.UtcNow,
+                    UpdatedById = CurrentUserId
+                });
+            }
+            else
+            {
+                settings.ResetDayOfMonth = resetDayOfMonth;
+                settings.UpdatedAt = DateTime.UtcNow;
+                settings.UpdatedById = CurrentUserId;
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"تم تحديث يوم الـ Reset إلى يوم {resetDayOfMonth} من كل شهر ✅";
+            return RedirectToAction("CommissionTiers");
+        }
         // POST /Admin/AddCommissionTier
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -1480,17 +1547,28 @@ namespace RecruitmentSaaS.Controllers
             return RedirectToAction("CommissionTiers");
         }
 
-        // GET /Admin/RecalculateCommissions
-        // Recalculates all PENDING commissions for current month based on current tiers
+        // POST /Admin/RecalculateCommissions
+        // Recalculates all PENDING commissions for current period based on current tiers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RecalculateCommissions()
         {
-            var now = DateTime.UtcNow;
-            var month = now.Month;
-            var year = now.Year;
+            // ── جيب إعداد يوم الـ Reset ───────────────────────────────────────
+            var settings = await _context.CommissionSettings.FirstOrDefaultAsync();
+            byte resetDay = settings?.ResetDayOfMonth ?? 1;
 
-            // Get all active tiers ordered
+            var now = DateTime.UtcNow;
+            DateOnly periodStart;
+            if (now.Day >= resetDay)
+                periodStart = new DateOnly(now.Year, now.Month, resetDay);
+            else
+            {
+                var prev = now.AddMonths(-1);
+                var safeDay = Math.Min(resetDay, DateTime.DaysInMonth(prev.Year, prev.Month));
+                periodStart = new DateOnly(prev.Year, prev.Month, safeDay);
+            }
+
+            // ── جيب الشرائح النشطة ───────────────────────────────────────────
             var tiers = await _context.CommissionTiers
                 .Where(t => t.IsActive)
                 .OrderBy(t => t.MinDeals)
@@ -1502,14 +1580,19 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("CommissionTiers");
             }
 
-            // Get all pending commissions this month grouped by sales user
+            // ── جيب كل الـ Pending commissions في الـ Period الحالية ──────────
             var pendingCommissions = await _context.Commissions
                 .Where(c => c.Status == 1
-                         && c.CreatedAt.Month == month
-                         && c.CreatedAt.Year == year)
+                         && c.CommissionMonth == periodStart)
                 .ToListAsync();
 
-            // Group by sales user
+            if (!pendingCommissions.Any())
+            {
+                TempData["Error"] = $"لا توجد عمولات معلقة في الفترة الحالية (من {periodStart:dd/MM/yyyy})";
+                return RedirectToAction("CommissionTiers");
+            }
+
+            // ── Group by sales user وأعد الحساب ─────────────────────────────
             var bySalesUser = pendingCommissions.GroupBy(c => c.SalesUserId);
             int updated = 0;
 
@@ -1517,14 +1600,13 @@ namespace RecruitmentSaaS.Controllers
             {
                 var salesUserId = group.Key;
 
-                // Count approved + paid + pending for this user this month
+                // عد كل الصفقات في الـ Period (pending + approved + paid — exclude reversed)
                 int totalDeals = await _context.Commissions
                     .CountAsync(c => c.SalesUserId == salesUserId
-                                  && c.CreatedAt.Month == month
-                                  && c.CreatedAt.Year == year
-                                  && c.Status != 4); // exclude reversed
+                                  && c.CommissionMonth == periodStart
+                                  && c.Status != 4);
 
-                // Find the correct tier
+                // جيب الشريحة الصحيحة
                 var correctTier = tiers
                     .Where(t => t.MinDeals <= totalDeals
                              && (t.MaxDeals == null || t.MaxDeals >= totalDeals))
@@ -1533,7 +1615,7 @@ namespace RecruitmentSaaS.Controllers
 
                 if (correctTier == null) continue;
 
-                // Update all pending commissions for this user
+                // حدّث كل الـ pending commissions لهذا الـ Sales user
                 foreach (var commission in group)
                 {
                     commission.AmountEgp = correctTier.AmountPerDeal;
@@ -1543,7 +1625,7 @@ namespace RecruitmentSaaS.Controllers
             }
 
             await _context.SaveChangesAsync();
-            TempData["Success"] = $"تم إعادة حساب {updated} عمولة معلقة بناءً على الشرائح الحالية";
+            TempData["Success"] = $"تم إعادة حساب {updated} عمولة معلقة — الفترة من {periodStart:dd/MM/yyyy}";
             return RedirectToAction("CommissionTiers");
         }
         // GET /Admin/Salaries
@@ -1781,8 +1863,8 @@ namespace RecruitmentSaaS.Controllers
             return RedirectToAction("Salaries", new { month, year });
         }
 
-
      
+
         public async Task<IActionResult> DownloadPassportsZip(Guid? packageId, Guid? id, bool newOnly = false)
         {
             var pkgId = packageId ?? id;

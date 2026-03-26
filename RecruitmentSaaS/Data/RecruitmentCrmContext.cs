@@ -26,6 +26,8 @@ public partial class RecruitmentCrmContext : DbContext
 
     public virtual DbSet<Commission> Commissions { get; set; }
 
+    public virtual DbSet<CommissionSetting> CommissionSettings { get; set; }
+
     public virtual DbSet<CommissionTier> CommissionTiers { get; set; }
 
     public virtual DbSet<Company> Companies { get; set; }
@@ -206,6 +208,14 @@ public partial class RecruitmentCrmContext : DbContext
                 .HasConstraintName("FK_demorecruitment_Com_Sa");
         });
 
+        modelBuilder.Entity<CommissionSetting>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Commissi__3214EC071B98EE42");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.ResetDayOfMonth).HasDefaultValue((byte)1);
+        });
+
         modelBuilder.Entity<CommissionTier>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK_demorecruitment_CommissionTiers");
@@ -293,6 +303,10 @@ public partial class RecruitmentCrmContext : DbContext
         modelBuilder.Entity<Lead>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK_demorecruitment_Ld");
+
+            entity.HasIndex(e => e.FacebookLeadId, "UX_Leads_FacebookLeadId")
+                .IsUnique()
+                .HasFilter("([FacebookLeadId] IS NOT NULL)");
 
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");

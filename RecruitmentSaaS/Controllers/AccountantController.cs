@@ -122,6 +122,7 @@ namespace RecruitmentSaaS.Controllers
 
             var payment = await _context.Payments
                 .Include(p => p.Candidate)
+                    .ThenInclude(c => c.JobPackage)
                 .FirstOrDefaultAsync(p => p.Id == paymentId && p.Status == 1);
 
             if (payment == null)
@@ -130,24 +131,83 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("Pending");
             }
 
+            // ── اعتماد الدفعة ──────────────────────────────────────────────
             payment.Status = 2;
             payment.ApprovedById = userId;
             payment.ApprovedAt = DateTime.UtcNow;
+
             if (!string.IsNullOrEmpty(notes))
                 payment.Notes = (payment.Notes ?? "") + $" | ملاحظة المحاسب: {notes}";
 
             var candidate = payment.Candidate;
+
             if (payment.TransactionType == 1)
                 candidate.TotalPaidEgp += payment.AmountEgp;
             else if (payment.TransactionType == 2)
                 candidate.TotalPaidEgp -= payment.AmountEgp;
 
             candidate.UpdatedAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
+
+            // ── إنشاء Commission تلقائياً عند اكتمال سعر الباقة ─────────────
+            if (payment.TransactionType == 1
+                && candidate.AssignedSalesId != Guid.Empty
+                && candidate.TotalPaidEgp >= candidate.JobPackage.PriceEgp)
+            {
+                // تحقق إن مفيش Commission موجودة بالفعل لهذا المرشح
+                var alreadyExists = await _context.Commissions
+                    .AnyAsync(c => c.CandidateId == candidate.Id
+                                && c.Status != 4);
+
+                if (!alreadyExists)
+                {
+                    var settings = await _context.CommissionSettings.FirstOrDefaultAsync();
+                    byte resetDay = settings?.ResetDayOfMonth ?? 1;
+                    var nowUtc = DateTime.UtcNow;
+
+                    DateOnly periodStart;
+                    if (nowUtc.Day >= resetDay)
+                        periodStart = new DateOnly(nowUtc.Year, nowUtc.Month, resetDay);
+                    else
+                    {
+                        var prev = nowUtc.AddMonths(-1);
+                        var safeDay = Math.Min(resetDay, DateTime.DaysInMonth(prev.Year, prev.Month));
+                        periodStart = new DateOnly(prev.Year, prev.Month, safeDay);
+                    }
+
+                    int dealsThisPeriod = await _context.Commissions
+                        .CountAsync(c => c.SalesUserId == candidate.AssignedSalesId
+                                      && c.CommissionMonth == periodStart
+                                      && c.Status != 4) + 1;
+
+                    var tier = await _context.CommissionTiers
+                        .Where(t => t.IsActive
+                                 && t.MinDeals <= dealsThisPeriod
+                                 && (t.MaxDeals == null || t.MaxDeals >= dealsThisPeriod))
+                        .OrderByDescending(t => t.MinDeals)
+                        .FirstOrDefaultAsync();
+
+                    _context.Commissions.Add(new Commission
+                    {
+                        Id = Guid.NewGuid(),
+                        SalesUserId = candidate.AssignedSalesId,
+                        CandidateId = candidate.Id,
+                        CommissionMonth = periodStart,
+                        AmountEgp = tier?.AmountPerDeal ?? 0,
+                        DealsThisMonth = dealsThisPeriod,
+                        Status = 1,
+                        CreatedAt = nowUtc
+                    });
+
+                    await _context.SaveChangesAsync();
+                }
+            }
 
             TempData["Success"] = $"تم اعتماد الدفعة بمبلغ {payment.AmountEgp:N0} ج.م";
             return RedirectToAction("Pending");
         }
+
 
         // ── POST /Accountant/RejectPayment ───────────────────────────────────
         [HttpPost]
@@ -615,7 +675,6 @@ namespace RecruitmentSaaS.Controllers
             TempData["Success"] = $"تم صرف عمولات {user?.FullName} بنجاح";
             return RedirectToAction("Commissions");
         }
-
         // ── GET /Accountant/Reports ───────────────────────────────────────────
         public async Task<IActionResult> Reports(int? month, int? year)
         {
@@ -625,6 +684,7 @@ namespace RecruitmentSaaS.Controllers
 
             var from = new DateTime(year.Value, month.Value, 1);
             var to = from.AddMonths(1);
+            var monthStart = new DateOnly(year.Value, month.Value, 1);
 
             var paymentsThisMonth = await _context.Payments
                 .Where(p => p.Status == 2 && p.ApprovedAt >= from && p.ApprovedAt < to && p.TransactionType == 1)
@@ -639,6 +699,26 @@ namespace RecruitmentSaaS.Controllers
             var commissionsThisMonth = await _context.Commissions
                 .Where(c => c.Status == 3 && c.PaidAt >= from && c.PaidAt < to)
                 .SumAsync(c => (decimal?)c.AmountEgp) ?? 0;
+
+            // ── المرتبات المصروفة هذا الشهر ──────────────────────────────────
+            var salariesThisMonth = await _context.SalaryPayments
+                .Where(sp => sp.Status == 3 && sp.SalaryMonth == monthStart)
+                .SumAsync(sp => (decimal?)(sp.BaseSalary + sp.Adjustment)) ?? 0;
+
+            // تفاصيل المرتبات للعرض في الجدول
+            var salaryDetails = await _context.SalaryPayments
+                .Include(sp => sp.User)
+                .Where(sp => sp.Status == 3 && sp.SalaryMonth == monthStart)
+                .OrderBy(sp => sp.User.Role)
+                .ThenBy(sp => sp.User.FullName)
+                .Select(sp => new {
+                    FullName = sp.User.FullName,
+                    Role = sp.User.Role,
+                    BaseSalary = sp.BaseSalary,
+                    Adjustment = sp.Adjustment,
+                    Total = sp.BaseSalary + sp.Adjustment
+                })
+                .ToListAsync();
 
             var candidatesThisMonth = await _context.Candidates
                 .CountAsync(c => c.CreatedAt >= from && c.CreatedAt < to);
@@ -660,6 +740,8 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.PaymentsThisMonth = paymentsThisMonth;
             ViewBag.RefundsThisMonth = refundsThisMonth;
             ViewBag.CommissionsThisMonth = commissionsThisMonth;
+            ViewBag.SalariesThisMonth = salariesThisMonth;
+            ViewBag.SalaryDetails = salaryDetails;
             ViewBag.CandidatesThisMonth = candidatesThisMonth;
             ViewBag.CompletedThisMonth = completedThisMonth;
             ViewBag.BySales = bySales;
@@ -667,7 +749,6 @@ namespace RecruitmentSaaS.Controllers
 
             return View();
         }
-
     } // ← إغلاق AccountantController ✅
 
     // ✅ SalaryUserDto خارج الـ class — هنا صح
