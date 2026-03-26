@@ -90,16 +90,27 @@ namespace RecruitmentSaaS.Controllers
         }
 
         // ── GET /TeleSales/Pool ───────────────────────────────────────────────
-        // Unassigned leads from campaigns this tele sales is assigned to
         public async Task<IActionResult> Pool(Guid? campaignId, int page = 1)
         {
             const int pageSize = 20;
+            var userId = CurrentUserId;
 
+            // Get sheet IDs assigned to this user
+            var mySheetIds = await _context.SalesGoogleSheetUsers
+                .Where(su => su.SalesUserId == userId && su.IsActive)
+                .Select(su => su.SheetId)
+                .ToListAsync();
+
+            // Pool rules:
+            // 1. Lead has no sheet (manual/webhook) → visible to ALL TeleSales
+            // 2. Lead has a sheet → visible only if user is assigned to that sheet
             var query = _context.Leads
                 .Include(l => l.Campaign)
                 .Where(l => l.AssignedSalesId == null
-                    && l.IsConverted == false
-                    && l.IsDuplicate == false);
+                         && l.IsConverted == false
+                         && l.IsDuplicate == false
+                         && (l.GoogleSheetId == null
+                             || mySheetIds.Contains(l.GoogleSheetId.Value)));
 
             if (campaignId.HasValue)
                 query = query.Where(l => l.CampaignId == campaignId.Value);

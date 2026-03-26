@@ -74,11 +74,13 @@ namespace RecruitmentSaaS.Models.DTOs
         public byte Status { get; set; }
         public string? CampaignName { get; set; }
         public string? AssignedSalesName { get; set; }
+        public string? AssignedOfficeSalesName { get; set; }  // ADD THIS
         public string? InterestedJobTitle { get; set; }
         public string? InterestedCountry { get; set; }
         public bool IsConverted { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? LastContactedAt { get; set; }
+        public DateTime? AppointmentDate { get; set; }        // ADD THIS
     }
 
     public class LeadDetailDto
@@ -97,12 +99,23 @@ namespace RecruitmentSaaS.Models.DTOs
         public bool IsConverted { get; set; }
         public DateTime? ConvertedAt { get; set; }
         public Guid? ConvertedCandidateId { get; set; }
+        public DateTime? AppointmentDate { get; set; }
+        public DateTime? LastContactedAt { get; set; }
+        public DateTime CreatedAt { get; set; }
+
+        // Assigned users
+        public Guid? AssignedSalesId { get; set; }
         public string? AssignedSalesName { get; set; }
+        public Guid? AssignedOfficeSalesId { get; set; }
+        public string? AssignedOfficeSalesName { get; set; }
+
+        // Related info
         public string? CampaignName { get; set; }
         public string? RegisteredByName { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? LastContactedAt { get; set; }
+
+        // Collections
         public List<LeadActivityDto> Activities { get; set; } = new();
+        public List<LeadCallLogDto> CallLogs { get; set; } = new();
         public List<FollowUpReminderDto> Reminders { get; set; } = new();
     }
 
@@ -628,7 +641,57 @@ namespace RecruitmentSaaS.Models.DTOs
     }
 
 
+    public class LeadFormDto
+    {
+        public Guid? Id { get; set; }
 
+        [Required(ErrorMessage = "الاسم مطلوب")]
+        [MaxLength(200)]
+        public string FullName { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "رقم الهاتف مطلوب")]
+        [MaxLength(30)]
+        public string Phone { get; set; } = string.Empty;
 
+        [Required]
+        public byte LeadSource { get; set; }
+
+        [MaxLength(200)]
+        public string? InterestedJobTitle { get; set; }
+
+        [MaxLength(100)]
+        public string? InterestedCountry { get; set; }
+
+        public string? Notes { get; set; }
+
+        [MaxLength(200)]
+        public string? ReferredByName { get; set; }
+
+        [MaxLength(30)]
+        public string? ReferredByPhone { get; set; }
+
+        public Guid? CampaignId { get; set; }
+        public Guid? AssignedSalesId { get; set; }
+        public Guid BranchId { get; set; }
+    }
+
+    public class CheckInDto
+    {
+        [Required]
+        public Guid LeadId { get; set; }
+
+        public Guid? AssignedOfficeSalesId { get; set; }
+        public string? Notes { get; set; }
+        public Guid? JobPackageId { get; set; }
+    }
+
+    public class LeadCallLogDto
+    {
+        public Guid Id { get; set; }
+        public byte Channel { get; set; }
+        public byte Outcome { get; set; }
+        public string? Note { get; set; }
+        public string? CalledByName { get; set; }
+        public DateTime CalledAt { get; set; }
+    }
 }

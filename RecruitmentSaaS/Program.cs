@@ -1,6 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
+using RecruitmentSaaS.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,11 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 
 builder.Services.AddControllersWithViews();
+
+builder.Services.AddHttpClient();
+
+builder.Services.AddScoped<IGoogleSheetsLeadImportService, GoogleSheetsLeadImportService>();
+builder.Services.AddHostedService<GoogleSheetsImportBackgroundService>();
 
 builder.Services.AddScoped<RecruitmentSaaS.Services.INotificationService,
                            RecruitmentSaaS.Services.NotificationService>();

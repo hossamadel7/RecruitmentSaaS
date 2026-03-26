@@ -1,0 +1,299 @@
+@{
+    ViewData["Title"] = "ربط شيت جديد";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var salesUsers = ViewBag.SalesUsers as List<RecruitmentSaaS.Models.Entities.User> ?? new();
+}
+
+<style>
+    :root {
+        --gs-bg: #0d0f14;
+        --gs-card: #171c27;
+        --gs-border: #1e2330;
+        --gs-accent: #10b981;
+        --gs-text: #e2e8f0;
+        --gs-muted: #64748b;
+    }
+
+    body {
+        background: var(--gs-bg);
+        color: var(--gs-text);
+        font-family: 'Tajawal', sans-serif;
+    }
+
+    .form-wrap {
+        max-width: 680px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        color: var(--gs-muted);
+        font-size: .85rem;
+        text-decoration: none;
+        margin-bottom: 1.5rem;
+    }
+
+        .back-link:hover {
+            color: var(--gs-text);
+        }
+
+    .page-title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin-bottom: .25rem;
+    }
+
+    .page-sub {
+        color: var(--gs-muted);
+        font-size: .88rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .info-box {
+        background: #6366f110;
+        border: 1px solid #6366f130;
+        border-radius: 8px;
+        padding: .85rem 1rem;
+        font-size: .82rem;
+        color: #a5b4fc;
+        line-height: 1.6;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-card {
+        background: var(--gs-card);
+        border: 1px solid var(--gs-border);
+        border-radius: 14px;
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: .4rem;
+    }
+
+    .field-label {
+        font-size: .82rem;
+        font-weight: 600;
+        color: var(--gs-muted);
+    }
+
+        .field-label span {
+            color: #ef4444;
+            margin-right: 2px;
+        }
+
+    .field-input, .field-select {
+        background: #0d0f14;
+        border: 1px solid var(--gs-border);
+        color: var(--gs-text);
+        border-radius: 8px;
+        padding: .65rem .9rem;
+        font-size: .9rem;
+        font-family: 'Tajawal', sans-serif;
+        width: 100%;
+        transition: border-color .2s;
+    }
+
+        .field-input:focus, .field-select:focus {
+            outline: none;
+            border-color: var(--gs-accent);
+        }
+
+    .field-hint {
+        font-size: .75rem;
+        color: var(--gs-muted);
+        margin-top: .2rem;
+    }
+
+    .divider {
+        border: none;
+        border-top: 1px solid var(--gs-border);
+        margin: 0;
+    }
+
+    .section-lbl {
+        font-size: .78rem;
+        font-weight: 700;
+        color: var(--gs-muted);
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        margin-bottom: .5rem;
+    }
+
+    .users-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: .5rem;
+        max-height: 220px;
+        overflow-y: auto;
+        padding: .5rem;
+        background: #0d0f14;
+        border: 1px solid var(--gs-border);
+        border-radius: 8px;
+    }
+
+    .user-check {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .5rem .65rem;
+        border-radius: 7px;
+        border: 1px solid var(--gs-border);
+        background: var(--gs-card);
+        cursor: pointer;
+        transition: border-color .15s, background .15s;
+        font-size: .82rem;
+    }
+
+        .user-check:hover {
+            border-color: var(--gs-accent);
+        }
+
+        .user-check input[type=checkbox] {
+            accent-color: var(--gs-accent);
+            width: 15px;
+            height: 15px;
+        }
+
+        .user-check.checked {
+            border-color: var(--gs-accent);
+            background: #10b98110;
+        }
+
+    .btn-submit {
+        background: var(--gs-accent);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: .75rem 2rem;
+        font-size: .95rem;
+        font-weight: 700;
+        font-family: 'Tajawal', sans-serif;
+        cursor: pointer;
+        width: 100%;
+        transition: opacity .2s;
+    }
+
+        .btn-submit:hover {
+            opacity: .88;
+        }
+</style>
+
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+<div class="form-wrap" dir="rtl">
+
+    <a href="/AdminGoogleSheets/Index" class="back-link">
+        <i class="fas fa-arrow-right"></i> العودة
+    </a>
+
+    <div class="page-title">ربط شيت Google جديد</div>
+    <div class="page-sub">كل شيت يمثل حملة إعلانية — يتم استيراد العملاء منه تلقائياً كل 30 دقيقة</div>
+
+    <div class="info-box">
+        <i class="fas fa-info-circle me-1"></i>
+        تأكد أن الشيت مشارك للعموم (Anyone with the link → Viewer)
+        وأن الـ Spreadsheet ID مأخوذ من رابط الشيت بشكل صحيح
+    </div>
+
+    <form method="post" action="/AdminGoogleSheets/Create">
+        @Html.AntiForgeryToken()
+
+        <div class="form-card">
+
+            <!-- Name -->
+            <div class="field-group">
+                <label class="field-label">اسم الشيت <span>*</span></label>
+                <input type="text" name="name" class="field-input"
+                       placeholder="مثال: حملة يناير 2025 - Facebook"
+                       required autofocus />
+                <div class="field-hint">اسم داخلي للتعرف على الشيت في النظام</div>
+            </div>
+
+            <!-- Spreadsheet ID -->
+            <div class="field-group">
+                <label class="field-label">Spreadsheet ID <span>*</span></label>
+                <input type="text" name="spreadsheetId" class="field-input"
+                       placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+                       required dir="ltr" />
+                <div class="field-hint">
+                    من رابط الشيت: docs.google.com/spreadsheets/d/<strong>ID_HERE</strong>/edit
+                </div>
+            </div>
+
+            <!-- Sheet tab name -->
+            <div class="field-group">
+                <label class="field-label">اسم التاب (Sheet tab name)</label>
+                <input type="text" name="sheetName" class="field-input"
+                       placeholder="Sheet1" value="Sheet1" dir="ltr" />
+                <div class="field-hint">اسم التاب داخل الشيت — الافتراضي Sheet1</div>
+            </div>
+
+            <hr class="divider" />
+
+            <!-- Campaign -->
+            <div class="field-group">
+                <label class="field-label">الحملة الإعلانية المرتبطة</label>
+                <select name="campaignId" class="field-select">
+                    <option value="">-- بدون حملة --</option>
+                    @foreach (Microsoft.AspNetCore.Mvc.Rendering.SelectListItem item in ViewBag.Campaigns)
+                    {
+                        <option value="@item.Value">@item.Text</option>
+                    }
+                </select>
+                <div class="field-hint">العملاء المستوردون سيُسجَّلون تحت هذه الحملة تلقائياً</div>
+            </div>
+
+            <hr class="divider" />
+
+            <!-- TeleSales users -->
+            <div>
+                <div class="section-lbl">موظفو المبيعات المعيّنون</div>
+                <div class="field-hint" style="margin-bottom:.65rem">
+                    العملاء القادمون من هذا الشيت ستظهر فقط لهؤلاء الموظفين في بنك العملاء
+                </div>
+                @if (!salesUsers.Any())
+                {
+                    <div style="color:var(--gs-muted); font-size:.85rem">
+                        لا يوجد موظفو مبيعات مضافون بعد
+                    </div>
+                }
+                else
+                {
+                    <div class="users-grid">
+                        @foreach (var user in salesUsers)
+                        {
+                            <label class="user-check" id="lbl_@user.Id">
+                                <input type="checkbox" name="salesUserIds"
+                                       value="@user.Id"
+                                       onchange="toggleCheck('@user.Id', this.checked)" />
+                                @user.FullName
+                            </label>
+                        }
+                    </div>
+                }
+            </div>
+
+            <button type="submit" class="btn-submit">
+                <i class="fas fa-link me-1"></i> ربط الشيت
+            </button>
+
+        </div>
+    </form>
+</div>
+
+<script>
+    function toggleCheck(id, checked) {
+        const lbl = document.getElementById('lbl_' + id);
+        if (checked) lbl.classList.add('checked');
+        else lbl.classList.remove('checked');
+    }
+</script>

@@ -5,11 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] — نظام التوظيف</title>
 
-    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <!-- Bootstrap RTL -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
-    <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
 
     <style>
@@ -38,9 +35,7 @@
             --transition: all .2s cubic-bezier(.4,0,.2,1);
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             font-family: 'Cairo', sans-serif;
@@ -52,779 +47,230 @@
 
         /* ── SIDEBAR ─────────────────────────────────────── */
         .sidebar {
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: var(--sidebar-width);
-            height: 100vh;
+            position: fixed; top: 0; right: 0;
+            width: var(--sidebar-width); height: 100vh;
             background: var(--sidebar-bg);
-            display: flex;
-            flex-direction: column;
-            z-index: 1000;
+            display: flex; flex-direction: column;
+            z-index: 1000; overflow: hidden;
             transition: var(--transition);
-            overflow: hidden;
         }
 
         .sidebar-logo {
             padding: 20px 24px;
             border-bottom: 1px solid rgba(255,255,255,.08);
-            display: flex;
-            align-items: center;
-            gap: 12px;
+            display: flex; align-items: center; gap: 12px;
             text-decoration: none;
         }
-
-            .sidebar-logo .logo-icon {
-                width: 40px;
-                height: 40px;
-                background: var(--primary);
-                border-radius: 10px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 18px;
-                color: #fff;
-                flex-shrink: 0;
-                box-shadow: 0 4px 12px rgba(27,79,216,.4);
-            }
-
-            .sidebar-logo .logo-text {
-                font-size: 15px;
-                font-weight: 700;
-                color: #fff;
-                line-height: 1.3;
-            }
-
-            .sidebar-logo .logo-sub {
-                font-size: 11px;
-                color: rgba(255,255,255,.4);
-                font-weight: 400;
-            }
+        .sidebar-logo .logo-icon {
+            width: 40px; height: 40px;
+            background: var(--primary); border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; color: #fff; flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(27,79,216,.4);
+        }
+        .sidebar-logo .logo-text { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.3; }
+        .sidebar-logo .logo-sub  { font-size: 11px; color: rgba(255,255,255,.4); font-weight: 400; }
 
         .sidebar-section {
             padding: 20px 16px 8px;
-            font-size: 10px;
-            font-weight: 700;
+            font-size: 10px; font-weight: 700;
             color: rgba(255,255,255,.3);
-            letter-spacing: .12em;
-            text-transform: uppercase;
+            letter-spacing: .12em; text-transform: uppercase;
         }
 
-        .sidebar-nav {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px 12px;
+        .sidebar-nav { flex: 1; overflow-y: auto; padding: 8px 12px; }
+        .sidebar-nav::-webkit-scrollbar { width: 4px; }
+        .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
+
+        .nav-item { margin-bottom: 2px; }
+
+        .sidebar-nav .nav-link {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            padding: 10px 14px !important;
+            border-radius: var(--radius-sm) !important;
+            color: rgba(255,255,255,.6) !important;
+            font-size: 14px !important;
+            font-weight: 500 !important;
+            text-decoration: none !important;
+            transition: var(--transition) !important;
+            background: transparent !important;
+            border: none !important;
+            width: 100%;
         }
-
-            .sidebar-nav::-webkit-scrollbar {
-                width: 4px;
-            }
-
-            .sidebar-nav::-webkit-scrollbar-track {
-                background: transparent;
-            }
-
-            .sidebar-nav::-webkit-scrollbar-thumb {
-                background: rgba(255,255,255,.1);
-                border-radius: 2px;
-            }
-
-        .nav-item {
-            margin-bottom: 2px;
+        .sidebar-nav .nav-link:hover {
+            background: rgba(255,255,255,.07) !important;
+            color: #fff !important;
         }
-
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 14px;
-            border-radius: var(--radius-sm);
-            color: rgba(255,255,255,.6);
-            font-size: 14px;
-            font-weight: 500;
-            text-decoration: none;
-            transition: var(--transition);
-            position: relative;
+        .sidebar-nav .nav-link.active {
+            background: var(--primary) !important;
+            color: #fff !important;
+            box-shadow: 0 4px 12px rgba(27,79,216,.35);
         }
-
-            .nav-link:hover {
-                background: rgba(255,255,255,.07);
-                color: #fff;
-            }
-
-            .nav-link.active {
-                background: var(--primary);
-                color: #fff;
-                box-shadow: 0 4px 12px rgba(27,79,216,.35);
-            }
-
-            .nav-link .nav-icon {
-                width: 20px;
-                height: 20px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 16px;
-                flex-shrink: 0;
-            }
-
-        .nav-badge {
-            margin-right: auto;
-            background: var(--danger);
-            color: #fff;
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 7px;
-            border-radius: 20px;
-            line-height: 1.4;
+        .sidebar-nav .nav-link .nav-icon {
+            width: 20px; height: 20px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0;
         }
 
         .sidebar-footer {
             padding: 16px 12px;
             border-top: 1px solid rgba(255,255,255,.08);
         }
-
         .user-card {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 12px;
-            border-radius: var(--radius-sm);
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 12px; border-radius: var(--radius-sm);
             background: rgba(255,255,255,.05);
         }
-
         .user-avatar {
-            width: 36px;
-            height: 36px;
-            background: var(--primary);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            font-weight: 700;
-            color: #fff;
-            flex-shrink: 0;
+            width: 36px; height: 36px;
+            background: var(--primary); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
         }
-
-        .user-name {
-            font-size: 13px;
-            font-weight: 600;
-            color: #fff;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .user-role {
-            font-size: 11px;
-            color: rgba(255,255,255,.4);
-        }
-
+        .user-name { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-role { font-size: 11px; color: rgba(255,255,255,.4); }
         .btn-logout {
-            margin-right: auto;
-            background: none;
-            border: none;
-            color: rgba(255,255,255,.4);
-            font-size: 16px;
-            cursor: pointer;
-            padding: 4px;
-            border-radius: 6px;
-            transition: var(--transition);
-            flex-shrink: 0;
+            margin-right: auto; background: none; border: none;
+            color: rgba(255,255,255,.4); font-size: 16px; cursor: pointer;
+            padding: 4px; border-radius: 6px; transition: var(--transition); flex-shrink: 0;
         }
-
-            .btn-logout:hover {
-                color: var(--danger);
-                background: rgba(239,68,68,.1);
-            }
+        .btn-logout:hover { color: var(--danger); background: rgba(239,68,68,.1); }
 
         /* ── TOPBAR ──────────────────────────────────────── */
         .topbar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: var(--sidebar-width);
+            position: fixed; top: 0; left: 0; right: var(--sidebar-width);
             height: var(--topbar-height);
-            background: var(--card-bg);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            padding: 0 28px;
-            gap: 16px;
-            z-index: 999;
-            box-shadow: var(--shadow-sm);
+            background: var(--card-bg); border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; padding: 0 28px; gap: 16px;
+            z-index: 999; box-shadow: var(--shadow-sm);
         }
-
-        .topbar-title {
-            font-size: 17px;
-            font-weight: 700;
-            color: var(--text-primary);
-            flex: 1;
-        }
-
-        .topbar-subtitle {
-            font-size: 12px;
-            color: var(--text-muted);
-            font-weight: 400;
-        }
-
-        .topbar-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-icon {
-            width: 38px;
-            height: 38px;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-            background: var(--card-bg);
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 17px;
-            cursor: pointer;
-            transition: var(--transition);
-            text-decoration: none;
-            position: relative;
-        }
-
-            .btn-icon:hover {
-                background: var(--primary-light);
-                color: var(--primary);
-                border-color: var(--primary);
-            }
-
-        .notif-dot {
-            position: absolute;
-            top: 6px;
-            left: 8px;
-            width: 8px;
-            height: 8px;
-            background: var(--danger);
-            border-radius: 50%;
-            border: 2px solid var(--card-bg);
-        }
+        .topbar-title { font-size: 17px; font-weight: 700; color: var(--text-primary); flex: 1; }
+        .topbar-subtitle { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+        .topbar-actions { display: flex; align-items: center; gap: 8px; }
 
         /* ── MAIN CONTENT ────────────────────────────────── */
-        .main-content {
-            margin-right: var(--sidebar-width);
-            padding-top: var(--topbar-height);
-            min-height: 100vh;
-        }
-
-        .page-body {
-            padding: 28px;
-        }
+        .main-content { margin-right: var(--sidebar-width); padding-top: var(--topbar-height); min-height: 100vh; }
+        .page-body { padding: 28px; }
 
         /* ── CARDS ───────────────────────────────────────── */
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-sm);
-            overflow: hidden;
-        }
-
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden; }
         .card-header {
-            background: var(--card-bg);
-            border-bottom: 1px solid var(--border);
-            padding: 16px 20px;
-            font-size: 14px;
-            font-weight: 700;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            background: var(--card-bg); border-bottom: 1px solid var(--border);
+            padding: 16px 20px; font-size: 14px; font-weight: 700;
+            color: var(--text-primary); display: flex; align-items: center; gap: 10px;
         }
-
-            .card-header .header-icon {
-                width: 30px;
-                height: 30px;
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 14px;
-            }
-
-        .card-body {
-            padding: 20px;
-        }
+        .card-header .header-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .card-body { padding: 20px; }
 
         /* ── STAT CARDS ──────────────────────────────────── */
         .stat-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 20px;
-            box-shadow: var(--shadow-sm);
-            position: relative;
-            overflow: hidden;
-            transition: var(--transition);
+            background: var(--card-bg); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow-sm);
+            position: relative; overflow: hidden; transition: var(--transition);
         }
-
-            .stat-card:hover {
-                transform: translateY(-2px);
-                box-shadow: var(--shadow-md);
-            }
-
-            .stat-card::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                right: 0;
-                width: 4px;
-                height: 100%;
-            }
-
-            .stat-card.blue::before {
-                background: var(--primary);
-            }
-
-            .stat-card.green::before {
-                background: var(--success);
-            }
-
-            .stat-card.amber::before {
-                background: var(--accent);
-            }
-
-            .stat-card.red::before {
-                background: var(--danger);
-            }
-
-        .stat-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            margin-bottom: 14px;
-        }
-
-        .stat-card.blue .stat-icon {
-            background: #EEF2FF;
-            color: var(--primary);
-        }
-
-        .stat-card.green .stat-icon {
-            background: #ECFDF5;
-            color: var(--success);
-        }
-
-        .stat-card.amber .stat-icon {
-            background: #FFFBEB;
-            color: var(--accent);
-        }
-
-        .stat-card.red .stat-icon {
-            background: #FEF2F2;
-            color: var(--danger);
-        }
-
-        .stat-value {
-            font-size: 28px;
-            font-weight: 800;
-            color: var(--text-primary);
-            line-height: 1;
-            margin-bottom: 4px;
-        }
-
-        .stat-label {
-            font-size: 13px;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .stat-card::before { content: ''; position: absolute; top: 0; right: 0; width: 4px; height: 100%; }
+        .stat-card.blue::before  { background: var(--primary); }
+        .stat-card.green::before { background: var(--success); }
+        .stat-card.amber::before { background: var(--accent); }
+        .stat-card.red::before   { background: var(--danger); }
+        .stat-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 14px; }
+        .stat-card.blue .stat-icon  { background: #EEF2FF; color: var(--primary); }
+        .stat-card.green .stat-icon { background: #ECFDF5; color: var(--success); }
+        .stat-card.amber .stat-icon { background: #FFFBEB; color: var(--accent); }
+        .stat-card.red .stat-icon   { background: #FEF2F2; color: var(--danger); }
+        .stat-value { font-size: 28px; font-weight: 800; color: var(--text-primary); line-height: 1; margin-bottom: 4px; }
+        .stat-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
 
         /* ── TABLES ──────────────────────────────────────── */
-        .table {
-            font-size: 13.5px;
-            margin: 0;
-        }
-
-            .table thead th {
-                background: #F8FAFC;
-                color: var(--text-muted);
-                font-size: 11px;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: .06em;
-                padding: 12px 16px;
-                border-bottom: 1px solid var(--border);
-                border-top: none;
-                white-space: nowrap;
-            }
-
-            .table tbody td {
-                padding: 13px 16px;
-                vertical-align: middle;
-                border-bottom: 1px solid #F1F5F9;
-                color: var(--text-primary);
-            }
-
-            .table tbody tr:last-child td {
-                border-bottom: none;
-            }
-
-            .table tbody tr:hover td {
-                background: #F8FAFC;
-            }
+        .table { font-size: 13.5px; margin: 0; }
+        .table thead th { background: #F8FAFC; color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 12px 16px; border-bottom: 1px solid var(--border); border-top: none; white-space: nowrap; }
+        .table tbody td { padding: 13px 16px; vertical-align: middle; border-bottom: 1px solid #F1F5F9; color: var(--text-primary); }
+        .table tbody tr:last-child td { border-bottom: none; }
+        .table tbody tr:hover td { background: #F8FAFC; }
 
         /* ── BADGES ──────────────────────────────────────── */
-        .badge {
-            font-size: 11px;
-            font-weight: 600;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-family: 'Cairo', sans-serif;
-        }
-
-        .badge-status-1 {
-            background: #F1F5F9;
-            color: #475569;
-        }
-
-        .badge-status-2 {
-            background: #EFF6FF;
-            color: #2563EB;
-        }
-
-        .badge-status-3 {
-            background: #F0FDF4;
-            color: #16A34A;
-        }
-
-        .badge-status-4 {
-            background: #FFFBEB;
-            color: #D97706;
-        }
-
-        .badge-status-5 {
-            background: #FFF7ED;
-            color: #EA580C;
-        }
-
-        .badge-status-6 {
-            background: #F5F3FF;
-            color: #7C3AED;
-        }
-
-        .badge-status-7 {
-            background: #ECFDF5;
-            color: #059669;
-        }
-
-        .badge-status-8 {
-            background: #FEF2F2;
-            color: #DC2626;
-        }
-
-        .badge-role-1 {
-            background: #FEF2F2;
-            color: #DC2626;
-        }
-
-        .badge-role-2 {
-            background: #EFF6FF;
-            color: #2563EB;
-        }
-
-        .badge-role-3 {
-            background: #ECFDF5;
-            color: #059669;
-        }
-
-        .badge-role-4 {
-            background: #FFFBEB;
-            color: #D97706;
-        }
-
-        .badge-role-5 {
-            background: #F5F3FF;
-            color: #7C3AED;
-        }
-
-        .badge-role-6 {
-            background: #EEF2FF;
-            color: #1B4FD8;
-        }
+        .badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-family: 'Cairo', sans-serif; }
+        .badge-status-1 { background: #F1F5F9; color: #475569; }
+        .badge-status-2 { background: #EFF6FF; color: #2563EB; }
+        .badge-status-3 { background: #F0FDF4; color: #16A34A; }
+        .badge-status-4 { background: #FFFBEB; color: #D97706; }
+        .badge-status-5 { background: #FFF7ED; color: #EA580C; }
+        .badge-status-6 { background: #F5F3FF; color: #7C3AED; }
+        .badge-status-7 { background: #ECFDF5; color: #059669; }
+        .badge-status-8 { background: #FEF2F2; color: #DC2626; }
+        .badge-role-1 { background: #FEF2F2; color: #DC2626; }
+        .badge-role-2 { background: #EFF6FF; color: #2563EB; }
+        .badge-role-3 { background: #ECFDF5; color: #059669; }
+        .badge-role-4 { background: #FFFBEB; color: #D97706; }
+        .badge-role-5 { background: #F5F3FF; color: #7C3AED; }
+        .badge-role-6 { background: #EEF2FF; color: #1B4FD8; }
 
         /* ── BUTTONS ─────────────────────────────────────── */
-        .btn {
-            font-family: 'Cairo', sans-serif;
-            font-weight: 600;
-            font-size: 13px;
-            border-radius: var(--radius-sm);
-            transition: var(--transition);
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            border-color: var(--primary);
-        }
-
-            .btn-primary:hover {
-                background: var(--primary-dark);
-                border-color: var(--primary-dark);
-                transform: translateY(-1px);
-                box-shadow: 0 4px 12px rgba(27,79,216,.3);
-            }
-
-        .btn-sm {
-            padding: 5px 14px;
-            font-size: 12px;
-        }
+        .btn { font-family: 'Cairo', sans-serif; font-weight: 600; font-size: 13px; border-radius: var(--radius-sm); transition: var(--transition); }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(27,79,216,.3); }
+        .btn-sm { padding: 5px 14px; font-size: 12px; }
 
         /* ── FORMS ───────────────────────────────────────── */
-        .form-control, .form-select {
-            font-family: 'Cairo', sans-serif;
-            font-size: 14px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 9px 14px;
-            transition: var(--transition);
-            color: var(--text-primary);
-        }
-
-            .form-control:focus, .form-select:focus {
-                border-color: var(--primary);
-                box-shadow: 0 0 0 3px rgba(27,79,216,.1);
-            }
-
-        .form-label {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 6px;
-        }
+        .form-control, .form-select { font-family: 'Cairo', sans-serif; font-size: 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 14px; transition: var(--transition); color: var(--text-primary); }
+        .form-control:focus, .form-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(27,79,216,.1); }
+        .form-label { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
 
         /* ── ALERTS ──────────────────────────────────────── */
-        .alert {
-            border: none;
-            border-radius: var(--radius-sm);
-            font-size: 13.5px;
-            font-weight: 500;
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .alert-success {
-            background: #ECFDF5;
-            color: #065F46;
-        }
-
-        .alert-danger {
-            background: #FEF2F2;
-            color: #991B1B;
-        }
-
-        .alert-warning {
-            background: #FFFBEB;
-            color: #92400E;
-        }
-
-        .alert-info {
-            background: #EFF6FF;
-            color: #1E40AF;
-        }
+        .alert { border: none; border-radius: var(--radius-sm); font-size: 13.5px; font-weight: 500; padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
+        .alert-success { background: #ECFDF5; color: #065F46; }
+        .alert-danger  { background: #FEF2F2; color: #991B1B; }
+        .alert-warning { background: #FFFBEB; color: #92400E; }
+        .alert-info    { background: #EFF6FF; color: #1E40AF; }
 
         /* ── FILTER BAR ──────────────────────────────────── */
-        .filter-bar {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .filter-btn {
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            border: 1px solid var(--border);
-            background: var(--card-bg);
-            color: var(--text-muted);
-            text-decoration: none;
-            transition: var(--transition);
-            font-family: 'Cairo', sans-serif;
-        }
-
-            .filter-btn:hover, .filter-btn.active {
-                background: var(--primary);
-                border-color: var(--primary);
-                color: #fff;
-            }
+        .filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .filter-btn { padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-muted); text-decoration: none; transition: var(--transition); font-family: 'Cairo', sans-serif; }
+        .filter-btn:hover, .filter-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
         /* ── PAGE HEADER ─────────────────────────────────── */
-        .page-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 24px;
-        }
-
-        .page-header-title {
-            font-size: 20px;
-            font-weight: 800;
-            color: var(--text-primary);
-            margin: 0;
-        }
-
-        .page-header-sub {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
+        .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+        .page-header-title { font-size: 20px; font-weight: 800; color: var(--text-primary); margin: 0; }
+        .page-header-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 
         /* ── TIMELINE ────────────────────────────────────── */
-        .timeline {
-            position: relative;
-            padding: 0;
-        }
-
-        .timeline-item {
-            display: flex;
-            gap: 14px;
-            padding: 14px 0;
-            border-bottom: 1px solid #F1F5F9;
-            position: relative;
-        }
-
-            .timeline-item:last-child {
-                border-bottom: none;
-            }
-
-        .timeline-dot {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 13px;
-            flex-shrink: 0;
-            margin-top: 2px;
-        }
-
-            .timeline-dot.type-1 {
-                background: #EEF2FF;
-                color: var(--primary);
-            }
-
-            .timeline-dot.type-2 {
-                background: #F5F3FF;
-                color: #7C3AED;
-            }
-
-            .timeline-dot.type-3 {
-                background: #ECFDF5;
-                color: var(--success);
-            }
-
-            .timeline-dot.type-4 {
-                background: #FFF7ED;
-                color: #EA580C;
-            }
-
-            .timeline-dot.type-5 {
-                background: #FFFBEB;
-                color: var(--accent);
-            }
-
-            .timeline-dot.type-6 {
-                background: #EFF6FF;
-                color: var(--info);
-            }
-
-            .timeline-dot.type-7 {
-                background: #ECFDF5;
-                color: var(--success);
-            }
-
-            .timeline-dot.type-8 {
-                background: #F1F5F9;
-                color: var(--text-muted);
-            }
-
-        .timeline-content {
-            flex: 1;
-        }
-
-        .timeline-desc {
-            font-size: 13.5px;
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        .timeline-meta {
-            font-size: 11.5px;
-            color: var(--text-muted);
-            margin-top: 3px;
-        }
+        .timeline { position: relative; padding: 0; }
+        .timeline-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid #F1F5F9; position: relative; }
+        .timeline-item:last-child { border-bottom: none; }
+        .timeline-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; margin-top: 2px; }
+        .timeline-dot.type-1 { background: #EEF2FF; color: var(--primary); }
+        .timeline-dot.type-2 { background: #F5F3FF; color: #7C3AED; }
+        .timeline-dot.type-3 { background: #ECFDF5; color: var(--success); }
+        .timeline-dot.type-4 { background: #FFF7ED; color: #EA580C; }
+        .timeline-dot.type-5 { background: #FFFBEB; color: var(--accent); }
+        .timeline-dot.type-6 { background: #EFF6FF; color: var(--info); }
+        .timeline-dot.type-7 { background: #ECFDF5; color: var(--success); }
+        .timeline-dot.type-8 { background: #F1F5F9; color: var(--text-muted); }
+        .timeline-content { flex: 1; }
+        .timeline-desc { font-size: 13.5px; font-weight: 500; color: var(--text-primary); }
+        .timeline-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
 
         /* ── EMPTY STATE ─────────────────────────────────── */
-        .empty-state {
-            text-align: center;
-            padding: 48px 24px;
-            color: var(--text-muted);
-        }
-
-            .empty-state i {
-                font-size: 40px;
-                margin-bottom: 12px;
-                opacity: .4;
-                display: block;
-            }
-
-            .empty-state p {
-                font-size: 14px;
-                margin: 0;
-            }
+        .empty-state { text-align: center; padding: 48px 24px; color: var(--text-muted); }
+        .empty-state i { font-size: 40px; margin-bottom: 12px; opacity: .4; display: block; }
+        .empty-state p { font-size: 14px; margin: 0; }
 
         /* ── SCROLLBAR ───────────────────────────────────── */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #CBD5E1;
-            border-radius: 3px;
-        }
-
-            ::-webkit-scrollbar-thumb:hover {
-                background: #94A3B8;
-            }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
         /* ── MOBILE ──────────────────────────────────────── */
         @@media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(100%);
-            }
-
-                .sidebar.open {
-                    transform: translateX(0);
-                }
-
-            .main-content {
-                margin-right: 0;
-            }
-
-            .topbar {
-                right: 0;
-            }
+            .sidebar { transform: translateX(100%); }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-right: 0; }
+            .topbar { right: 0; }
         }
     </style>
 
@@ -832,7 +278,6 @@
 </head>
 <body>
 
-    <!-- ── SIDEBAR ──────────────────────────────────────────── -->
     <aside class="sidebar" id="sidebar">
 
         <a class="sidebar-logo" href="#">
@@ -844,7 +289,6 @@
         </a>
 
         <nav class="sidebar-nav">
-
             @{
                 var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
                 var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
@@ -856,96 +300,100 @@
             {
                 <div class="sidebar-section">الرئيسية</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "Index" ? "active" : "")" href="/Admin/Index">
+                    <a class="nav-link @(currentController=="Admin"&&currentAction=="Index"?"active":"")" href="/Admin/Index">
                         <span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span> لوحة التحكم
                     </a>
                 </div>
+
                 <div class="sidebar-section">البيانات</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "Leads" ? "active" : "")" href="/Admin/Leads">
+                    <a class="nav-link @(currentController=="Admin"&&currentAction=="Leads"?"active":"")" href="/Admin/Leads">
                         <span class="nav-icon"><i class="bi bi-person-lines-fill"></i></span> العملاء المحتملون
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "Candidates" ? "active" : "")" href="/Admin/Candidates">
+                    <a class="nav-link @(currentController=="Admin"&&currentAction=="Candidates"?"active":"")" href="/Admin/Candidates">
                         <span class="nav-icon"><i class="bi bi-people-fill"></i></span> المرشحون
                     </a>
                 </div>
-                <div class="sidebar-section">الموافقات</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "Refunds" ? "active" : "")" href="/Admin/Refunds"
-                       style="display:flex;align-items:center;justify-content:space-between">
-                        <span><span class="nav-icon"><i class="bi bi-arrow-counterclockwise"></i></span> الاستردادات</span>
-                        @if (ViewBag.PendingRefundsCount != null && (int)ViewBag.PendingRefundsCount > 0)
-                        {
-                            <span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;min-width:18px;text-align:center">@ViewBag.PendingRefundsCount</span>
-                        }
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "Commissions" ? "active" : "")" href="/Admin/Commissions"
-                       style="display:flex;align-items:center;justify-content:space-between">
-                        <span><span class="nav-icon"><i class="bi bi-cash-stack"></i></span> العمولات</span>
-                        @if (ViewBag.PendingCommissionsCount != null && (int)ViewBag.PendingCommissionsCount > 0)
-                        {
-                            <span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;min-width:18px;text-align:center">@ViewBag.PendingCommissionsCount</span>
-                        }
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "Salaries" ? "active" : "")"
-                       href="/Admin/Salaries">
-                        <span class="nav-icon"><i class="bi bi-wallet2-fill"></i></span> المرتبات
-                    </a>
-                </div>
-                <div class="sidebar-section">الإعدادات</div>
-                <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "Users" ? "active" : "")" href="/Admin/Users">
-                        <span class="nav-icon"><i class="bi bi-person-badge-fill"></i></span> المستخدمون
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "Branches" ? "active" : "")" href="/Admin/Branches">
-                        <span class="nav-icon"><i class="bi bi-building"></i></span> الفروع
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "Campaigns" ? "active" : "")" href="/Admin/Campaigns">
-                        <span class="nav-icon"><i class="bi bi-megaphone-fill"></i></span> الحملات
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && (currentAction == "Packages" || currentAction == "PackageStages") ? "active" : "")" href="/Admin/Packages">
-                        <span class="nav-icon"><i class="bi bi-boxes"></i></span> الباقات والمراحل
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "CommissionTiers" ? "active" : "")"
-                       href="/Admin/CommissionTiers">
-                        <span class="nav-icon"><i class="bi bi-bar-chart-steps"></i></span> اسعار العمولة
-                    </a>
-                </div>
-
-                <div class="nav-item">
-                    <a class="nav-link @(currentController == "Companies" ? "active" : "")" href="/Companies/Index">
-                        <span class="nav-icon"><i class="bi bi-building"></i></span> الشركات
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a class="nav-link @(currentController == "Visa" ? "active" : "")" href="/Visa/Index">
+                    <a class="nav-link @(currentController=="Visa"?"active":"")" href="/Visa/Index">
                         <span class="nav-icon"><i class="bi bi-credit-card-2-front-fill"></i></span> التأشيرات
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Admin" && currentAction == "StageApprovals" ? "active" : "")" href="/Admin/StageApprovals"
-                       style="display:flex;align-items:center;justify-content:space-between">
-                        <span><span class="nav-icon"><i class="bi bi-shield-lock-fill"></i></span> طلبات الموافقة</span>
+                    <a class="nav-link @(currentController=="Admin"&&currentAction=="StageApprovals"?"active":"")" href="/Admin/StageApprovals">
+                        <span class="nav-icon"><i class="bi bi-shield-lock-fill"></i></span>
+                        <span style="flex:1">طلبات الموافقة</span>
                         @if (ViewBag.PendingApprovalsCount != null && (int)ViewBag.PendingApprovalsCount > 0)
-                        {
-                            <span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;min-width:18px;text-align:center">
-                                @ViewBag.PendingApprovalsCount
-                            </span>
-                        }
+                        { <span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700">@ViewBag.PendingApprovalsCount</span> }
+                    </a>
+                </div>
+
+                <div class="sidebar-section">الموافقات</div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Admin"&&currentAction=="Refunds"?"active":"")" href="/Admin/Refunds">
+                        <span class="nav-icon"><i class="bi bi-arrow-counterclockwise"></i></span>
+                        <span style="flex:1">الاستردادات</span>
+                        @if (ViewBag.PendingRefundsCount != null && (int)ViewBag.PendingRefundsCount > 0)
+                        { <span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700">@ViewBag.PendingRefundsCount</span> }
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Admin"&&currentAction=="Commissions"?"active":"")" href="/Admin/Commissions">
+                        <span class="nav-icon"><i class="bi bi-cash-stack"></i></span>
+                        <span style="flex:1">العمولات</span>
+                        @if (ViewBag.PendingCommissionsCount != null && (int)ViewBag.PendingCommissionsCount > 0)
+                        { <span style="background:#ef4444;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700">@ViewBag.PendingCommissionsCount</span> }
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Admin"&&currentAction=="Salaries"?"active":"")" href="/Admin/Salaries">
+                        <span class="nav-icon"><i class="bi bi-wallet2-fill"></i></span> المرتبات
+                    </a>
+                </div>
+
+                <div class="sidebar-section">الإعدادات</div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Admin"&&currentAction=="Users"?"active":"")" href="/Admin/Users">
+                        <span class="nav-icon"><i class="bi bi-person-badge-fill"></i></span> المستخدمون
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Admin"&&currentAction=="Branches"?"active":"")" href="/Admin/Branches">
+                        <span class="nav-icon"><i class="bi bi-building"></i></span> الفروع
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Admin"&&currentAction=="Campaigns"?"active":"")" href="/Admin/Campaigns">
+                        <span class="nav-icon"><i class="bi bi-megaphone-fill"></i></span> الحملات
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Admin"&&(currentAction=="Packages"||currentAction=="PackageStages")?"active":"")" href="/Admin/Packages">
+                        <span class="nav-icon"><i class="bi bi-boxes"></i></span> الباقات والمراحل
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Admin"&&currentAction=="CommissionTiers"?"active":"")" href="/Admin/CommissionTiers">
+                        <span class="nav-icon"><i class="bi bi-bar-chart-steps"></i></span> اسعار العمولة
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Companies"?"active":"")" href="/Companies/Index">
+                        <span class="nav-icon"><i class="bi bi-building"></i></span> الشركات
+                    </a>
+                </div>
+
+                <div class="sidebar-section">التسويق</div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="AdminGoogleSheets"?"active":"")" href="/AdminGoogleSheets/Index">
+                        <span class="nav-icon"><i class="bi bi-table"></i></span> Google Sheets
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="CampaignAnalytics"?"active":"")" href="/CampaignAnalytics/Index">
+                        <span class="nav-icon"><i class="bi bi-graph-up-arrow"></i></span> تحليل الحملات
                     </a>
                 </div>
             }
@@ -955,18 +403,18 @@
             {
                 <div class="sidebar-section">الرئيسية</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Reception" && currentAction == "Index" ? "active" : "")" href="/Reception/Index">
+                    <a class="nav-link @(currentController=="Reception"&&currentAction=="Index"?"active":"")" href="/Reception/Index">
                         <span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span> لوحة الاستقبال
                     </a>
                 </div>
                 <div class="sidebar-section">العمليات</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Reception" && currentAction == "WalkIn" ? "active" : "")" href="/Reception/WalkIn">
+                    <a class="nav-link @(currentController=="Reception"&&currentAction=="WalkIn"?"active":"")" href="/Reception/WalkIn">
                         <span class="nav-icon"><i class="bi bi-person-plus-fill"></i></span> تسجيل زيارة
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Reception" && currentAction == "Leads" ? "active" : "")" href="/Reception/Leads">
+                    <a class="nav-link @(currentController=="Reception"&&currentAction=="Leads"?"active":"")" href="/Reception/Leads">
                         <span class="nav-icon"><i class="bi bi-person-lines-fill"></i></span> سجل الزيارات
                     </a>
                 </div>
@@ -977,36 +425,19 @@
             {
                 <div class="sidebar-section">الرئيسية</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "TeleSales" && currentAction == "Index" ? "active" : "")" href="/TeleSales/Index">
+                    <a class="nav-link @(currentController=="TeleSales"&&currentAction=="Index"?"active":"")" href="/TeleSales/Index">
                         <span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span> لوحة تيلي سيلز
                     </a>
                 </div>
                 <div class="sidebar-section">العمل</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "TeleSales" && currentAction == "Leads" ? "active" : "")" href="/TeleSales/Leads">
+                    <a class="nav-link @(currentController=="TeleSales"&&currentAction=="Leads"?"active":"")" href="/TeleSales/Leads">
                         <span class="nav-icon"><i class="bi bi-person-lines-fill"></i></span> عملائي
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "TeleSales" && currentAction == "Pool" ? "active" : "")" href="/TeleSales/Pool">
+                    <a class="nav-link @(currentController=="TeleSales"&&currentAction=="Pool"?"active":"")" href="/TeleSales/Pool">
                         <span class="nav-icon"><i class="bi bi-inbox-fill"></i></span> بنك العملاء
-                    </a>
-                </div>
-            }
-
-            @* ── OFFICE SALES (Role 6) ── *@
-            @if (role == "6")
-            {
-                <div class="sidebar-section">الرئيسية</div>
-                <div class="nav-item">
-                    <a class="nav-link @(currentController == "Sales" && currentAction == "Index" ? "active" : "")" href="/Sales/Index">
-                        <span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span> لوحة المبيعات
-                    </a>
-                </div>
-                <div class="sidebar-section">العمل</div>
-                <div class="nav-item">
-                    <a class="nav-link @(currentController == "Sales" && currentAction == "Candidates" ? "active" : "")" href="/Sales/Candidates">
-                        <span class="nav-icon"><i class="bi bi-people-fill"></i></span> المرشحين
                     </a>
                 </div>
             }
@@ -1016,52 +447,50 @@
             {
                 <div class="sidebar-section">الرئيسية</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Accountant" && currentAction == "Index" ? "active" : "")" href="/Accountant/Index">
+                    <a class="nav-link @(currentController=="Accountant"&&currentAction=="Index"?"active":"")" href="/Accountant/Index">
                         <span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span> لوحة المحاسبة
                     </a>
                 </div>
                 <div class="sidebar-section">الدفعات</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Accountant" && currentAction == "Pending" ? "active" : "")" href="/Accountant/Pending">
+                    <a class="nav-link @(currentController=="Accountant"&&currentAction=="Pending"?"active":"")" href="/Accountant/Pending">
                         <span class="nav-icon"><i class="bi bi-hourglass-split"></i></span> في انتظار الاعتماد
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Accountant" && currentAction == "Payments" ? "active" : "")" href="/Accountant/Payments">
+                    <a class="nav-link @(currentController=="Accountant"&&currentAction=="Payments"?"active":"")" href="/Accountant/Payments">
                         <span class="nav-icon"><i class="bi bi-cash-coin"></i></span> كل المدفوعات
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Accountant" && currentAction == "History" ? "active" : "")" href="/Accountant/History">
+                    <a class="nav-link @(currentController=="Accountant"&&currentAction=="History"?"active":"")" href="/Accountant/History">
                         <span class="nav-icon"><i class="bi bi-clock-history"></i></span> سجل المعاملات
                     </a>
                 </div>
                 <div class="sidebar-section">المرشحون</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Accountant" && currentAction == "AllCandidates" ? "active" : "")" href="/Accountant/AllCandidates">
+                    <a class="nav-link @(currentController=="Accountant"&&currentAction=="AllCandidates"?"active":"")" href="/Accountant/AllCandidates">
                         <span class="nav-icon"><i class="bi bi-people-fill"></i></span> ملخص مالي للمرشحين
                     </a>
                 </div>
                 <div class="sidebar-section">المالية</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Accountant" && currentAction == "Refunds" ? "active" : "")" href="/Accountant/Refunds">
+                    <a class="nav-link @(currentController=="Accountant"&&currentAction=="Refunds"?"active":"")" href="/Accountant/Refunds">
                         <span class="nav-icon"><i class="bi bi-arrow-counterclockwise"></i></span> الاستردادات
                     </a>
                 </div>
-
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Accountant" && currentAction == "Commissions" ? "active" : "")" href="/Accountant/Commissions">
+                    <a class="nav-link @(currentController=="Accountant"&&currentAction=="Commissions"?"active":"")" href="/Accountant/Commissions">
                         <span class="nav-icon"><i class="bi bi-cash-stack"></i></span> العمولات
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Accountant" && currentAction == "Salaries" ? "active" : "")"
-                       href="/Accountant/Salaries">
+                    <a class="nav-link @(currentController=="Accountant"&&currentAction=="Salaries"?"active":"")" href="/Accountant/Salaries">
                         <span class="nav-icon"><i class="bi bi-cash-coin"></i></span> صرف المرتبات
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Accountant" && currentAction == "Reports" ? "active" : "")" href="/Accountant/Reports">
+                    <a class="nav-link @(currentController=="Accountant"&&currentAction=="Reports"?"active":"")" href="/Accountant/Reports">
                         <span class="nav-icon"><i class="bi bi-bar-chart-fill"></i></span> التقارير
                     </a>
                 </div>
@@ -1072,13 +501,13 @@
             {
                 <div class="sidebar-section">الرئيسية</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Operations" && currentAction == "Index" ? "active" : "")" href="/Operations/Index">
+                    <a class="nav-link @(currentController=="Operations"&&currentAction=="Index"?"active":"")" href="/Operations/Index">
                         <span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span> لوحة العمليات
                     </a>
                 </div>
                 <div class="sidebar-section">المرشحين</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Operations" && currentAction == "Candidates" ? "active" : "")" href="/Operations/Candidates">
+                    <a class="nav-link @(currentController=="Operations"&&currentAction=="Candidates"?"active":"")" href="/Operations/Candidates">
                         <span class="nav-icon"><i class="bi bi-people-fill"></i></span> المرشحين
                     </a>
                 </div>
@@ -1089,13 +518,13 @@
             {
                 <div class="sidebar-section">الرئيسية</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Sales" && currentAction == "Index" ? "active" : "")" href="/Sales/Index">
+                    <a class="nav-link @(currentController=="Sales"&&currentAction=="Index"?"active":"")" href="/Sales/Index">
                         <span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span> لوحة المبيعات
                     </a>
                 </div>
                 <div class="sidebar-section">العمل</div>
                 <div class="nav-item">
-                    <a class="nav-link @(currentController == "Sales" && currentAction == "Candidates" ? "active" : "")" href="/Sales/Candidates">
+                    <a class="nav-link @(currentController=="Sales"&&currentAction=="Candidates"?"active":"")" href="/Sales/Candidates">
                         <span class="nav-icon"><i class="bi bi-people-fill"></i></span> المرشحين
                     </a>
                 </div>
@@ -1109,7 +538,7 @@
                 <div style="flex:1;min-width:0">
                     <div class="user-name">@User.Identity?.Name</div>
                     <div class="user-role">
-                        @(role switch { "1" => "مدير", "2" => "استقبال", "3" => "تيلي سيلز", "4" => "محاسب", "5" => "عمليات", "6" => "مبيعات مكتبية", _ => "مستخدم" })
+                        @(role switch { "1"=>"مدير","2"=>"استقبال","3"=>"تيلي سيلز","4"=>"محاسب","5"=>"عمليات","6"=>"مبيعات مكتبية",_=>"مستخدم" })
                     </div>
                 </div>
                 <form asp-controller="Auth" asp-action="Logout" method="post" class="d-inline">
@@ -1128,41 +557,24 @@
         <div class="topbar-title">
             @ViewData["Title"]
             @if (ViewData["Subtitle"] != null)
-            {
-                <div class="topbar-subtitle">@ViewData["Subtitle"]</div>
-            }
+            { <div class="topbar-subtitle">@ViewData["Subtitle"]</div> }
         </div>
         <div class="topbar-actions">
-            <!-- Notification Bell -->
             <div style="position:relative" id="notifWrapper">
-                <button id="notifBtn"
-                        onclick="toggleNotifDropdown()"
-                        style="position:relative;background:none;border:none;cursor:pointer;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:18px;transition:background .15s"
-                        onmouseover="this.style.background='var(--hover-bg)'"
-                        onmouseout="this.style.background='none'"
+                <button onclick="toggleNotifDropdown()"
+                        style="position:relative;background:none;border:none;cursor:pointer;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:18px"
                         title="الإشعارات">
                     <i class="bi bi-bell"></i>
-                    <span id="notifBadge"
-                          style="display:none;position:absolute;top:2px;right:2px;width:17px;height:17px;background:#ef4444;color:#fff;border-radius:50%;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1">
-                        0
-                    </span>
+                    <span id="notifBadge" style="display:none;position:absolute;top:2px;right:2px;width:17px;height:17px;background:#ef4444;color:#fff;border-radius:50%;font-size:9px;font-weight:700;align-items:center;justify-content:center;line-height:1">0</span>
                 </button>
-
-                <!-- Dropdown -->
-                <div id="notifDropdown"
-                     style="display:none;position:absolute;top:44px;left:0;width:340px;background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);box-shadow:0 8px 30px rgba(0,0,0,.12);z-index:9999;overflow:hidden">
-                    <!-- Header -->
+                <div id="notifDropdown" style="display:none;position:absolute;top:44px;left:0;width:340px;background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);box-shadow:0 8px 30px rgba(0,0,0,.12);z-index:9999;overflow:hidden">
                     <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
                         <span style="font-weight:700;font-size:13px">الإشعارات</span>
                         <div style="display:flex;gap:8px">
-                            <button onclick="markAllRead()"
-                                    style="background:none;border:none;font-size:11px;color:var(--primary);cursor:pointer;font-family:inherit;font-weight:600">
-                                تعيين كمقروء
-                            </button>
+                            <button onclick="markAllRead()" style="background:none;border:none;font-size:11px;color:var(--primary);cursor:pointer;font-family:inherit;font-weight:600">تعيين كمقروء</button>
                             <a href="/Notifications" style="font-size:11px;color:var(--text-muted);text-decoration:none">عرض الكل</a>
                         </div>
                     </div>
-                    <!-- List -->
                     <div id="notifList" style="max-height:360px;overflow-y:auto">
                         <div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">
                             <i class="bi bi-bell" style="font-size:24px;display:block;margin-bottom:8px"></i>
@@ -1175,106 +587,64 @@
     </header>
 
     <script>
-        // ── Notification System ────────────────────────────────────────────────────
         let notifOpen = false;
-
         async function loadNotifications() {
             try {
-                const res  = await fetch('/Notifications/Recent');
+                const res = await fetch('/Notifications/Recent');
                 const data = await res.json();
-
-                // Update badge
                 const badge = document.getElementById('notifBadge');
-                if (data.unreadCount > 0) {
-                    badge.style.display    = 'flex';
-                    badge.textContent      = data.unreadCount > 99 ? '99+' : data.unreadCount;
-                } else {
-                    badge.style.display    = 'none';
-                }
-
-                // Update list
+                if (data.unreadCount > 0) { badge.style.display='flex'; badge.textContent=data.unreadCount>99?'99+':data.unreadCount; }
+                else { badge.style.display='none'; }
                 const list = document.getElementById('notifList');
                 if (!data.notifications.length) {
-                    list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px"><i class="bi bi-bell" style="font-size:24px;display:block;margin-bottom:8px"></i>لا توجد إشعارات</div>';
+                    list.innerHTML='<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px"><i class="bi bi-bell" style="font-size:24px;display:block;margin-bottom:8px"></i>لا توجد إشعارات</div>';
                     return;
                 }
-
-                const typeIcon  = t => (['','bi-shield-lock-fill','bi-arrow-left-circle-fill','bi-cash-coin','bi-arrow-counterclockwise','bi-cash-stack','bi-bell-fill'])[t] || 'bi-bell-fill';
-                const typeColor = t => (['','#7c3aed','var(--primary)','#16a34a','#f59e0b','#0ea5e9','#64748b'])[t] || '#64748b';
-                const typeBg    = t => (['','#f5f3ff','var(--primary-light)','#f0fdf4','#fffbeb','#f0f9ff','#f8fafc'])[t] || '#f8fafc';
-
-                list.innerHTML = data.notifications.map(n => `
-                    <a href="${n.link || '#'}"
-                       style="display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;background:${n.isRead ? 'transparent' : 'rgba(79,70,229,.04)'};transition:background .1s"
-                       onmouseover="this.style.background='var(--hover-bg)'"
-                       onmouseout="this.style.background='${n.isRead ? 'transparent' : 'rgba(79,70,229,.04)'}'">
+                const typeIcon  = t=>(['','bi-shield-lock-fill','bi-arrow-left-circle-fill','bi-cash-coin','bi-arrow-counterclockwise','bi-cash-stack','bi-bell-fill'])[t]||'bi-bell-fill';
+                const typeColor = t=>(['','#7c3aed','var(--primary)','#16a34a','#f59e0b','#0ea5e9','#64748b'])[t]||'#64748b';
+                const typeBg    = t=>(['','#f5f3ff','var(--primary-light)','#f0fdf4','#fffbeb','#f0f9ff','#f8fafc'])[t]||'#f8fafc';
+                list.innerHTML=data.notifications.map(n=>`
+                    <a href="${n.link||'#'}" style="display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;background:${n.isRead?'transparent':'rgba(79,70,229,.04)'}">
                         <div style="width:32px;height:32px;border-radius:50%;background:${typeBg(n.type)};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
                             <i class="bi ${typeIcon(n.type)}" style="font-size:13px;color:${typeColor(n.type)}"></i>
                         </div>
                         <div style="flex:1;min-width:0">
-                            <div style="font-size:12px;font-weight:${n.isRead ? '600' : '700'};color:var(--text-primary);margin-bottom:2px;display:flex;align-items:center;gap:6px">
-                                ${n.title}
-                                ${!n.isRead ? '<span style="width:6px;height:6px;border-radius:50%;background:var(--primary);flex-shrink:0;display:inline-block"></span>' : ''}
-                            </div>
+                            <div style="font-size:12px;font-weight:${n.isRead?'600':'700'};color:var(--text-primary);margin-bottom:2px">${n.title}${!n.isRead?'<span style="width:6px;height:6px;border-radius:50%;background:var(--primary);display:inline-block;margin-right:4px"></span>':''}</div>
                             <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.message}</div>
                             <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${n.timeAgo}</div>
                         </div>
-                    </a>
-                `).join('');
-            } catch(e) {
-                console.error('Notification load failed:', e);
-            }
+                    </a>`).join('');
+            } catch(e) { console.error('Notification load failed:',e); }
         }
-
         function toggleNotifDropdown() {
-            const dd = document.getElementById('notifDropdown');
-            notifOpen = !notifOpen;
-            dd.style.display = notifOpen ? 'block' : 'none';
-            if (notifOpen) loadNotifications();
+            const dd=document.getElementById('notifDropdown');
+            notifOpen=!notifOpen;
+            dd.style.display=notifOpen?'block':'none';
+            if(notifOpen) loadNotifications();
         }
-
         async function markAllRead() {
-            await fetch('/Notifications/MarkAllRead', { method: 'POST', headers: { 'RequestVerificationToken': document.querySelector('input[name=__RequestVerificationToken]')?.value || '' } });
-            document.getElementById('notifBadge').style.display = 'none';
+            await fetch('/Notifications/MarkAllRead',{method:'POST',headers:{'RequestVerificationToken':document.querySelector('input[name=__RequestVerificationToken]')?.value||''}});
+            document.getElementById('notifBadge').style.display='none';
             loadNotifications();
         }
-
-        // Close on outside click
-        document.addEventListener('click', function(e) {
-            if (!document.getElementById('notifWrapper')?.contains(e.target)) {
-                document.getElementById('notifDropdown').style.display = 'none';
-                notifOpen = false;
+        document.addEventListener('click',function(e){
+            if(!document.getElementById('notifWrapper')?.contains(e.target)){
+                document.getElementById('notifDropdown').style.display='none';
+                notifOpen=false;
             }
         });
-
-        // Auto-refresh every 30 seconds
         loadNotifications();
-        setInterval(loadNotifications, 30000);
+        setInterval(loadNotifications,30000);
     </script>
 
-    <!-- ── MAIN ──────────────────────────────────────────────── -->
     <main class="main-content">
         <div class="page-body">
-
             @if (TempData["Success"] != null)
-            {
-                <div class="alert alert-success mb-4">
-                    <i class="bi bi-check-circle-fill"></i> @TempData["Success"]
-                </div>
-            }
+            { <div class="alert alert-success mb-4"><i class="bi bi-check-circle-fill"></i> @TempData["Success"]</div> }
             @if (TempData["Error"] != null)
-            {
-                <div class="alert alert-danger mb-4">
-                    <i class="bi bi-exclamation-circle-fill"></i> @TempData["Error"]
-                </div>
-            }
+            { <div class="alert alert-danger mb-4"><i class="bi bi-exclamation-circle-fill"></i> @TempData["Error"]</div> }
             @if (TempData["Info"] != null)
-            {
-                <div class="alert alert-info mb-4">
-                    <i class="bi bi-info-circle-fill"></i> @TempData["Info"]
-                </div>
-            }
-
+            { <div class="alert alert-info mb-4"><i class="bi bi-info-circle-fill"></i> @TempData["Info"]</div> }
             @RenderBody()
         </div>
     </main>
