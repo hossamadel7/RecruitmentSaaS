@@ -1,0 +1,272 @@
+@{
+    ViewData["Title"] = "نتيجة الاستيراد";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var sheet = ViewBag.Sheet as RecruitmentSaaS.Models.Entities.SalesGoogleSheet;
+    var imported = (int)ViewBag.Imported;
+    var skipped = (int)ViewBag.Skipped;
+    var duplicates = (int)ViewBag.Duplicates;
+    var errors = (string)ViewBag.Errors;
+    var hasErrors = !string.IsNullOrWhiteSpace(errors);
+}
+
+<style>
+    .ir-wrap {
+        max-width: 580px;
+        margin: 2rem auto;
+        text-align: center;
+    }
+
+    /* Icon */
+    .ir-icon {
+        font-size: 3.5rem;
+        margin-bottom: 1rem;
+        display: block;
+        line-height: 1;
+    }
+
+        .ir-icon.success {
+            color: #10b981;
+        }
+
+        .ir-icon.warning {
+            color: #f59e0b;
+        }
+
+        .ir-icon.empty {
+            color: #64748b;
+        }
+
+    .ir-title {
+        font-size: 1.6rem;
+        font-weight: 800;
+        margin-bottom: .3rem;
+    }
+
+    .ir-sub {
+        color: #64748b;
+        font-size: .9rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Sheet info strip */
+    .ir-sheet-info {
+        background: #1e2330;
+        border: 1px solid #2a3347;
+        border-radius: 10px;
+        padding: .9rem 1.25rem;
+        margin-bottom: 1.5rem;
+        text-align: right;
+        font-size: .85rem;
+        color: #94a3b8;
+        line-height: 1.8;
+    }
+
+        .ir-sheet-info strong {
+            color: #e2e8f0;
+        }
+
+    /* Stats grid */
+    .ir-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .ir-stat {
+        border-radius: 12px;
+        padding: 1.5rem 1rem;
+        border: 1px solid transparent;
+    }
+
+        .ir-stat.imported {
+            background: #10b98115;
+            border-color: #10b98130;
+        }
+
+        .ir-stat.skipped {
+            background: #f59e0b15;
+            border-color: #f59e0b30;
+        }
+
+        .ir-stat.duplicate {
+            background: #6366f115;
+            border-color: #6366f130;
+        }
+
+        .ir-stat .sv {
+            font-size: 2.5rem;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: .4rem;
+        }
+
+        .ir-stat.imported .sv {
+            color: #10b981;
+        }
+
+        .ir-stat.skipped .sv {
+            color: #f59e0b;
+        }
+
+        .ir-stat.duplicate .sv {
+            color: #818cf8;
+        }
+
+        .ir-stat .sl {
+            font-size: .82rem;
+            font-weight: 600;
+        }
+
+        .ir-stat.imported .sl {
+            color: #6ee7b7;
+        }
+
+        .ir-stat.skipped .sl {
+            color: #fcd34d;
+        }
+
+        .ir-stat.duplicate .sl {
+            color: #a5b4fc;
+        }
+
+    /* Error box */
+    .ir-error {
+        background: #ef444415;
+        border: 1px solid #ef444430;
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        text-align: right;
+        margin-bottom: 1.5rem;
+        font-size: .82rem;
+        color: #fca5a5;
+        line-height: 1.7;
+        white-space: pre-line;
+    }
+
+        .ir-error .err-title {
+            font-weight: 700;
+            color: #ef4444;
+            margin-bottom: .5rem;
+            font-size: .88rem;
+            display: block;
+        }
+
+    /* Buttons */
+    .ir-btns {
+        display: flex;
+        gap: .75rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .ir-btn-primary {
+        background: #10b981;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: .7rem 1.75rem;
+        font-size: .92rem;
+        font-weight: 700;
+        font-family: 'Cairo', sans-serif;
+        text-decoration: none;
+        cursor: pointer;
+        transition: opacity .2s;
+    }
+
+        .ir-btn-primary:hover {
+            opacity: .88;
+            color: #fff;
+            text-decoration: none;
+        }
+
+    .ir-btn-secondary {
+        background: #1e2330;
+        color: #e2e8f0;
+        border: 1px solid #2a3347;
+        border-radius: 8px;
+        padding: .7rem 1.75rem;
+        font-size: .92rem;
+        font-weight: 600;
+        font-family: 'Cairo', sans-serif;
+        text-decoration: none;
+        transition: border-color .2s;
+    }
+
+        .ir-btn-secondary:hover {
+            border-color: #10b981;
+            color: #e2e8f0;
+            text-decoration: none;
+        }
+</style>
+
+<div class="ir-wrap" dir="rtl">
+
+    @if (hasErrors)
+    {
+        <span class="ir-icon warning"><i class="bi bi-exclamation-triangle-fill"></i></span>
+        <div class="ir-title">حدث خطأ أثناء الاستيراد</div>
+    }
+    else if (imported > 0)
+    {
+        <span class="ir-icon success"><i class="bi bi-check-circle-fill"></i></span>
+        <div class="ir-title">تم الاستيراد بنجاح</div>
+    }
+    else
+    {
+        <span class="ir-icon empty"><i class="bi bi-inbox-fill"></i></span>
+        <div class="ir-title">لا توجد صفوف جديدة</div>
+    }
+
+    @if (sheet != null)
+    {
+        <div class="ir-sub">@sheet.Name</div>
+        <div class="ir-sheet-info">
+            <strong>@sheet.Name</strong><br />
+            آخر صف مستورد: <strong>@sheet.LastImportedRow</strong>
+            &nbsp;·&nbsp;
+            إجمالي المستورد: <strong>@sheet.TotalImported</strong>
+            @if (sheet.Campaign != null)
+            {
+                <span>&nbsp;·&nbsp; حملة: <strong>@sheet.Campaign.Name</strong></span>
+            }
+        </div>
+    }
+
+    <!-- Stats -->
+    <div class="ir-stats">
+        <div class="ir-stat imported">
+            <div class="sv">@imported</div>
+            <div class="sl">عميل جديد</div>
+        </div>
+        <div class="ir-stat skipped">
+            <div class="sv">@skipped</div>
+            <div class="sl">تم تخطيه</div>
+        </div>
+        <div class="ir-stat duplicate">
+            <div class="sv">@duplicates</div>
+            <div class="sl">مكرر</div>
+        </div>
+    </div>
+
+    <!-- Errors -->
+    @if (hasErrors)
+    {
+        <div class="ir-error">
+            <span class="err-title"><i class="bi bi-bug-fill me-1"></i> تفاصيل الخطأ</span>
+            @errors
+        </div>
+    }
+
+    <!-- Actions -->
+    <div class="ir-btns">
+        <a href="/AdminGoogleSheets/Index" class="ir-btn-primary">
+            <i class="bi bi-table me-1"></i> العودة للشيتات
+        </a>
+        <a href="/TeleSales/Pool" class="ir-btn-secondary">
+            <i class="bi bi-inbox-fill me-1"></i> بنك العملاء
+        </a>
+    </div>
+
+</div>
