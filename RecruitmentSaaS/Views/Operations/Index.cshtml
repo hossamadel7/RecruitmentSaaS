@@ -1,0 +1,344 @@
+@{
+    ViewData["Title"] = "لوحة العمليات";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    int total = ViewBag.TotalCandidates;
+    int inProgress = ViewBag.InProgress;
+    int completed = ViewBag.CompletedCount;
+    var byStage = ViewBag.ByStage as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var readyToTravel = ViewBag.ReadyToTravel as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+
+    string[] stageColors = {
+        "#3b82f6","#8b5cf6","#0ea5e9","#f59e0b",
+        "#ec4899","#6366f1","#22c55e","#14b8a6",
+        "#f97316","#64748b"
+    };
+
+    var countryFlags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["المملكة العربية السعودية"] = "🇸🇦",
+                ["الكويت"] = "🇰🇼",
+                ["قطر"] = "🇶🇦",
+                ["الإمارات"] = "🇦🇪",
+                ["البحرين"] = "🇧🇭",
+                ["عُمان"] = "🇴🇲",
+                ["ألمانيا"] = "🇩🇪",
+                ["رومانيا"] = "🇷🇴",
+                ["بولندا"] = "🇵🇱",
+                ["ليبيا"] = "🇱🇾",
+                ["الأردن"] = "🇯🇴",
+            };
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);">⚙️</div>
+        <div>
+            <h1 class="page-title">لوحة العمليات</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">متابعة مراحل المرشحين</p>
+        </div>
+    </div>
+    <a href="/Operations/Candidates" class="btn btn-primary">
+        <i class="bi bi-people-fill me-1"></i> عرض كل المرشحين
+    </a>
+</div>
+
+@* ── Alerts ── *@
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show mb-3" style="font-size:13px">
+        <i class="bi bi-check-circle-fill me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show mb-3" style="font-size:13px">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@* ── Stats ── *@
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#eff6ff;color:#2563eb;">👥</div>
+            <div>
+                <div class="stat-value">@total</div>
+                <div class="stat-label">إجمالي المرشحين</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#fffbeb;color:#b45309;">⏳</div>
+            <div>
+                <div class="stat-value">@inProgress</div>
+                <div class="stat-label">قيد المعالجة</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#f0fdf4;color:#16a34a;">✅</div>
+            <div>
+                <div class="stat-value">@completed</div>
+                <div class="stat-label">مكتملون / سافروا</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <a href="#ready-section" class="text-decoration-none">
+            <div class="stat-card" style="border-right:3px solid #22c55e;">
+                <div class="stat-icon" style="background:#f0fdf4;color:#16a34a;">✈️</div>
+                <div>
+                    <div class="stat-value" style="color:#16a34a;">@readyToTravel.Count()</div>
+                    <div class="stat-label">جاهزون للسفر</div>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+@* ── Ready to Travel Section ── *@
+@if (readyToTravel.Any())
+{
+    <div class="card mb-4" id="ready-section"
+         style="border:2px solid #22c55e;box-shadow:0 4px 20px rgba(34,197,94,.15);">
+        <div class="card-header"
+             style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:16px 20px;">
+            <div class="d-flex align-items-center gap-2">
+                <span style="font-size:22px;">✈️</span>
+                <span style="font-weight:700;font-size:15px;color:#15803d;">
+                    جاهزون للسفر — استلموا التأشيرة
+                </span>
+                <span class="badge"
+                      style="background:#22c55e;color:#fff;font-size:12px;padding:4px 10px;border-radius:99px;">
+                    @readyToTravel.Count()
+                </span>
+            </div>
+            <span style="font-size:12px;color:#16a34a;margin-top:2px;display:block;">
+                هؤلاء المرشحون جاهزون للسفر — اضغط "تأكيد استلام التأشيرة" لنقلهم لمرحلة السفر
+            </span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                @foreach (var c in readyToTravel)
+                {
+                    string country = c.DestinationCountry?.ToString() ?? "—";
+                    string flag = countryFlags.TryGetValue(country, out var f) ? f : "🌍";
+                    string jobTitle = c.JobTitle?.ToString() ?? "—";
+                    string pkgName = c.JobPackageName?.ToString() ?? "—";
+                    decimal price = (decimal)c.PriceEgp;
+                    decimal paid = (decimal)c.TotalPaidEgp;
+                    string salesName = c.AssignedSalesName?.ToString() ?? "—";
+
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card"
+                             style="border:1.5px solid #bbf7d0;border-radius:14px;overflow:hidden;
+                                    transition:transform .15s,box-shadow .15s;"
+                             onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(34,197,94,.15)'"
+                             onmouseout="this.style.transform='';this.style.boxShadow=''">
+
+                            @* Header *@
+                            <div style="background:linear-gradient(135deg,#22c55e,#16a34a);padding:14px 16px;
+                                        display:flex;align-items:center;justify-content:space-between;">
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <div style="width:38px;height:38px;background:rgba(255,255,255,.2);
+                                                border-radius:50%;display:flex;align-items:center;
+                                                justify-content:center;font-size:16px;font-weight:800;color:#fff;">
+                                        @c.FullName.ToString()[0]
+                                    </div>
+                                    <div>
+                                        <div style="font-weight:800;color:#fff;font-size:14px;">@c.FullName</div>
+                                        <div style="font-size:11px;color:rgba(255,255,255,.8);">@c.Phone</div>
+                                    </div>
+                                </div>
+                                <span style="font-size:28px;">@flag</span>
+                            </div>
+
+                            @* Body *@
+                            <div style="padding:14px 16px;">
+                                <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span style="font-size:12px;color:var(--text-muted);">🌍 الوجهة</span>
+                                        <span style="font-weight:700;font-size:13px;">@country</span>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span style="font-size:12px;color:var(--text-muted);">💼 الوظيفة</span>
+                                        <span style="font-weight:600;font-size:13px;">@jobTitle</span>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span style="font-size:12px;color:var(--text-muted);">📦 الباقة</span>
+                                        <span style="font-size:12px;color:#6366f1;font-weight:600;">@pkgName</span>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span style="font-size:12px;color:var(--text-muted);">👤 المسؤول</span>
+                                        <span style="font-size:12px;">@salesName</span>
+                                    </div>
+                                </div>
+
+                                @* Payment progress *@
+                                <div style="background:#f8fafc;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+                                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                                        <span style="font-size:11px;color:var(--text-muted);">المدفوع</span>
+                                        <span style="font-size:12px;font-weight:700;color:#16a34a;">
+                                            @paid.ToString("N0") / @price.ToString("N0") ج.م
+                                        </span>
+                                    </div>
+                                    @{
+                                        double pct = price > 0 ? Math.Min(100, (double)(paid / price * 100)) : 0;
+                                    }
+                                    <div style="height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden;">
+                                        <div style="width:@pct.ToString("F0")%;height:100%;
+                                                    background:linear-gradient(90deg,#22c55e,#16a34a);
+                                                    border-radius:99px;"></div>
+                                    </div>
+                                </div>
+
+                                @* Action buttons *@
+                                <div class="d-flex gap-2">
+                                    <form asp-controller="Operations"
+                                          asp-action="ConfirmVisaReceived"
+                                          method="post" style="flex:1;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="candidateId" value="@c.Id" />
+                                        <button type="submit"
+                                                class="btn btn-success btn-sm w-100"
+                                                style="font-size:12px;font-weight:700;"
+                                                onclick="return confirm('هل تأكدت من استلام تأشيرة @c.FullName؟ سيتم نقله لمرحلة السفر.')">
+                                            <i class="bi bi-airplane-fill me-1"></i>
+                                            تأكيد استلام التأشيرة
+                                        </button>
+                                    </form>
+                                    <a href="/Operations/CandidateDetail/@c.Id"
+                                       class="btn btn-outline-secondary btn-sm"
+                                       style="font-size:12px;">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Pipeline by stage ── *@
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">📊 توزيع المرشحين على المراحل</span>
+        <a href="/Operations/Candidates" class="btn btn-ghost btn-sm">عرض الكل</a>
+    </div>
+    <div class="card-body">
+        @if (byStage.Any())
+        {
+            <div class="row g-3">
+                @{
+                    int colorIdx = 0;
+                }
+                @foreach (var item in byStage)
+                {
+                    string stageName = item.Stage?.ToString() ?? "—";
+                    int stageCount = (int)item.Count;
+                    int stageOrder = (int)item.Order;
+                    string color = stageColors[colorIdx % stageColors.Length];
+                    // مرحلة 6 = لونها أخضر دايماً
+                    if (stageOrder == 6) color = "#22c55e";
+                    colorIdx++;
+
+                    <div class="col-md-3 col-6">
+                        <a href="/Operations/Candidates?q=@Uri.EscapeDataString(stageName)"
+                           class="text-decoration-none">
+                            <div class="card card-flat"
+                                 style="border-right:4px solid @color;padding:16px;
+                                        transition:transform .15s;cursor:pointer;
+                                        @(stageOrder == 6 ? "background:#f0fdf4;" : "")"
+                                 onmouseover="this.style.transform='translateY(-2px)'"
+                                 onmouseout="this.style.transform=''">
+                                <div style="font-size:1.6rem;margin-bottom:6px;">
+                                    @(stageOrder == 6 ? "✈️" : "📌")
+                                </div>
+                                <div style="font-size:1.4rem;font-weight:800;color:@color;">
+                                    @stageCount
+                                </div>
+                                <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;">
+                                    @stageName
+                                </div>
+                                @if (stageOrder == 6 && stageCount > 0)
+                                {
+                                    <div style="font-size:10px;color:#16a34a;font-weight:700;margin-top:4px;">
+                                        جاهزون للسفر ↑
+                                    </div>
+                                }
+                            </div>
+                        </a>
+                    </div>
+                }
+            </div>
+
+            @* Visual progress bar *@
+            <div style="margin-top:28px;">
+                <div style="font-size:12px;font-weight:600;color:var(--text-muted);
+                            margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">
+                    معاينة مرئية للتوزيع
+                </div>
+                <div style="display:flex;gap:0;border-radius:10px;overflow:hidden;height:32px;">
+                    @{
+                        colorIdx = 0;
+                    }
+                    @foreach (var item in byStage)
+                    {
+                        int stageCount = (int)item.Count;
+                        int stageOrder = (int)item.Order;
+                        string stageName = item.Stage?.ToString() ?? "—";
+                        string color = stageColors[colorIdx % stageColors.Length];
+                        if (stageOrder == 6) color = "#22c55e";
+                        double pct = inProgress > 0 ? (stageCount * 100.0 / inProgress) : 0;
+                        colorIdx++;
+
+                        <div style="background:@color;flex:@pct;display:flex;align-items:center;
+                                    justify-content:center;color:#fff;font-size:11px;font-weight:700;
+                                    white-space:nowrap;padding:0 6px;min-width:0;overflow:hidden;"
+                             title="@stageName — @stageCount مرشح">
+                            @stageCount
+                        </div>
+                    }
+                </div>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;">
+                    @{
+                        colorIdx = 0;
+                    }
+                    @foreach (var item in byStage)
+                    {
+                        string stageName = item.Stage?.ToString() ?? "—";
+                        int stageCount = (int)item.Count;
+                        int stageOrder = (int)item.Order;
+                        string color = stageColors[colorIdx % stageColors.Length];
+                        if (stageOrder == 6) color = "#22c55e";
+                        colorIdx++;
+
+                        <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);">
+                            <div style="width:10px;height:10px;border-radius:2px;background:@color;flex-shrink:0;"></div>
+                            @stageName (@stageCount)
+                            @if (stageOrder == 6 && stageCount > 0)
+                            {
+                                <span style="color:#16a34a;font-weight:700;">✈️</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="empty-state" style="padding:32px;">
+                <div class="empty-state-icon">👥</div>
+                <div class="empty-state-title">لا يوجد مرشحون قيد المعالجة</div>
+            </div>
+        }
+    </div>
+</div>

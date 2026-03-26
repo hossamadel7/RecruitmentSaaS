@@ -10,6 +10,7 @@
     int pendingRefunds = ViewBag.PendingRefunds;
     int pendingCommissions = ViewBag.PendingCommissions;
     int pendingPayments = ViewBag.PendingPayments;
+    int pendingApprovals = ViewBag.PendingApprovals ?? 0;
     decimal totalCollected = ViewBag.TotalCollected;
 
     var recentLeads = (IEnumerable<Lead>)ViewBag.RecentLeads;
@@ -18,7 +19,6 @@
 
     string[] leadStatusLabels = { "", "عميل جديد", "تم التواصل", "مهتم", "يفكر", "وعد بالزيارة", "زيارة", "تحويل", "ملغى" };
     string[] leadStatusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626" };
-
 }
 
 <div class="page-header">
@@ -31,28 +31,46 @@
     </div>
 </div>
 
-@* Pending alerts *@
-@if (pendingRefunds > 0 || pendingCommissions > 0)
+@* ── Pending alerts ── *@
+@if (pendingRefunds > 0 || pendingCommissions > 0 || pendingPayments > 0 || pendingApprovals > 0)
 {
     <div class="d-flex gap-3 mb-4 flex-wrap">
+        @if (pendingApprovals > 0)
+        {
+            <a href="/Admin/StageApprovals" class="alert-pill"
+               style="background:#f5f3ff;border:1.5px solid #e9d5ff;color:#7c3aed;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
+                ✅ <span>@pendingApprovals طلب موافقة في انتظارك</span>
+                <span style="background:#7c3aed;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
+            </a>
+        }
         @if (pendingRefunds > 0)
         {
-            <a href="/Admin/Refunds" class="alert-pill" style="background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
+            <a href="/Admin/Refunds" class="alert-pill"
+               style="background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
                 ↩️ <span>@pendingRefunds طلب استرداد في انتظار موافقتك</span>
                 <span style="background:#dc2626;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
             </a>
         }
         @if (pendingCommissions > 0)
         {
-            <a href="/Admin/Commissions" class="alert-pill" style="background:#fffbeb;border:1.5px solid #fde68a;color:#b45309;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
+            <a href="/Admin/Commissions" class="alert-pill"
+               style="background:#fffbeb;border:1.5px solid #fde68a;color:#b45309;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
                 🏆 <span>@pendingCommissions عمولة في انتظار اعتمادك</span>
                 <span style="background:#b45309;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
+            </a>
+        }
+        @if (pendingPayments > 0)
+        {
+            <a href="/Admin/Candidates" class="alert-pill"
+               style="background:#eff6ff;border:1.5px solid #bfdbfe;color:#2563eb;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
+                💰 <span>@pendingPayments دفعة في انتظار اعتماد المحاسب</span>
+                <span style="background:#2563eb;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
             </a>
         }
     </div>
 }
 
-@* KPI cards *@
+@* ── KPI cards ── *@
 <div class="row g-3 mb-4">
     <div class="col-md-3 col-6">
         <div class="stat-card">
@@ -92,11 +110,22 @@
     </div>
 </div>
 
-@* Secondary stats — pending actions *@
+@* ── Pending action cards ── *@
 <div class="row g-3 mb-4">
-    <div class="col-md-4 col-6">
+    <div class="col-md-3 col-6">
+        <a href="/Admin/StageApprovals" class="text-decoration-none">
+            <div class="stat-card" style="border-right:3px solid #7c3aed;">
+                <div class="stat-icon" style="background:#f5f3ff;color:#7c3aed;">✅</div>
+                <div>
+                    <div class="stat-value" style="color:#7c3aed;">@pendingApprovals</div>
+                    <div class="stat-label">طلبات موافقة معلقة</div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 col-6">
         <a href="/Admin/Refunds" class="text-decoration-none">
-            <div class="stat-card" style="border-right: 3px solid #dc2626;">
+            <div class="stat-card" style="border-right:3px solid #dc2626;">
                 <div class="stat-icon" style="background:#fef2f2;color:#dc2626;">↩️</div>
                 <div>
                     <div class="stat-value" style="color:#dc2626;">@pendingRefunds</div>
@@ -105,9 +134,9 @@
             </div>
         </a>
     </div>
-    <div class="col-md-4 col-6">
+    <div class="col-md-3 col-6">
         <a href="/Admin/Commissions" class="text-decoration-none">
-            <div class="stat-card" style="border-right: 3px solid #b45309;">
+            <div class="stat-card" style="border-right:3px solid #b45309;">
                 <div class="stat-icon" style="background:#fffbeb;color:#b45309;">🏆</div>
                 <div>
                     <div class="stat-value" style="color:#b45309;">@pendingCommissions</div>
@@ -116,9 +145,9 @@
             </div>
         </a>
     </div>
-    <div class="col-md-4 col-6">
+    <div class="col-md-3 col-6">
         <a href="/Admin/Users" class="text-decoration-none">
-            <div class="stat-card" style="border-right: 3px solid #2563eb;">
+            <div class="stat-card" style="border-right:3px solid #2563eb;">
                 <div class="stat-icon" style="background:#eff6ff;color:#2563eb;">👤</div>
                 <div>
                     <div class="stat-value" style="color:#2563eb;">@totalUsers</div>
@@ -129,7 +158,7 @@
     </div>
 </div>
 
-@* Charts row *@
+@* ── Charts row ── *@
 <div class="row g-3 mb-4">
     @* Leads by status *@
     <div class="col-md-6">
@@ -211,7 +240,7 @@
     </div>
 </div>
 
-@* Recent Leads *@
+@* ── Recent Leads ── *@
 <div class="card">
     <div class="card-header">
         <span class="card-title">🕐 أحدث العملاء المحتملين</span>

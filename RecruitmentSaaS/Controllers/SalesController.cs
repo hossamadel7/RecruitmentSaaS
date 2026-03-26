@@ -190,45 +190,7 @@ namespace RecruitmentSaaS.Controllers
                 // reload context before touching any entities
                 _context.ChangeTracker.Clear();
 
-                // ── Auto-calculate commission from tiers ──────────────────────
-                var existingCommission = await _context.Commissions
-                    .AnyAsync(c => c.CandidateId == newCandidateId);
-
-                if (!existingCommission)
-                {
-                    var now = DateTime.UtcNow;
-                    var monthStart = new DateOnly(now.Year, now.Month, 1);
-
-                    // Count deals this month for this sales user (pending/approved/paid — exclude reversed)
-                    int dealsThisMonth = await _context.Commissions
-                        .CountAsync(c => c.SalesUserId == userId
-                                      && c.CommissionMonth == monthStart
-                                      && c.Status != 4) + 1; // +1 for current deal
-
-                    // Find the correct tier based on deal count
-                    var tier = await _context.CommissionTiers
-                        .Where(t => t.IsActive
-                                 && t.MinDeals <= dealsThisMonth
-                                 && (t.MaxDeals == null || t.MaxDeals >= dealsThisMonth))
-                        .OrderByDescending(t => t.MinDeals)
-                        .FirstOrDefaultAsync();
-
-                    decimal commissionAmount = tier?.AmountPerDeal ?? 0;
-
-                    _context.Commissions.Add(new Commission
-                    {
-                        Id = Guid.NewGuid(),
-                        SalesUserId = userId,
-                        CandidateId = newCandidateId,
-                        CommissionMonth = monthStart,
-                        AmountEgp = commissionAmount,  // ✅ محسوب من الشرائح تلقائياً
-                        DealsThisMonth = dealsThisMonth,
-                        Status = 1, // Pending admin approval
-                        CreatedAt = now
-                    });
-
-                    await _context.SaveChangesAsync();
-                }
+                // ✅ Commission لا تُنشأ هنا — تُنشأ تلقائياً عند اكتمال الدفع في ApprovePayment
 
                 TempData["Success"] = "تم تحويل العميل إلى مرشح بنجاح";
                 return RedirectToAction("CandidateDetail", new { id = newCandidateId });
@@ -434,6 +396,7 @@ namespace RecruitmentSaaS.Controllers
 
             return View(dto);
         }
+
 
         // ── POST /Sales/AddVisitComment ───────────────────────────────────────
         [HttpPost]
