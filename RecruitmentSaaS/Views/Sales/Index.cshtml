@@ -4,7 +4,23 @@
     ViewData["Subtitle"] = "العملاء في انتظار المقابلة";
 }
 
-<!-- Stat Cards -->
+@* ── Alerts ── *@
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show mb-3" style="font-size:13px">
+        <i class="bi bi-check-circle-fill me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show mb-3" style="font-size:13px">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@* ── Stat Cards ── *@
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-3">
         <div class="stat-card blue">
@@ -36,7 +52,70 @@
     </div>
 </div>
 
-<!-- Waiting Clients -->
+@* ── Reminders Section ── *@
+@if (Model.TodayReminders != null && Model.TodayReminders.Any())
+{
+    <div class="card mb-4" style="border:1.5px solid #FDE68A;">
+        <div class="card-header" style="background:linear-gradient(135deg,#FFFBEB,#FEF3C7);">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-bell-fill" style="color:#B45309;font-size:16px;"></i>
+                <span style="font-weight:700;font-size:14px;color:#92400E;">
+                    تذكيرات المرشحين اليوم
+                </span>
+                <span class="badge" style="background:#B45309;color:#fff;border-radius:99px;padding:3px 10px;">
+                    @Model.TodayReminders.Count
+                </span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            @foreach (var r in Model.TodayReminders)
+            {
+                <div class="d-flex align-items-center gap-3 px-4 py-3"
+                     style="border-bottom:1px solid #FEF3C7;">
+                    <div style="width:38px;height:38px;border-radius:50%;background:#FEF3C7;
+                                display:flex;align-items:center;justify-content:center;
+                                color:#B45309;flex-shrink:0;font-size:16px;">
+                        <i class="bi bi-alarm"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13.5px;font-weight:700;">@r.LeadName</div>
+                        <div style="font-size:12px;color:var(--text-muted);">
+                            @r.LeadPhone
+                            @if (!string.IsNullOrEmpty(r.Notes))
+                            {
+                                <span> — @r.Notes</span>
+                            }
+                        </div>
+                        <div style="font-size:11px;color:#B45309;font-weight:600;margin-top:2px;">
+                            <i class="bi bi-calendar3 me-1"></i>@r.ReminderDate.ToString("dd/MM/yyyy")
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        @if (r.CandidateId.HasValue)
+                        {
+                            <a href="/Sales/CandidateDetail/@r.CandidateId"
+                               class="btn btn-sm btn-primary" style="font-size:12px;">
+                                <i class="bi bi-eye me-1"></i>عرض
+                            </a>
+                        }
+                        <form asp-action="DismissCandidateReminder" asp-controller="Sales"
+                              method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="reminderId" value="@r.Id" />
+                            <input type="hidden" name="candidateId" value="@(r.CandidateId ?? Guid.Empty)" />
+                            <button type="submit" class="btn btn-sm"
+                                    style="border:1px solid var(--border);background:#fff;font-size:12px;">
+                                تجاهل
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@* ── Waiting Clients ── *@
 <div class="card">
     <div class="card-header">
         <div class="header-icon" style="background:#F5F3FF;color:#7C3AED">
@@ -45,9 +124,12 @@
         العملاء في انتظار المقابلة
         @if (Model.RecentLeads.Any())
         {
-            <span class="badge ms-auto" style="background:#7C3AED;color:#fff">@Model.RecentLeads.Count</span>
+            <span class="badge ms-auto" style="background:#7C3AED;color:#fff">
+                @Model.RecentLeads.Count
+            </span>
         }
-        <a href="/Sales/Candidates" class="btn btn-sm btn-primary @(Model.RecentLeads.Any() ? "" : "ms-auto")">
+        <a href="/Sales/Candidates"
+           class="btn btn-sm btn-primary @(Model.RecentLeads.Any() ? "" : "ms-auto")">
             <i class="bi bi-people-fill"></i> المرشحين
         </a>
     </div>
@@ -68,7 +150,6 @@
                         <th>الكود</th>
                         <th>الاسم</th>
                         <th>الهاتف</th>
-                        <th>الوظيفة المطلوبة</th>
                         <th>وقت الوصول</th>
                         <th></th>
                     </tr>
@@ -78,19 +159,23 @@
                     {
                         <tr>
                             <td>
-                                <span style="font-size:11px;font-weight:700;color:var(--text-muted);background:#F1F5F9;padding:3px 8px;border-radius:6px">
+                                <span style="font-size:11px;font-weight:700;color:var(--text-muted);
+                                             background:#F1F5F9;padding:3px 8px;border-radius:6px">
                                     @lead.LeadCode
                                 </span>
                             </td>
                             <td style="font-weight:600">@lead.FullName</td>
-                            <td style="color:var(--text-muted);font-size:13px;direction:ltr;text-align:right">@lead.Phone</td>
-                            <td style="color:var(--text-muted);font-size:13px">—</td>
+                            <td style="color:var(--text-muted);font-size:13px;
+                                       direction:ltr;text-align:right">
+                                @lead.Phone
+                            </td>
                             <td style="color:var(--text-muted);font-size:12.5px">
-                                @(lead.LastContactedAt.HasValue ? lead.LastContactedAt.Value.ToString("dd/MM/yyyy — HH:mm") : lead.CreatedAt.ToString("dd/MM/yyyy"))
+                                @(lead.LastContactedAt.HasValue
+                                    ? lead.LastContactedAt.Value.ToString("dd/MM/yyyy — HH:mm")
+                                    : lead.CreatedAt.ToString("dd/MM/yyyy"))
                             </td>
                             <td>
-                                <a href="/Sales/LeadDetail/@lead.Id"
-                                   class="btn btn-sm btn-primary">
+                                <a href="/Sales/LeadDetail/@lead.Id" class="btn btn-sm btn-primary">
                                     <i class="bi bi-person-check-fill"></i> بدء المقابلة
                                 </a>
                             </td>

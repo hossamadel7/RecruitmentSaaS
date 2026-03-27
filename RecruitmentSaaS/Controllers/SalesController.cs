@@ -36,10 +36,10 @@ namespace RecruitmentSaaS.Controllers
         {
             var userId = CurrentUserId;
             var now = DateTime.UtcNow;
+            var today = DateOnly.FromDateTime(now);
 
             var waitingLeads = await _context.Leads
-                .Where(l => l.AssignedOfficeSalesId == userId
-                    && l.Status == 6)
+                .Where(l => l.AssignedOfficeSalesId == userId && l.Status == 6)
                 .OrderBy(l => l.UpdatedAt)
                 .Select(l => new LeadListItemDto
                 {
@@ -51,6 +51,27 @@ namespace RecruitmentSaaS.Controllers
                     IsConverted = l.IsConverted,
                     CreatedAt = l.CreatedAt,
                     LastContactedAt = l.LastContactedAt
+                })
+                .ToListAsync();
+
+            // ── التذكيرات المتعلقة بالمرشحين لهذا الـ Sales ──────────────────
+            var todayReminders = await _context.FollowUpReminders
+                .Include(r => r.Candidate)
+                .Where(r => r.AssignedToId == userId
+                         && r.CandidateId != null
+                         && r.Status == 1
+                         && r.ReminderDate <= today)
+                .OrderBy(r => r.ReminderDate)
+                .Select(r => new FollowUpReminderDto
+                {
+                    Id = r.Id,
+                    LeadId = r.LeadId,
+                    CandidateId = r.CandidateId,
+                    LeadName = r.Candidate != null ? r.Candidate.FullName : "—",
+                    LeadPhone = r.Candidate != null ? r.Candidate.Phone : "—",
+                    ReminderDate = r.ReminderDate,
+                    Status = r.Status,
+                    Notes = r.Notes
                 })
                 .ToListAsync();
 
@@ -71,12 +92,81 @@ namespace RecruitmentSaaS.Controllers
                         && c.CompletedAt.Value.Month == now.Month
                         && c.CompletedAt.Value.Year == now.Year),
 
-                TodayReminders = new List<FollowUpReminderDto>(),
+                TodayReminders = todayReminders,
                 RecentLeads = waitingLeads
             };
 
             return View(dto);
         }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DismissCandidateReminder(Guid reminderId, Guid candidateId)
+        {
+            var reminder = await _context.FollowUpReminders.FindAsync(reminderId);
+            if (reminder != null)
+            {
+                reminder.Status = 3; // Dismissed
+                reminder.DismissedAt = DateTime.UtcNow;
+                reminder.DismissedById = CurrentUserId;
+                reminder.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+
+            TempData["Success"] = "تم تجاهل التذكير";
+
+            // لو جاي من الـ Dashboard يرجع للـ Index، لو جاي من ملف المرشح يرجع ليه
+            if (candidateId == Guid.Empty)
+                return RedirectToAction("Index");
+
+            return RedirectToAction("CandidateDetail", new { id = candidateId });
+        }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SetCandidateReminder(
+            Guid candidateId, DateOnly reminderDate, string? notes)
+        {
+            var userId = CurrentUserId;
+
+            var candidate = await _context.Candidates
+                .FirstOrDefaultAsync(c => c.Id == candidateId && c.AssignedSalesId == userId);
+
+            if (candidate == null)
+            {
+                TempData["Error"] = "المرشح غير موجود";
+                return RedirectToAction("Candidates");
+            }
+
+            // نحتاج LeadId — نجيبه من الـ Lead المرتبط
+            var lead = await _context.Leads
+                .FirstOrDefaultAsync(l => l.ConvertedCandidateId == candidateId);
+
+            // لو مفيش lead مرتبط — نستخدم Guid.Empty (LeadId nullable في المنطق بس مش في الـ schema)
+            // عشان الـ FK مش nullable نضيف default lead id أو نستخدم lead فعلي
+            if (lead == null)
+            {
+                TempData["Error"] = "لا يمكن إضافة تذكير — لا يوجد عميل مرتبط بهذا المرشح";
+                return RedirectToAction("CandidateDetail", new { id = candidateId });
+            }
+
+            _context.FollowUpReminders.Add(new FollowUpReminder
+            {
+                Id = Guid.NewGuid(),
+                LeadId = lead.Id,
+                CandidateId = candidateId,
+                AssignedToId = userId,
+                CreatedById = userId,
+                ReminderDate = reminderDate,
+                Notes = notes,
+                Status = 1,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"تم إضافة تذكير بتاريخ {reminderDate:dd/MM/yyyy} لـ {candidate.FullName}";
+            return RedirectToAction("CandidateDetail", new { id = candidateId });
+        }
+
 
         // ── GET /Sales/LeadDetail/{id} ────────────────────────────────────────
         public async Task<IActionResult> LeadDetail(Guid id)
