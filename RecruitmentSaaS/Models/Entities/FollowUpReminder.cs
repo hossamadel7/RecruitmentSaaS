@@ -52,12 +52,6 @@ public partial class FollowUpReminder
     [InverseProperty("FollowUpReminderAssignedTos")]
     public virtual User AssignedTo { get; set; } = null!;
 
-    [ForeignKey("CandidateId")]
-    [InverseProperty("FollowUpReminders")]
-    public virtual Candidate? Candidate { get; set; }
-
-    [ForeignKey("CreatedById")]
-    [InverseProperty("FollowUpReminderCreatedBies")]
     public virtual User CreatedBy { get; set; } = null!;
 
     [ForeignKey("LeadId")]

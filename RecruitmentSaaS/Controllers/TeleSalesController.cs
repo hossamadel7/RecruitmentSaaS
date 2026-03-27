@@ -42,7 +42,7 @@ namespace RecruitmentSaaS.Controllers
                 MyLeadsNew = await _context.Leads
                     .CountAsync(l => l.AssignedSalesId == userId && l.Status == 1),
 
-                MyCandidatesTotal = 0, // Tele Sales doesn't manage candidates
+                MyCandidatesTotal = 0,
 
                 DealsThisMonth = await _context.Leads
                     .CountAsync(l => l.AssignedSalesId == userId
@@ -96,7 +96,6 @@ namespace RecruitmentSaaS.Controllers
             const int pageSize = 20;
             var userId = CurrentUserId;
 
-            // Get sheet IDs assigned to this user
             var mySheetIds = await _context.SalesGoogleSheetUsers
                 .Where(su => su.SalesUserId == userId && su.IsActive)
                 .Select(su => su.SheetId)
@@ -143,15 +142,10 @@ namespace RecruitmentSaaS.Controllers
                 })
                 .ToListAsync();
 
-            // Load campaigns for filter
             var campaigns = await _context.Campaigns
                 .Where(c => c.Status == 1)
                 .OrderBy(c => c.Name)
-                .Select(c => new CampaignListItemDto
-                {
-                    Id = c.Id,
-                    Name = c.Name
-                })
+                .Select(c => new CampaignListItemDto { Id = c.Id, Name = c.Name })
                 .ToListAsync();
 
             ViewBag.Campaigns = campaigns;
@@ -206,8 +200,7 @@ namespace RecruitmentSaaS.Controllers
             var userId = CurrentUserId;
             const int pageSize = 20;
 
-            var query = _context.Leads
-                .Where(l => l.AssignedSalesId == userId);
+            var query = _context.Leads.Where(l => l.AssignedSalesId == userId);
 
             if (status.HasValue)
                 query = query.Where(l => l.Status == status.Value);
@@ -244,7 +237,6 @@ namespace RecruitmentSaaS.Controllers
         {
             var userId = CurrentUserId;
 
-            // Allow viewing unassigned leads too (from pool)
             var lead = await _context.Leads
                 .Include(l => l.AssignedSales)
                 .Include(l => l.Campaign)
@@ -285,6 +277,7 @@ namespace RecruitmentSaaS.Controllers
                 RegisteredByName = lead.RegisteredBy?.FullName,
                 CreatedAt = lead.CreatedAt,
                 LastContactedAt = lead.LastContactedAt,
+                AppointmentDate = lead.AppointmentDate,
 
                 Activities = activities.Select(a => new LeadActivityDto
                 {
@@ -318,14 +311,18 @@ namespace RecruitmentSaaS.Controllers
         {
             var userId = CurrentUserId;
 
-            // Tele Sales can only set status 2-5 and 8
-            if (!new byte[] { 2, 3, 4, 5, 8 }.Contains(newStatus))
+            // Funnel order — status can only move forward (except خسارة=8 from any stage)
+            var funnelOrder = new Dictionary<byte, int>
+            {
+                {1, 1}, {2, 2}, {4, 3}, {5, 4}, {7, 5}
+            };
+
+            if (!new byte[] { 2, 4, 5, 8 }.Contains(newStatus))
             {
                 TempData["Error"] = "غير مسموح بهذه الحالة";
                 return RedirectToAction("LeadDetail", new { id = leadId });
             }
 
-            // Status 5 requires appointment date
             if (newStatus == 5 && appointmentDate == null)
             {
                 TempData["Error"] = "يرجى تحديد تاريخ ووقت الموعد";
@@ -342,15 +339,24 @@ namespace RecruitmentSaaS.Controllers
             }
 
             var oldStatus = lead.Status;
+
+            // Block going backwards (except خسارة which is allowed from any stage)
+            if (newStatus != 8 &&
+                funnelOrder.TryGetValue(newStatus, out int newOrder) &&
+                funnelOrder.TryGetValue(oldStatus, out int oldOrder) &&
+                newOrder <= oldOrder)
+            {
+                TempData["Error"] = "لا يمكن الرجوع لحالة سابقة — الفانيل يسير للأمام فقط";
+                return RedirectToAction("LeadDetail", new { id = leadId });
+            }
+
             lead.Status = newStatus;
             lead.UpdatedAt = DateTime.UtcNow;
 
-            // Save appointment date and schedule reminder
             if (newStatus == 5 && appointmentDate.HasValue)
             {
                 lead.AppointmentDate = appointmentDate.Value;
 
-                // Create follow-up reminder for the day before
                 var reminderDate = DateOnly.FromDateTime(appointmentDate.Value.AddDays(-1));
                 _context.FollowUpReminders.Add(new FollowUpReminder
                 {
@@ -364,7 +370,6 @@ namespace RecruitmentSaaS.Controllers
                     CreatedAt = DateTime.UtcNow
                 });
 
-                // Send immediate notification to confirm appointment was set
                 await _notifications.SendAsync(
                     userId: userId,
                     title: $"📅 تم تحديد موعد: {lead.FullName}",
@@ -374,34 +379,74 @@ namespace RecruitmentSaaS.Controllers
                 );
             }
 
+            // ✅ FIX 2: Removed استجاب from statusNames
             var statusNames = new Dictionary<byte, string>
             {
-                {1,"جديد"},{2,"تم التواصل"},{3,"استجاب"},
+                {1,"جديد"},{2,"تم التواصل"},
                 {4,"مهتم"},{5,"موعد مجدول"},{6,"زار المكتب"},
                 {7,"تم التحويل"},{8,"خسارة"}
             };
 
-            _context.LeadActivities.Add(new LeadActivity
-            {
-                Id = Guid.NewGuid(),
-                LeadId = leadId,
-                ActivityType = 4,
-                Description = $"تغيير الحالة من {statusNames.GetValueOrDefault(oldStatus, oldStatus.ToString())} إلى {statusNames.GetValueOrDefault(newStatus, newStatus.ToString())}",
-                CreatedById = userId,
-                CreatedByName = CurrentUserName,
-                ActorType = 1,
-                CreatedAt = DateTime.UtcNow
-            });
+            // Build intermediate steps for funnel tracking
+            // e.g. تم التواصل → موعد مجدول auto-logs: تم التواصل→مهتم + مهتم→موعد مجدول
+            var funnelSteps = new List<byte> { 1, 2, 4, 5 }; // ordered funnel statuses
+            var stepsToLog = new List<(byte from, byte to)>();
 
-            _context.LeadFunnelHistories.Add(new LeadFunnelHistory
+            if (newStatus != 8) // خسارة logs directly without intermediates
             {
-                Id = Guid.NewGuid(),
-                LeadId = leadId,
-                FromStatus = oldStatus,
-                ToStatus = newStatus,
-                ChangedById = userId,
-                CreatedAt = DateTime.UtcNow
-            });
+                var fromIdx = funnelSteps.IndexOf(oldStatus);
+                var toIdx = funnelSteps.IndexOf(newStatus);
+
+                if (fromIdx >= 0 && toIdx > fromIdx)
+                {
+                    // Log every intermediate step
+                    for (int i = fromIdx; i < toIdx; i++)
+                        stepsToLog.Add((funnelSteps[i], funnelSteps[i + 1]));
+                }
+                else
+                {
+                    stepsToLog.Add((oldStatus, newStatus));
+                }
+            }
+            else
+            {
+                stepsToLog.Add((oldStatus, newStatus));
+            }
+
+            var now = DateTime.UtcNow;
+            foreach (var (stepFrom, stepTo) in stepsToLog)
+            {
+                var fromName = statusNames.GetValueOrDefault(stepFrom, $"حالة {stepFrom}");
+                var toName = statusNames.GetValueOrDefault(stepTo, $"حالة {stepTo}");
+                var actDesc = $"تغيير الحالة من {fromName} إلى {toName}";
+                if (stepTo == 5 && appointmentDate.HasValue)
+                    actDesc += $" — الموعد: {appointmentDate.Value:dd/MM/yyyy HH:mm}";
+
+                _context.LeadActivities.Add(new LeadActivity
+                {
+                    Id = Guid.NewGuid(),
+                    LeadId = leadId,
+                    ActivityType = 4,
+                    Description = actDesc,
+                    CreatedById = userId,
+                    CreatedByName = CurrentUserName,
+                    ActorType = 1,
+                    CreatedAt = now
+                });
+
+                _context.LeadFunnelHistories.Add(new LeadFunnelHistory
+                {
+                    Id = Guid.NewGuid(),
+                    LeadId = leadId,
+                    FromStatus = stepFrom,
+                    ToStatus = stepTo,
+                    ChangedById = userId,
+                    Note = stepTo == 5 && appointmentDate.HasValue
+                                      ? appointmentDate.Value.ToString("dd/MM/yyyy HH:mm")
+                                      : null,
+                    CreatedAt = now
+                });
+            }
 
             await _context.SaveChangesAsync();
 
@@ -431,7 +476,6 @@ namespace RecruitmentSaaS.Controllers
             if (lead != null)
             {
                 lead.LastContactedAt = DateTime.UtcNow;
-                // Auto set status to 2 if still new
                 if (lead.Status == 1 && dto.Outcome == 2)
                 {
                     lead.Status = 2;
@@ -463,7 +507,6 @@ namespace RecruitmentSaaS.Controllers
 
             await _context.SaveChangesAsync();
 
-            // Notify telesales if they set a follow-up date
             if (dto.NextFollowUpDate.HasValue && lead != null)
             {
                 await _notifications.SendAsync(
@@ -531,7 +574,6 @@ namespace RecruitmentSaaS.Controllers
 
             await _context.SaveChangesAsync();
 
-            // Notify telesales confirming the reminder was set
             if (reminderLead != null)
             {
                 await _notifications.SendAsync(
