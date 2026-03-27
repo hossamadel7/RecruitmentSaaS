@@ -73,6 +73,9 @@ public partial class User
     public virtual ICollection<Company> Companies { get; set; } = new List<Company>();
 
     [InverseProperty("UploadedBy")]
+    public virtual ICollection<ContractUpload> ContractUploads { get; set; } = new List<ContractUpload>();
+
+    [InverseProperty("UploadedBy")]
     public virtual ICollection<Document> Documents { get; set; } = new List<Document>();
 
     [InverseProperty("AssignedTo")]
