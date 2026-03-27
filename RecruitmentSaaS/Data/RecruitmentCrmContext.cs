@@ -534,30 +534,6 @@ public partial class RecruitmentCrmContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PK_demorecruitment_Ld");
 
-            entity.ToTable("Leads", "demorecruitment");
-
-            entity.HasIndex(e => e.GoogleSheetId, "IX_Leads_GoogleSheetId").HasFilter("([GoogleSheetId] IS NOT NULL)");
-
-            entity.HasIndex(e => e.CampaignId, "IX_demorecruitment_Ld_Ca");
-
-            entity.HasIndex(e => e.AssignedOfficeSalesId, "IX_demorecruitment_Ld_OfSa");
-
-            entity.HasIndex(e => e.Phone, "IX_demorecruitment_Ld_Ph");
-
-            entity.HasIndex(e => e.AssignedSalesId, "IX_demorecruitment_Ld_Sa");
-
-            entity.HasIndex(e => e.LeadSource, "IX_demorecruitment_Ld_Src");
-
-            entity.HasIndex(e => e.Status, "IX_demorecruitment_Ld_St");
-
-            entity.HasIndex(e => e.LeadCode, "UQ_demorecruitment_Ld_Code").IsUnique();
-
-            entity.HasIndex(e => e.Phone, "UQ_demorecruitment_Ld_Ph").IsUnique();
-
-            entity.HasIndex(e => e.FacebookLeadId, "UX_Leads_FacebookLeadId")
-                .IsUnique()
-                .HasFilter("([FacebookLeadId] IS NOT NULL)");
-
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.AppointmentDate).HasPrecision(0);
             entity.Property(e => e.ConvertedAt).HasPrecision(0);

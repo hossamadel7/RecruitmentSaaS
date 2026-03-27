@@ -3,8 +3,11 @@
     ViewData["Title"] = "شرائح العمولة";
     ViewData["Subtitle"] = "إدارة نظام العمولات حسب عدد الصفقات";
     bool hasOverlap = (bool)(ViewBag.HasOverlap ?? false);
-    bool hasGap     = (bool)(ViewBag.HasGap ?? false);
-    int  pending    = (int)(ViewBag.PendingCount ?? 0);
+    bool hasGap = (bool)(ViewBag.HasGap ?? false);
+    int pending = (int)(ViewBag.PendingCount ?? 0);
+    byte resetDay = (byte)(ViewBag.ResetDayOfMonth ?? 1);
+    DateOnly nextReset = (DateOnly)(ViewBag.NextResetDate ?? DateOnly.FromDateTime(DateTime.UtcNow));
+    DateOnly periodStart = (DateOnly)(ViewBag.CurrentPeriodStart ?? DateOnly.FromDateTime(DateTime.UtcNow));
 }
 
 <div style="padding:24px">
@@ -51,7 +54,7 @@
                 <form asp-action="RecalculateCommissions" method="post">
                     @Html.AntiForgeryToken()
                     <button type="submit" class="btn btn-outline-primary btn-sm"
-                            onclick="return confirm('هل تريد إعادة حساب كل العمولات المعلقة لهذا الشهر بناءً على الشرائح الحالية؟')">
+                            onclick="return confirm('هل تريد إعادة حساب كل العمولات المعلقة للفترة الحالية بناءً على الشرائح الحالية؟')">
                         <i class="bi bi-arrow-clockwise me-1"></i>
                         إعادة الحساب
                         <span class="badge bg-primary ms-1">@pending</span>
@@ -64,6 +67,65 @@
         </div>
     </div>
 
+    @* ── Reset Day Setting Card ── *@
+    <div class="card mb-4" style="border:1.5px solid #DBEAFE;background:#EFF6FF;">
+        <div class="card-body py-3">
+            <div class="d-flex align-items-start gap-3 flex-wrap">
+                <div style="font-size:28px;line-height:1">🔄</div>
+                <div style="flex:1;min-width:220px">
+                    <div style="font-weight:700;font-size:14px;color:#1B4FD8;margin-bottom:4px">
+                        إعداد يوم إعادة تعيين العداد
+                    </div>
+                    <div style="font-size:12.5px;color:#64748B;line-height:1.6;margin-bottom:10px">
+                        في هذا اليوم من كل شهر يبدأ عداد صفقات كل مندوب من الصفر من جديد.
+                        <br />
+                        <strong style="color:#1B4FD8">الفترة الحالية تبدأ من:</strong>
+                        <span style="font-weight:700;color:#1E293B">@periodStart.ToString("dd/MM/yyyy")</span>
+                        &nbsp;|&nbsp;
+                        <strong style="color:#1B4FD8">الـ Reset القادم:</strong>
+                        <span style="font-weight:700;color:#DC2626">@nextReset.ToString("dd/MM/yyyy")</span>
+                    </div>
+                    <form asp-action="UpdateCommissionSettings" method="post" class="d-flex align-items-center gap-2 flex-wrap">
+                        @Html.AntiForgeryToken()
+                        <div class="d-flex align-items-center gap-2">
+                            <label style="font-size:13px;font-weight:600;white-space:nowrap;color:#1E293B">
+                                يوم الـ Reset:
+                            </label>
+                            <input type="number"
+                                   name="resetDayOfMonth"
+                                   value="@resetDay"
+                                   min="1" max="28"
+                                   class="form-control form-control-sm"
+                                   style="width:80px;text-align:center;font-weight:700;font-size:15px"
+                                   required />
+                            <span style="font-size:12.5px;color:#64748B">من كل شهر (1-28)</span>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm"
+                                onclick="return confirm('تغيير يوم الـ Reset سيؤثر على حساب الفترة القادمة. هل أنت متأكد؟')">
+                            <i class="bi bi-check-lg me-1"></i> حفظ
+                        </button>
+                    </form>
+                </div>
+
+                @* Mini info boxes *@
+                <div class="d-flex gap-2 flex-wrap">
+                    <div style="background:#fff;border:1px solid #BFDBFE;border-radius:10px;padding:10px 16px;text-align:center;min-width:110px">
+                        <div style="font-size:22px;font-weight:800;color:#1B4FD8">@resetDay</div>
+                        <div style="font-size:11px;color:#64748B">يوم الـ Reset</div>
+                    </div>
+                    <div style="background:#fff;border:1px solid #BBF7D0;border-radius:10px;padding:10px 16px;text-align:center;min-width:110px">
+                        <div style="font-size:14px;font-weight:700;color:#16A34A">@periodStart.ToString("dd MMM")</div>
+                        <div style="font-size:11px;color:#64748B">بداية الفترة</div>
+                    </div>
+                    <div style="background:#fff;border:1px solid #FECACA;border-radius:10px;padding:10px 16px;text-align:center;min-width:110px">
+                        <div style="font-size:14px;font-weight:700;color:#DC2626">@nextReset.ToString("dd MMM")</div>
+                        <div style="font-size:11px;color:#64748B">Reset القادم</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     @* ── How it works explanation ── *@
     <div class="card mb-4" style="background:var(--bg-secondary,#F8FAFC);border:1px dashed #CBD5E1">
         <div class="card-body py-3">
@@ -72,10 +134,10 @@
                 <div>
                     <div style="font-weight:600;font-size:13.5px;margin-bottom:4px">كيف تعمل الشرائح؟</div>
                     <div style="font-size:12.5px;color:var(--text-muted,#64748b);line-height:1.7">
-                        عدد الصفقات يُحسب <strong>شهرياً</strong> لكل مندوب مبيعات ويبدأ من الصفر في أول كل شهر.
-                        عند إتمام صفقة جديدة، يتم تطبيق الشريحة المناسبة <strong>على كل صفقات الشهر</strong> — ليس فقط الأخيرة.
+                        عدد الصفقات يُحسب <strong>شهرياً</strong> لكل مندوب مبيعات ويبدأ من الصفر في <strong>يوم @resetDay من كل شهر</strong>.
+                        عند إتمام صفقة جديدة، يتم تطبيق الشريحة المناسبة <strong>على كل صفقات الفترة</strong> — ليس فقط الأخيرة.
                         مثلاً: إذا كانت الشريحة الأولى 300 ج.م (1-5 صفقات) والثانية 500 ج.م (6-10)،
-                        فعند إتمام الصفقة السادسة تصبح قيمة <em>كل</em> صفقاته في الشهر 500 ج.م.
+                        فعند إتمام الصفقة السادسة تصبح قيمة <em>كل</em> صفقاته في الفترة 500 ج.م.
                     </div>
                 </div>
             </div>
@@ -117,7 +179,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @{int rowNum = 1;}
+                        @{
+                            int rowNum = 1;
+                        }
                         @foreach (var tier in Model.OrderBy(t => t.MinDeals))
                         {
                             var isLast = !tier.MaxDeals.HasValue;
@@ -205,7 +269,7 @@
                 <div style="display:flex;gap:0;border-radius:10px;overflow:hidden;height:36px">
                     @{
                         var sortedTiers = Model.OrderBy(t => t.MinDeals).ToList();
-                        var colors = new[] { "#1B4FD8","#2563EB","#3B82F6","#60A5FA","#93C5FD","#BFDBFE" };
+                        var colors = new[] { "#1B4FD8", "#2563EB", "#3B82F6", "#60A5FA", "#93C5FD", "#BFDBFE" };
                         var totalMax = sortedTiers.LastOrDefault()?.MaxDeals ?? (sortedTiers.Any() ? sortedTiers.Max(t => t.MinDeals) + 10 : 20);
                         var scale = sortedTiers.Any() ? 100.0 / (totalMax == 0 ? 1 : totalMax) : 0;
                     }
@@ -213,7 +277,7 @@
                     {
                         var t = sortedTiers[i];
                         var spanDeals = t.MaxDeals.HasValue ? (t.MaxDeals.Value - t.MinDeals + 1) : (totalMax - t.MinDeals + 1);
-                        var widthPct  = Math.Max(10, (double)spanDeals / (totalMax == 0 ? 1 : totalMax) * 100);
+                        var widthPct = Math.Max(10, (double)spanDeals / (totalMax == 0 ? 1 : totalMax) * 100);
                         var col = colors[i % colors.Length];
 
                         <div style="background:@col;flex:@widthPct;display:flex;align-items:center;justify-content:center;
@@ -247,7 +311,7 @@
         <div class="card-body">
             <div class="row g-3 align-items-end">
                 <div class="col-md-4">
-                    <label class="form-label" style="font-size:13px;font-weight:600">عدد الصفقات هذا الشهر</label>
+                    <label class="form-label" style="font-size:13px;font-weight:600">عدد الصفقات في الفترة الحالية</label>
                     <input type="number" id="simDeals" class="form-control form-control-sm"
                            min="1" value="1" oninput="runSimulator()" />
                 </div>
@@ -286,7 +350,7 @@
                         <label class="form-label" style="font-size:13px;font-weight:600">الحد الأقصى للصفقات</label>
                         <input type="number" name="maxDeals" class="form-control form-control-sm"
                                min="1" placeholder="اتركه فارغاً للشريحة المفتوحة (بلا حد)" />
-                        <div class="form-text" style="font-size:11.5px">اتركه فارغاً إذا كانت هذه الشريحة الأخيرة (مفتوحة النهاية)</div>
+                        <div class="form-text" style="font-size:11.5px">اتركه فارغاً إذا كانت هذه الشريحة الأخيرة</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label" style="font-size:13px;font-weight:600">
@@ -352,79 +416,86 @@
 </div>
 
 @section Scripts {
-<script>
-// Tier data for simulator
-const tiers = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
-    Model.OrderBy(t => t.MinDeals).Select(t => new {
-        minDeals     = t.MinDeals,
-        maxDeals     = t.MaxDeals,
-        amountPerDeal = t.AmountPerDeal
-    })
-));
+    <script>
+        const tiers = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        Model.OrderBy(t => t.MinDeals).Select(t => new
+        {
+           minDeals = t.MinDeals,
+           maxDeals = t.MaxDeals,
+           amountPerDeal = t.AmountPerDeal
+        })
+    ));
 
-function openEditTier(id, min, max, amount) {
-    document.getElementById('editTierId').value  = id;
-    document.getElementById('editMinDeals').value = min;
-    document.getElementById('editMaxDeals').value = max;
-    document.getElementById('editAmount').value   = amount;
-    new bootstrap.Modal(document.getElementById('editTierModal')).show();
-}
+        function openEditTier(id, min, max, amount) {
+            document.getElementById('editTierId').value   = id;
+            document.getElementById('editMinDeals').value = min;
+            document.getElementById('editMaxDeals').value = max;
+            document.getElementById('editAmount').value   = amount;
+            new bootstrap.Modal(document.getElementById('editTierModal')).show();
+        }
 
-function runSimulator() {
-    const deals  = parseInt(document.getElementById('simDeals').value) || 0;
-    const result = document.getElementById('simResult');
+               function runSimulator() {
+            const deals  = parseInt(document.getElementById('simDeals').value) || 0;
+            const result = document.getElementById('simResult');
 
-    if (deals < 1 || tiers.length === 0) {
-        result.innerHTML = 'أدخل عدد الصفقات لحساب العمولة';
-        result.style.background = '#F0FDF4';
-        result.style.borderColor = '#BBF7D0';
-        return;
-    }
+            if (deals < 1 || tiers.length === 0) {
+                result.innerHTML = 'أدخل عدد الصفقات لحساب العمولة';
+                result.style.background  = '#F0FDF4';
+                result.style.borderColor = '#BBF7D0';
+                return;
+            }
 
-    // Find matching tier
-    const tier = tiers.find(t =>
-        t.minDeals <= deals && (t.maxDeals === null || t.maxDeals >= deals)
-    );
+            // ✅ كل صفقة بتاخد قيمة الشريحة اللي هي فيها
+            let totalEarning = 0;
+            for (let i = 1; i <= deals; i++) {
+                const tier = tiers.find(t =>
+                    t.minDeals <= i && (t.maxDeals === null || t.maxDeals >= i)
+                );
+                if (tier) totalEarning += tier.amountPerDeal;
+            }
 
-    if (!tier) {
-        result.innerHTML = `<i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
-            عدد الصفقات (${deals}) لا يقع ضمن أي شريحة محددة`;
-        result.style.background = '#FFFBEB';
-        result.style.borderColor = '#FDE68A';
-        return;
-    }
+            // الشريحة الحالية (للعرض)
+            const currentTier = tiers.find(t =>
+                t.minDeals <= deals && (t.maxDeals === null || t.maxDeals >= deals)
+            );
 
-    const totalEarning = deals * tier.amountPerDeal;
-    result.innerHTML = `
-        <div class="d-flex align-items-center gap-4 flex-wrap">
-            <div>
-                <div style="font-size:11px;color:#64748b;margin-bottom:2px">عدد الصفقات</div>
-                <div style="font-size:18px;font-weight:700;color:#1B4FD8">${deals}</div>
-            </div>
-            <div style="font-size:20px;color:#CBD5E1">→</div>
-            <div>
-                <div style="font-size:11px;color:#64748b;margin-bottom:2px">الشريحة المطبقة</div>
-                <div style="font-size:13px;font-weight:600">
-                    ${tier.minDeals}${tier.maxDeals ? ` - ${tier.maxDeals}` : '+'} صفقة
+            if (!currentTier) {
+                result.innerHTML = `<i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+                    عدد الصفقات (${deals}) لا يقع ضمن أي شريحة محددة`;
+                result.style.background  = '#FFFBEB';
+                result.style.borderColor = '#FDE68A';
+                return;
+            }
+
+            result.innerHTML = `
+                <div class="d-flex align-items-center gap-4 flex-wrap">
+                    <div>
+                        <div style="font-size:11px;color:#64748b;margin-bottom:2px">عدد الصفقات</div>
+                        <div style="font-size:18px;font-weight:700;color:#1B4FD8">${deals}</div>
+                    </div>
+                    <div style="font-size:20px;color:#CBD5E1">→</div>
+                    <div>
+                        <div style="font-size:11px;color:#64748b;margin-bottom:2px">الشريحة الحالية</div>
+                        <div style="font-size:13px;font-weight:600">
+                            ${currentTier.minDeals}${currentTier.maxDeals ? ` - ${currentTier.maxDeals}` : '+'} صفقة
+                        </div>
+                    </div>
+                    <div style="font-size:20px;color:#CBD5E1">→</div>
+                    <div>
+                        <div style="font-size:11px;color:#64748b;margin-bottom:2px">عمولة الصفقة الأخيرة</div>
+                        <div style="font-size:13px;font-weight:600">${currentTier.amountPerDeal.toLocaleString()} ج.م</div>
+                    </div>
+                    <div style="font-size:20px;color:#CBD5E1">=</div>
+                    <div>
+                        <div style="font-size:11px;color:#64748b;margin-bottom:2px">إجمالي العمولات المتراكمة</div>
+                        <div style="font-size:20px;font-weight:700;color:#16A34A">${totalEarning.toLocaleString()} ج.م</div>
+                    </div>
                 </div>
-            </div>
-            <div style="font-size:20px;color:#CBD5E1">×</div>
-            <div>
-                <div style="font-size:11px;color:#64748b;margin-bottom:2px">العمولة / صفقة</div>
-                <div style="font-size:13px;font-weight:600">${tier.amountPerDeal.toLocaleString()} ج.م</div>
-            </div>
-            <div style="font-size:20px;color:#CBD5E1">=</div>
-            <div>
-                <div style="font-size:11px;color:#64748b;margin-bottom:2px">إجمالي العمولة</div>
-                <div style="font-size:20px;font-weight:700;color:#16A34A">${totalEarning.toLocaleString()} ج.م</div>
-            </div>
-        </div>
-    `;
-    result.style.background = '#F0FDF4';
-    result.style.borderColor = '#BBF7D0';
-}
+            `;
+            result.style.background  = '#F0FDF4';
+            result.style.borderColor = '#BBF7D0';
+        }
 
-// Run simulator on page load with default value
-runSimulator();
-</script>
+        runSimulator();
+    </script>
 }
