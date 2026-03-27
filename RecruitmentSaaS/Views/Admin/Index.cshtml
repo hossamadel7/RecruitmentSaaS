@@ -12,23 +12,81 @@
     int pendingPayments = ViewBag.PendingPayments;
     int pendingApprovals = ViewBag.PendingApprovals ?? 0;
     decimal totalCollected = ViewBag.TotalCollected;
+    int selMonth = ViewBag.SelectedMonth ?? DateTime.Now.Month;
+    int selYear = ViewBag.SelectedYear ?? DateTime.Now.Year;
+    int monthLeadsTotal = ViewBag.MonthLeadsTotal ?? 0;
+    int monthCandidatesTotal = ViewBag.MonthCandidatesTotal ?? 0;
 
     var recentLeads = (IEnumerable<Lead>)ViewBag.RecentLeads;
     var leadsByStatus = (IEnumerable<dynamic>)ViewBag.LeadsByStatus;
     var candidatesByStage = (IEnumerable<dynamic>)ViewBag.CandidatesByStage;
 
-    string[] leadStatusLabels = { "", "عميل جديد", "تم التواصل", "مهتم", "يفكر", "وعد بالزيارة", "زيارة", "تحويل", "ملغى" };
-    string[] leadStatusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626" };
+    // Funnel statuses — ordered forward + خسارة + تحويل
+    var funnelLabels = new Dictionary<int, string>
+    {
+        {1,"عميل جديد"}, {2,"تم التواصل"}, {4,"مهتم"},
+        {5,"موعد مجدول"}, {8,"خسارة"}, {7,"تحويل"}
+    };
+    var funnelColors = new Dictionary<int, string>
+    {
+        {1,"#3b82f6"}, {2,"#8b5cf6"}, {4,"#0ea5e9"},
+        {5,"#22c55e"}, {8,"#dc2626"}, {7,"#6366f1"}
+    };
+
+    // All statuses for recent leads table
+    string[] allStatusLabels = { "", "عميل جديد", "تم التواصل", "استجاب", "مهتم", "موعد مجدول", "زار المكتب", "تحويل", "خسارة" };
+    string[] allStatusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626" };
+
+    var monthName = new System.Globalization.CultureInfo("ar-EG").DateTimeFormat.GetMonthName(selMonth);
 }
 
 <div class="page-header">
-    <div class="page-header-left">
-        <div class="page-header-icon" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);">🛡️</div>
+    <div class="d-flex align-items-center gap-3">
         <div>
-            <h1 class="page-title">لوحة التحكم</h1>
-            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">نظرة عامة على النظام</p>
+            <h1 class="page-header-title">لوحة التحكم</h1>
+            <div class="page-header-sub">نظرة عامة على النظام</div>
         </div>
     </div>
+
+    <!-- Month / Year selector -->
+    <form method="get" action="/Admin/Index" class="d-flex align-items-center gap-2">
+        <select name="month" class="form-select form-select-sm" style="width:130px">
+            @for (int m = 1; m <= 12; m++)
+            {
+                var mName = new System.Globalization.CultureInfo("ar-EG").DateTimeFormat.GetMonthName(m);
+                if (m == selMonth)
+                {
+                    <option value="@m" selected="selected">@mName</option>
+                }
+                else
+                {
+                    <option value="@m">@mName</option>
+                }
+            }
+        </select>
+        <select name="year" class="form-select form-select-sm" style="width:90px">
+            @for (int y = DateTime.Now.Year; y >= DateTime.Now.Year - 3; y--)
+            {
+                if (y == selYear)
+                {
+                    <option value="@y" selected="selected">@y</option>
+                }
+                else
+                {
+                    <option value="@y">@y</option>
+                }
+            }
+        </select>
+        <button type="submit" class="btn btn-sm btn-primary">
+            <i class="bi bi-funnel-fill"></i> عرض
+        </button>
+        @if (selMonth != DateTime.Now.Month || selYear != DateTime.Now.Year)
+        {
+            <a href="/Admin/Index" class="btn btn-sm" style="border:1px solid var(--border)">
+                <i class="bi bi-arrow-clockwise"></i> الشهر الحالي
+            </a>
+        }
+    </form>
 </div>
 
 @* ── Pending alerts ── *@
@@ -37,33 +95,37 @@
     <div class="d-flex gap-3 mb-4 flex-wrap">
         @if (pendingApprovals > 0)
         {
-            <a href="/Admin/StageApprovals" class="alert-pill"
+            <a href="/Admin/StageApprovals"
                style="background:#f5f3ff;border:1.5px solid #e9d5ff;color:#7c3aed;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
-                ✅ <span>@pendingApprovals طلب موافقة في انتظارك</span>
+                <i class="bi bi-shield-lock-fill"></i>
+                <span>@pendingApprovals طلب موافقة في انتظارك</span>
                 <span style="background:#7c3aed;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
             </a>
         }
         @if (pendingRefunds > 0)
         {
-            <a href="/Admin/Refunds" class="alert-pill"
+            <a href="/Admin/Refunds"
                style="background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
-                ↩️ <span>@pendingRefunds طلب استرداد في انتظار موافقتك</span>
+                <i class="bi bi-arrow-counterclockwise"></i>
+                <span>@pendingRefunds طلب استرداد في انتظار موافقتك</span>
                 <span style="background:#dc2626;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
             </a>
         }
         @if (pendingCommissions > 0)
         {
-            <a href="/Admin/Commissions" class="alert-pill"
+            <a href="/Admin/Commissions"
                style="background:#fffbeb;border:1.5px solid #fde68a;color:#b45309;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
-                🏆 <span>@pendingCommissions عمولة في انتظار اعتمادك</span>
+                <i class="bi bi-cash-stack"></i>
+                <span>@pendingCommissions عمولة في انتظار اعتمادك</span>
                 <span style="background:#b45309;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
             </a>
         }
         @if (pendingPayments > 0)
         {
-            <a href="/Admin/Candidates" class="alert-pill"
+            <a href="/Admin/Candidates"
                style="background:#eff6ff;border:1.5px solid #bfdbfe;color:#2563eb;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
-                💰 <span>@pendingPayments دفعة في انتظار اعتماد المحاسب</span>
+                <i class="bi bi-cash-coin"></i>
+                <span>@pendingPayments دفعة في انتظار اعتماد المحاسب</span>
                 <span style="background:#2563eb;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
             </a>
         }
@@ -73,39 +135,31 @@
 @* ── KPI cards ── *@
 <div class="row g-3 mb-4">
     <div class="col-md-3 col-6">
-        <div class="stat-card">
-            <div class="stat-icon" style="background:#eff6ff;color:#2563eb;">👥</div>
-            <div>
-                <div class="stat-value">@totalLeads.ToString("N0")</div>
-                <div class="stat-label">إجمالي العملاء المحتملين</div>
-            </div>
+        <div class="stat-card blue">
+            <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="stat-value">@totalLeads.ToString("N0")</div>
+            <div class="stat-label">إجمالي العملاء</div>
         </div>
     </div>
     <div class="col-md-3 col-6">
-        <div class="stat-card">
-            <div class="stat-icon" style="background:#f0fdf4;color:#16a34a;">🧳</div>
-            <div>
-                <div class="stat-value">@totalCandidates.ToString("N0")</div>
-                <div class="stat-label">إجمالي المرشحين</div>
-            </div>
+        <div class="stat-card green">
+            <div class="stat-icon"><i class="bi bi-person-check-fill"></i></div>
+            <div class="stat-value">@totalCandidates.ToString("N0")</div>
+            <div class="stat-label">إجمالي المرشحين</div>
         </div>
     </div>
     <div class="col-md-3 col-6">
-        <div class="stat-card">
-            <div class="stat-icon" style="background:#fffbeb;color:#b45309;">💰</div>
-            <div>
-                <div class="stat-value">@totalCollected.ToString("N0")</div>
-                <div class="stat-label">إجمالي المحصّل (ج.م)</div>
-            </div>
+        <div class="stat-card amber">
+            <div class="stat-icon"><i class="bi bi-cash-coin"></i></div>
+            <div class="stat-value">@totalCollected.ToString("N0")</div>
+            <div class="stat-label">إجمالي المحصّل (ج.م)</div>
         </div>
     </div>
     <div class="col-md-3 col-6">
-        <div class="stat-card">
-            <div class="stat-icon" style="background:#faf5ff;color:#7c3aed;">📣</div>
-            <div>
-                <div class="stat-value">@activeCampaigns</div>
-                <div class="stat-label">حملات نشطة</div>
-            </div>
+        <div class="stat-card blue">
+            <div class="stat-icon"><i class="bi bi-megaphone-fill"></i></div>
+            <div class="stat-value">@activeCampaigns</div>
+            <div class="stat-label">حملات نشطة</div>
         </div>
     </div>
 </div>
@@ -115,47 +169,46 @@
     <div class="col-md-3 col-6">
         <a href="/Admin/StageApprovals" class="text-decoration-none">
             <div class="stat-card" style="border-right:3px solid #7c3aed;">
-                <div class="stat-icon" style="background:#f5f3ff;color:#7c3aed;">✅</div>
-                <div>
-                    <div class="stat-value" style="color:#7c3aed;">@pendingApprovals</div>
-                    <div class="stat-label">طلبات موافقة معلقة</div>
-                </div>
+                <div class="stat-icon" style="background:#f5f3ff;color:#7c3aed;"><i class="bi bi-shield-lock-fill"></i></div>
+                <div class="stat-value" style="color:#7c3aed;">@pendingApprovals</div>
+                <div class="stat-label">طلبات موافقة معلقة</div>
             </div>
         </a>
     </div>
     <div class="col-md-3 col-6">
         <a href="/Admin/Refunds" class="text-decoration-none">
             <div class="stat-card" style="border-right:3px solid #dc2626;">
-                <div class="stat-icon" style="background:#fef2f2;color:#dc2626;">↩️</div>
-                <div>
-                    <div class="stat-value" style="color:#dc2626;">@pendingRefunds</div>
-                    <div class="stat-label">استردادات معلقة</div>
-                </div>
+                <div class="stat-icon" style="background:#fef2f2;color:#dc2626;"><i class="bi bi-arrow-counterclockwise"></i></div>
+                <div class="stat-value" style="color:#dc2626;">@pendingRefunds</div>
+                <div class="stat-label">استردادات معلقة</div>
             </div>
         </a>
     </div>
     <div class="col-md-3 col-6">
         <a href="/Admin/Commissions" class="text-decoration-none">
             <div class="stat-card" style="border-right:3px solid #b45309;">
-                <div class="stat-icon" style="background:#fffbeb;color:#b45309;">🏆</div>
-                <div>
-                    <div class="stat-value" style="color:#b45309;">@pendingCommissions</div>
-                    <div class="stat-label">عمولات تحتاج اعتماد</div>
-                </div>
+                <div class="stat-icon" style="background:#fffbeb;color:#b45309;"><i class="bi bi-cash-stack"></i></div>
+                <div class="stat-value" style="color:#b45309;">@pendingCommissions</div>
+                <div class="stat-label">عمولات تحتاج اعتماد</div>
             </div>
         </a>
     </div>
     <div class="col-md-3 col-6">
         <a href="/Admin/Users" class="text-decoration-none">
             <div class="stat-card" style="border-right:3px solid #2563eb;">
-                <div class="stat-icon" style="background:#eff6ff;color:#2563eb;">👤</div>
-                <div>
-                    <div class="stat-value" style="color:#2563eb;">@totalUsers</div>
-                    <div class="stat-label">مستخدمي النظام</div>
-                </div>
+                <div class="stat-icon" style="background:#eff6ff;color:#2563eb;"><i class="bi bi-person-badge-fill"></i></div>
+                <div class="stat-value" style="color:#2563eb;">@totalUsers</div>
+                <div class="stat-label">مستخدمي النظام</div>
             </div>
         </a>
     </div>
+</div>
+
+@* ── Month label ── *@
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+    <div style="width:4px;height:24px;background:var(--primary);border-radius:2px"></div>
+    <span style="font-size:15px;font-weight:700;color:var(--text-primary)">إحصائيات @monthName @selYear</span>
+    <span style="font-size:12px;color:var(--text-muted)">(@monthLeadsTotal عميل · @monthCandidatesTotal مرشح)</span>
 </div>
 
 @* ── Charts row ── *@
@@ -164,37 +217,34 @@
     <div class="col-md-6">
         <div class="card h-100">
             <div class="card-header">
-                <span class="card-title">📊 العملاء المحتملين حسب الحالة</span>
-                <a href="/Admin/Leads" class="btn btn-ghost btn-sm">عرض الكل</a>
+                <div class="header-icon" style="background:#EEF2FF;color:var(--primary)"><i class="bi bi-bar-chart-fill"></i></div>
+                العملاء المحتملين حسب الحالة
+                <a href="/Admin/Leads" class="btn btn-sm ms-auto" style="border:1px solid var(--border);font-size:11px">عرض الكل</a>
             </div>
             <div class="card-body">
-                @if (leadsByStatus != null && leadsByStatus.Any())
+                @if (leadsByStatus != null && leadsByStatus.Any(x => (int)x.Count > 0))
                 {
                     @foreach (var item in leadsByStatus)
                     {
                         int s = (int)item.Status;
                         int count = (int)item.Count;
-                        string label = s >= 1 && s < leadStatusLabels.Length ? leadStatusLabels[s] : $"حالة {s}";
-                        string color = s >= 1 && s < leadStatusColors.Length ? leadStatusColors[s] : "#64748b";
-                        double pct = totalLeads > 0 ? (count * 100.0 / totalLeads) : 0;
-
-                        <div class="mb-2">
+                        string label = funnelLabels.GetValueOrDefault(s, $"حالة {s}");
+                        string color = funnelColors.GetValueOrDefault(s, "#64748b");
+                        double pct = monthLeadsTotal > 0 ? (count * 100.0 / monthLeadsTotal) : 0;
+                        <div class="mb-3">
                             <div class="d-flex justify-content-between mb-1">
-                                <span style="font-size:.78rem;font-weight:600;color:@color;">@label</span>
-                                <span style="font-size:.78rem;color:var(--text-muted);">@count</span>
+                                <span style="font-size:13px;font-weight:600;color:@color">@label</span>
+                                <span style="font-size:13px;font-weight:700;color:var(--text-primary)">@count</span>
                             </div>
-                            <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
-                                <div style="height:100%;width:@(pct.ToString("F1"))%;background:@color;border-radius:3px;transition:width .4s;"></div>
+                            <div style="height:7px;background:#F1F5F9;border-radius:4px;overflow:hidden">
+                                <div style="height:100%;width:@(pct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%;background:@color;border-radius:4px;transition:width .4s"></div>
                             </div>
                         </div>
                     }
                 }
                 else
                 {
-                    <div class="empty-state" style="padding:24px;">
-                        <div class="empty-state-icon">📊</div>
-                        <div class="empty-state-title">لا يوجد بيانات</div>
-                    </div>
+                    <div class="empty-state"><i class="bi bi-bar-chart"></i><p>لا توجد بيانات لهذا الشهر</p></div>
                 }
             </div>
         </div>
@@ -204,8 +254,9 @@
     <div class="col-md-6">
         <div class="card h-100">
             <div class="card-header">
-                <span class="card-title">🧳 المرشحون حسب المرحلة</span>
-                <a href="/Admin/Candidates" class="btn btn-ghost btn-sm">عرض الكل</a>
+                <div class="header-icon" style="background:#ECFDF5;color:#059669"><i class="bi bi-people-fill"></i></div>
+                المرشحون حسب المرحلة
+                <a href="/Admin/Candidates" class="btn btn-sm ms-auto" style="border:1px solid var(--border);font-size:11px">عرض الكل</a>
             </div>
             <div class="card-body">
                 @if (candidatesByStage != null && candidatesByStage.Any())
@@ -214,26 +265,21 @@
                     {
                         string label = item.Stage?.ToString() ?? "—";
                         int count = (int)item.Count;
-                        string color = "#1B4FD8";
-                        double pct = totalCandidates > 0 ? (count * 100.0 / totalCandidates) : 0;
-
-                        <div class="mb-2">
+                        double pct = monthCandidatesTotal > 0 ? (count * 100.0 / monthCandidatesTotal) : 0;
+                        <div class="mb-3">
                             <div class="d-flex justify-content-between mb-1">
-                                <span style="font-size:.78rem;font-weight:600;color:@color;">@label</span>
-                                <span style="font-size:.78rem;color:var(--text-muted);">@count</span>
+                                <span style="font-size:13px;font-weight:600;color:var(--primary)">@label</span>
+                                <span style="font-size:13px;font-weight:700;color:var(--text-primary)">@count</span>
                             </div>
-                            <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
-                                <div style="height:100%;width:@(pct.ToString("F1"))%;background:@color;border-radius:3px;transition:width .4s;"></div>
+                            <div style="height:7px;background:#F1F5F9;border-radius:4px;overflow:hidden">
+                                <div style="height:100%;width:@(pct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%;background:var(--primary);border-radius:4px;transition:width .4s"></div>
                             </div>
                         </div>
                     }
                 }
                 else
                 {
-                    <div class="empty-state" style="padding:24px;">
-                        <div class="empty-state-icon">🧳</div>
-                        <div class="empty-state-title">لا يوجد مرشحون</div>
-                    </div>
+                    <div class="empty-state"><i class="bi bi-people"></i><p>لا يوجد مرشحون لهذا الشهر</p></div>
                 }
             </div>
         </div>
@@ -243,8 +289,9 @@
 @* ── Recent Leads ── *@
 <div class="card">
     <div class="card-header">
-        <span class="card-title">🕐 أحدث العملاء المحتملين</span>
-        <a href="/Admin/Leads" class="btn btn-ghost btn-sm">عرض الكل</a>
+        <div class="header-icon" style="background:#F5F3FF;color:#7C3AED"><i class="bi bi-clock-history"></i></div>
+        أحدث العملاء المحتملين — @monthName @selYear
+        <a href="/Admin/Leads" class="btn btn-sm ms-auto" style="border:1px solid var(--border);font-size:11px">عرض الكل</a>
     </div>
     <div class="card-body p-0">
         @if (recentLeads != null && recentLeads.Any())
@@ -264,24 +311,17 @@
                     @foreach (var lead in recentLeads)
                     {
                         int s = lead.Status;
-                        string label = s >= 1 && s < leadStatusLabels.Length ? leadStatusLabels[s] : $"حالة {s}";
-                        string color = s >= 1 && s < leadStatusColors.Length ? leadStatusColors[s] : "#64748b";
-                        string colorBg = color + "20";
-                        string colorBorder = color + "40";
-
+                        string lbl = s >= 1 && s < allStatusLabels.Length ? allStatusLabels[s] : $"حالة {s}";
+                        string col = s >= 1 && s < allStatusColors.Length ? allStatusColors[s] : "#64748b";
                         <tr>
-                            <td style="font-weight:600;">@lead.FullName</td>
-                            <td style="font-family:monospace;font-size:.83rem;">@lead.Phone</td>
-                            <td style="font-size:.82rem;color:var(--text-muted);">@(lead.Campaign?.Name ?? "—")</td>
-                            <td style="font-size:.82rem;">@(lead.AssignedSales?.FullName ?? "—")</td>
+                            <td style="font-weight:600">@lead.FullName</td>
+                            <td style="font-family:monospace;font-size:13px">@lead.Phone</td>
+                            <td style="font-size:12px;color:var(--text-muted)">@(lead.Campaign?.Name ?? "—")</td>
+                            <td style="font-size:12px">@(lead.AssignedSales?.FullName ?? "—")</td>
                             <td>
-                                <span style="background:@colorBg;color:@color;border:1px solid @colorBorder;font-size:.7rem;padding:3px 8px;border-radius:99px;font-weight:700;">
-                                    @label
-                                </span>
+                                <span style="background:@(col)20;color:@col;border:1px solid @(col)40;font-size:11px;padding:3px 8px;border-radius:99px;font-weight:700">@lbl</span>
                             </td>
-                            <td style="font-size:.78rem;color:var(--text-muted);">
-                                @lead.CreatedAt.ToString("dd/MM/yyyy")
-                            </td>
+                            <td style="font-size:12px;color:var(--text-muted)">@lead.CreatedAt.ToString("dd/MM/yyyy")</td>
                         </tr>
                     }
                 </tbody>
@@ -289,9 +329,9 @@
         }
         else
         {
-            <div class="empty-state" style="padding:32px;">
-                <div class="empty-state-icon">👥</div>
-                <div class="empty-state-title">لا يوجد عملاء محتملين بعد</div>
+            <div class="empty-state" style="padding:32px">
+                <i class="bi bi-people"></i>
+                <p>لا يوجد عملاء محتملين لهذا الشهر</p>
             </div>
         }
     </div>

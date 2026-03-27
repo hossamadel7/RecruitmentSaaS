@@ -194,43 +194,23 @@ namespace RecruitmentSaaS.Controllers
                     await _context.SaveChangesAsync();
                 }
 
-                // ── Auto-calculate commission from tiers ──────────────────────
+                // Auto-create commission for this deal (Status=1 pending admin approval)
                 var existingCommission = await _context.Commissions
                     .AnyAsync(c => c.CandidateId == newCandidateId);
 
                 if (!existingCommission)
                 {
-                    var now = DateTime.UtcNow;
-                    var monthStart = new DateOnly(now.Year, now.Month, 1);
-
-                    // Count deals this month for this sales user (pending/approved/paid — exclude reversed)
-                    int dealsThisMonth = await _context.Commissions
-                        .CountAsync(c => c.SalesUserId == userId
-                                      && c.CommissionMonth == monthStart
-                                      && c.Status != 4) + 1; // +1 for current deal
-
-                    // Find the correct tier based on deal count
-                    var tier = await _context.CommissionTiers
-                        .Where(t => t.IsActive
-                                 && t.MinDeals <= dealsThisMonth
-                                 && (t.MaxDeals == null || t.MaxDeals >= dealsThisMonth))
-                        .OrderByDescending(t => t.MinDeals)
-                        .FirstOrDefaultAsync();
-
-                    decimal commissionAmount = tier?.AmountPerDeal ?? 0;
-
-                    _context.Commissions.Add(new Commission
+                    _context.Commissions.Add(new RecruitmentSaaS.Models.Entities.Commission
                     {
                         Id = Guid.NewGuid(),
                         SalesUserId = userId,
                         CandidateId = newCandidateId,
-                        CommissionMonth = monthStart,
-                        AmountEgp = commissionAmount,  // ✅ محسوب من الشرائح تلقائياً
-                        DealsThisMonth = dealsThisMonth,
+                        CommissionMonth = DateOnly.FromDateTime(DateTime.UtcNow),
+                        AmountEgp = 0, // Admin sets the actual amount when approving
+                        DealsThisMonth = 1,
                         Status = 1, // Pending admin approval
-                        CreatedAt = now
+                        CreatedAt = DateTime.UtcNow
                     });
-
                     await _context.SaveChangesAsync();
                 }
 
@@ -439,7 +419,6 @@ namespace RecruitmentSaaS.Controllers
 
             return View(dto);
         }
-
 
         // ── POST /Sales/AddVisitComment ───────────────────────────────────────
         [HttpPost]
@@ -777,6 +756,7 @@ namespace RecruitmentSaaS.Controllers
             var userId = CurrentUserId;
 
             var candidate = await _context.Candidates
+                .Include(c => c.CurrentPackageStage)
                 .FirstOrDefaultAsync(c => c.Id == candidateId && c.AssignedSalesId == userId);
 
             if (candidate == null)
