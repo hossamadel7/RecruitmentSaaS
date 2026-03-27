@@ -106,7 +106,8 @@
                         <tr style="@(!u.IsActive ? "opacity:.5;" : "")">
                             <td>
                                 <div class="d-flex align-items-center gap-2">
-                                    <div class="avatar avatar-sm" style="background:@rColorBg;color:@rColor;border:1.5px solid @rColorBorder;">
+                                    <div class="avatar avatar-sm"
+                                         style="background:@rColorBg;color:@rColor;border:1.5px solid @rColorBorder;">
                                         @(u.FullName.FirstOrDefault())
                                     </div>
                                     <div style="font-weight:600;">@u.FullName</div>
@@ -114,25 +115,28 @@
                             </td>
                             <td style="font-family:monospace;font-size:.82rem;">@u.Email</td>
                             <td>
-                                <span style="background:@rColorBg;color:@rColor;border:1px solid @rColorBorder;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">
+                                <span style="background:@rColorBg;color:@rColor;border:1px solid @rColorBorder;
+                                             font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">
                                     @rName
                                 </span>
                             </td>
                             <td>
                                 @if (u.IsActive)
                                 {
-                                    <span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">نشط</span>
+                                    <span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;
+                                                 font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">نشط</span>
                                 }
                                 else
                                 {
-                                    <span style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">معطّل</span>
+                                    <span style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;
+                                                 font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">معطّل</span>
                                 }
                             </td>
                             <td style="font-size:.78rem;color:var(--text-muted);">
                                 @u.CreatedAt.ToString("dd/MM/yyyy")
                             </td>
                             <td>
-                                <div class="d-flex gap-1">
+                                <div class="d-flex gap-1 flex-wrap">
                                     <form method="post" action="/Admin/ToggleUser" class="d-inline">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="userId" value="@u.Id" />
@@ -142,10 +146,22 @@
                                             <i class="bi @(u.IsActive ? "bi-person-slash" : "bi-person-check")"></i>
                                         </button>
                                     </form>
-                                    <button class="btn btn-outline-secondary btn-sm" title="تغيير كلمة المرور"
+
+                                    <button class="btn btn-outline-secondary btn-sm"
+                                            title="تغيير كلمة المرور"
                                             onclick="openResetPwd('@u.Id', '@u.FullName')">
                                         <i class="bi bi-key"></i>
                                     </button>
+
+                                    @* ── زر نسخ الرابط الشخصي — للـ TeleSales فقط (Role = 3) ── *@
+                                    @if (u.Role == 3)
+                                    {
+                                        <button class="btn btn-outline-success btn-sm"
+                                                title="نسخ الرابط الشخصي لـ @u.FullName"
+                                                onclick="copyRefLink('@u.Id', '@u.FullName')">
+                                            <i class="bi bi-link-45deg"></i>
+                                        </button>
+                                    }
                                 </div>
                             </td>
                         </tr>
@@ -156,13 +172,23 @@
     </div>
 </div>
 
-@* ── CREATE USER MODAL (Bootstrap) ──────────────────────────────── *@
-<div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
+@* ── Toast notification ─────────────────────────────────────────── *@
+<div id="copyToast"
+     style="display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+            background:#1B4FD8;color:#fff;padding:12px 28px;border-radius:12px;
+            font-size:13px;font-weight:600;z-index:9999;
+            box-shadow:0 4px 20px rgba(27,79,216,.35);transition:opacity .3s;">
+    ✅ تم نسخ الرابط
+</div>
+
+@* ── CREATE USER MODAL ──────────────────────────────────────────── *@
+<div class="modal fade" id="createUserModal" tabindex="-1"
+     aria-labelledby="createUserModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="createUserModalLabel">مستخدم جديد</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="post" action="/Admin/CreateUser">
                 @Html.AntiForgeryToken()
@@ -198,7 +224,7 @@
     </div>
 </div>
 
-@* ── RESET PASSWORD MODAL (Bootstrap) ────────────────────────────── *@
+@* ── RESET PASSWORD MODAL ────────────────────────────────────────── *@
 <div class="modal fade" id="resetPwdModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -230,10 +256,26 @@
 @section Scripts {
     <script>
         function openResetPwd(userId, userName) {
-            document.getElementById('resetUserId').value = userId;
+            document.getElementById('resetUserId').value        = userId;
             document.getElementById('resetUserName').textContent = userName;
-            var modal = new bootstrap.Modal(document.getElementById('resetPwdModal'));
-            modal.show();
+            new bootstrap.Modal(document.getElementById('resetPwdModal')).show();
+        }
+
+        function copyRefLink(userId, userName) {
+            var url = window.location.origin + '/?ref=' + userId;
+            navigator.clipboard.writeText(url).then(function () {
+                var toast = document.getElementById('copyToast');
+                toast.textContent  = '✅ تم نسخ رابط ' + userName;
+                toast.style.display = 'block';
+                toast.style.opacity = '1';
+                setTimeout(function () {
+                    toast.style.opacity = '0';
+                    setTimeout(function () { toast.style.display = 'none'; }, 300);
+                }, 3000);
+            }).catch(function () {
+                // Fallback لو clipboard API مش متاح
+                prompt('انسخ الرابط يدوياً:', url);
+            });
         }
     </script>
 }
