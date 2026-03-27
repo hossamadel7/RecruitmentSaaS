@@ -90,6 +90,7 @@ namespace RecruitmentSaaS.Controllers
         }
 
         // ── GET /TeleSales/Pool ───────────────────────────────────────────────
+        // ── GET /TeleSales/Pool ───────────────────────────────────────────────
         public async Task<IActionResult> Pool(Guid? campaignId, int page = 1)
         {
             const int pageSize = 20;
@@ -102,15 +103,22 @@ namespace RecruitmentSaaS.Controllers
                 .ToListAsync();
 
             // Pool rules:
-            // 1. Lead has no sheet (manual/webhook) → visible to ALL TeleSales
-            // 2. Lead has a sheet → visible only if user is assigned to that sheet
+            // 1. Lead مش معيّن لحد + مش من sheet → يظهر لكل TeleSales
+            // 2. Lead من sheet → يظهر بس لو الـ user معيّن على الـ sheet
+            // 3. Lead معيّن مباشرة لهذا الـ TeleSales من الـ ref link → يظهر بس ليه
             var query = _context.Leads
                 .Include(l => l.Campaign)
-                .Where(l => l.AssignedSalesId == null
-                         && l.IsConverted == false
+                .Where(l => l.IsConverted == false
                          && l.IsDuplicate == false
-                         && (l.GoogleSheetId == null
-                             || mySheetIds.Contains(l.GoogleSheetId.Value)));
+                         && (
+                                // Leads معيّنة مباشرة لهذا الـ TeleSales من الـ Form
+                                l.AssignedSalesId == userId
+                                ||
+                                // Leads مش معيّنة لحد + sheet rule
+                                (l.AssignedSalesId == null
+                                 && (l.GoogleSheetId == null
+                                     || mySheetIds.Contains(l.GoogleSheetId.Value)))
+                            ));
 
             if (campaignId.HasValue)
                 query = query.Where(l => l.CampaignId == campaignId.Value);
@@ -153,7 +161,6 @@ namespace RecruitmentSaaS.Controllers
 
             return View(leads);
         }
-
         // ── POST /TeleSales/AssignToMe ────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
