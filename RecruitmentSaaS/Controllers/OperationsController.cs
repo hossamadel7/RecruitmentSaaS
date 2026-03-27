@@ -34,18 +34,110 @@ namespace RecruitmentSaaS.Controllers
 
             // Candidates by stage
             var byStage = await _context.Candidates
-                .Where(c => c.IsCompleted != true)
-                .GroupBy(c => c.CurrentPackageStage!.StageName)
-                .Select(g => new { Stage = g.Key, Count = g.Count() })
-                .OrderBy(g => g.Stage)
+                .Where(c => c.IsCompleted != true && c.CurrentPackageStageId != null)
+                .GroupBy(c => new {
+                    Name = c.CurrentPackageStage!.StageName,
+                    Order = c.CurrentPackageStage!.StageOrder
+                })
+                .Select(g => new {
+                    Stage = g.Key.Name,
+                    Order = g.Key.Order,
+                    Count = g.Count()
+                })
+                .OrderBy(g => g.Order)
+                .ToListAsync();
+
+            // ── المرشحون الجاهزون للسفر (StageOrder = 6) ─────────────────────
+            var readyToTravel = await _context.Candidates
+                .Include(c => c.JobPackage)
+                .Include(c => c.AssignedSales)
+                .Where(c => c.IsCompleted != true
+                         && c.CurrentPackageStage != null
+                         && c.CurrentPackageStage.StageOrder == 6)
+                .OrderBy(c => c.FullName)
+                .Select(c => new {
+                    c.Id,
+                    c.FullName,
+                    c.Phone,
+                    c.TotalPaidEgp,
+                    JobPackageName = c.JobPackage.Name,
+                    DestinationCountry = c.JobPackage.DestinationCountry,
+                    JobTitle = c.JobPackage.JobTitle,
+                    PriceEgp = c.JobPackage.PriceEgp,
+                    AssignedSalesName = c.AssignedSales != null ? c.AssignedSales.FullName : "—"
+                })
                 .ToListAsync();
 
             ViewBag.TotalCandidates = totalCandidates;
             ViewBag.InProgress = inProgress;
             ViewBag.CompletedCount = completedCount;
             ViewBag.ByStage = byStage;
+            ViewBag.ReadyToTravel = readyToTravel;
 
             return View();
+        }
+
+        // ── POST /Operations/ConfirmVisaReceived ──────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ConfirmVisaReceived(Guid candidateId)
+        {
+            var candidate = await _context.Candidates
+                .Include(c => c.CurrentPackageStage)
+                .FirstOrDefaultAsync(c => c.Id == candidateId);
+
+            if (candidate == null)
+            {
+                TempData["Error"] = "المرشح غير موجود";
+                return RedirectToAction("Index");
+            }
+
+            if (candidate.CurrentPackageStage?.StageOrder != 6)
+            {
+                TempData["Error"] = "المرشح ليس في مرحلة استلام التأشيرة";
+                return RedirectToAction("Index");
+            }
+
+            var successParam = new Microsoft.Data.SqlClient.SqlParameter
+            {
+                ParameterName = "@Success",
+                SqlDbType = System.Data.SqlDbType.Bit,
+                Direction = System.Data.ParameterDirection.Output
+            };
+            var messageParam = new Microsoft.Data.SqlClient.SqlParameter
+            {
+                ParameterName = "@Message",
+                SqlDbType = System.Data.SqlDbType.NVarChar,
+                Size = 500,
+                Direction = System.Data.ParameterDirection.Output
+            };
+            var stageNameParam = new Microsoft.Data.SqlClient.SqlParameter
+            {
+                ParameterName = "@NewStageName",
+                SqlDbType = System.Data.SqlDbType.NVarChar,
+                Size = 200,
+                Direction = System.Data.ParameterDirection.Output
+            };
+
+            await _context.Database.ExecuteSqlRawAsync(
+                "EXEC demorecruitment.sp_MoveToNextStage @CandidateId, @MovedById, @Notes, @IsOverride, @OverrideReason, @Success OUTPUT, @Message OUTPUT, @NewStageName OUTPUT",
+                new Microsoft.Data.SqlClient.SqlParameter("@CandidateId", candidateId),
+                new Microsoft.Data.SqlClient.SqlParameter("@MovedById", CurrentUserId),
+                new Microsoft.Data.SqlClient.SqlParameter("@Notes", "تم استلام التأشيرة — جاهز للسفر"),
+                new Microsoft.Data.SqlClient.SqlParameter("@IsOverride", false),
+                new Microsoft.Data.SqlClient.SqlParameter("@OverrideReason", DBNull.Value),
+                successParam, messageParam, stageNameParam
+            );
+
+            var success = (bool)successParam.Value;
+            var message = messageParam.Value?.ToString() ?? "";
+
+            if (success)
+                TempData["Success"] = "تم تأكيد استلام التأشيرة — انتقل المرشح إلى مرحلة السفر ✅";
+            else
+                TempData["Error"] = message;
+
+            return RedirectToAction("Index");
         }
 
         // ── GET /Operations/Candidates ────────────────────────────────────────
