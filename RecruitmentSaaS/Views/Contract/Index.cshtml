@@ -1,0 +1,347 @@
+@{
+    ViewData["Title"] = "عقود العمل";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var pending = ViewBag.Pending as List<RecruitmentSaaS.Models.Entities.ContractUpload> ?? new();
+    var matched = ViewBag.Matched as List<RecruitmentSaaS.Models.Entities.ContractUpload> ?? new();
+}
+
+<div style="padding:24px">
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-3" style="font-size:13px">
+            <i class="bi bi-check-circle-fill me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ExtractionLog"] != null)
+    {
+        var logItems = TempData["ExtractionLog"]!.ToString()!.Split('|', StringSplitOptions.RemoveEmptyEntries);
+        <div class="alert alert-info alert-dismissible fade show mb-3" style="font-size:12px">
+            <div style="font-weight:700;margin-bottom:8px"><i class="bi bi-search me-2"></i>نتيجة الاستخراج:</div>
+            @foreach (var item in logItems)
+            {
+                <div style="padding:3px 0;border-bottom:1px solid rgba(0,0,0,.06)">@item</div>
+            }
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3" style="font-size:13px">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+        <div>
+            <h1 style="font-size:22px;font-weight:800;margin:0">📄 عقود العمل</h1>
+            <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0">
+                رفع وربط عقود العمل بالمرشحين تلقائياً
+            </p>
+        </div>
+    </div>
+
+    <!-- Upload Zone -->
+    <div style="background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);padding:24px;margin-bottom:24px">
+        <h2 style="font-size:14px;font-weight:700;margin:0 0 16px">⬆️ رفع عقود جديدة</h2>
+        <form method="post" action="/Contract/Upload" enctype="multipart/form-data" id="uploadForm">
+            @Html.AntiForgeryToken()
+            <div id="dropZone"
+                 style="border:2px dashed var(--border);border-radius:var(--radius);padding:40px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s"
+                 onclick="document.getElementById('fileInput').click()"
+                 ondragover="event.preventDefault();this.style.borderColor='var(--primary)';this.style.background='var(--primary-light)'"
+                 ondragleave="this.style.borderColor='var(--border)';this.style.background=''"
+                 ondrop="handleDrop(event)">
+                <div style="font-size:36px;margin-bottom:12px">📄</div>
+                <div style="font-weight:700;font-size:14px;margin-bottom:6px">اسحب ملفات PDF هنا أو اضغط للاختيار</div>
+                <div style="font-size:12px;color:var(--text-muted)">يمكن رفع أكثر من ملف في نفس الوقت</div>
+                <input type="file" name="files" id="fileInput" accept=".pdf" multiple style="display:none"
+                       onchange="showFileList(this.files)" />
+            </div>
+
+            <div id="fileList" style="margin-top:12px;display:none">
+                <div id="fileListItems" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px"></div>
+                <button type="submit"
+                        style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                    <i class="bi bi-upload me-2"></i> رفع وتحليل العقود
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px">
+        <button class="tab-btn active" onclick="switchTab('pending')"
+                id="tab-pending"
+                style="padding:10px 20px;background:none;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px">
+            ⏳ بدون تطابق
+            <span style="background:#fee2e2;color:#dc2626;border-radius:20px;padding:1px 8px;font-size:11px;margin-right:4px">@pending.Count</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('matched')"
+                id="tab-matched"
+                style="padding:10px 20px;background:none;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-muted)">
+            ✅ تم التطابق
+            <span style="background:#f0fdf4;color:#16a34a;border-radius:20px;padding:1px 8px;font-size:11px;margin-right:4px">@matched.Count</span>
+        </button>
+    </div>
+
+    <!-- Pending Tab -->
+    <div id="panel-pending">
+        @if (!pending.Any())
+        {
+            <div style="background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);padding:48px;text-align:center">
+                <div style="font-size:36px;margin-bottom:12px">✅</div>
+                <div style="font-weight:700;font-size:14px">لا توجد عقود بدون تطابق</div>
+            </div>
+        }
+        else
+        {
+            <div style="display:flex;flex-direction:column;gap:10px">
+                @foreach (var u in pending)
+                {
+                    <div style="background:var(--card-bg);border-radius:var(--radius);border:1px solid #fecaca;padding:16px 20px">
+                        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                            <div style="flex:1;min-width:0">
+                                <div style="font-weight:700;font-size:13px;margin-bottom:4px">
+                                    <i class="bi bi-file-earmark-pdf-fill me-2" style="color:#dc2626"></i>@u.FileName
+                                </div>
+                                <div style="display:flex;gap:12px;font-size:12px;color:var(--text-muted);flex-wrap:wrap">
+                                    @if (!string.IsNullOrEmpty(u.ExtractedPassportNo))
+                                    {
+                                        <span><i class="bi bi-passport me-1"></i>@u.ExtractedPassportNo</span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(u.ExtractedEmployerName))
+                                    {
+                                        <span><i class="bi bi-building me-1"></i>@u.ExtractedEmployerName</span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(u.ExtractedTransactionNo))
+                                    {
+                                        <span><i class="bi bi-hash me-1"></i>@u.ExtractedTransactionNo</span>
+                                    }
+                                    <span><i class="bi bi-clock me-1"></i>@u.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:8px;flex-shrink:0">
+                                <button onclick="openMatchModal('@u.Id')"
+                                        style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+                                    <i class="bi bi-link-45deg me-1"></i> ربط يدوي
+                                </button>
+                                <form method="post" action="/Contract/Dismiss" style="display:inline"
+                                      onsubmit="return confirm('تجاهل هذا الملف؟')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="uploadId" value="@u.Id" />
+                                    <button type="submit"
+                                            style="background:#fef2f2;border:1px solid #fecaca;border-radius:var(--radius-sm);padding:7px 12px;font-size:12px;color:#dc2626;cursor:pointer;font-family:inherit">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Matched Tab -->
+    <div id="panel-matched" style="display:none">
+        @if (!matched.Any())
+        {
+            <div style="background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);padding:48px;text-align:center">
+                <div style="font-size:13px;color:var(--text-muted)">لا توجد عقود مطابقة بعد</div>
+            </div>
+        }
+        else
+        {
+            <div style="background:var(--card-bg);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden">
+                <table class="table mb-0" style="font-size:13px">
+                    <thead style="background:#f8fafc">
+                        <tr>
+                            <th style="padding:12px 20px;font-weight:700;color:var(--text-muted);font-size:12px">الملف</th>
+                            <th style="font-weight:700;color:var(--text-muted);font-size:12px">المرشح</th>
+                            <th style="font-weight:700;color:var(--text-muted);font-size:12px">رقم الجواز</th>
+                            <th style="font-weight:700;color:var(--text-muted);font-size:12px">صاحب العمل</th>
+                            <th style="font-weight:700;color:var(--text-muted);font-size:12px">النوع</th>
+                            <th style="font-weight:700;color:var(--text-muted);font-size:12px">التاريخ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var u in matched)
+                        {
+                            <tr style="border-top:1px solid var(--border)">
+                                <td style="padding:12px 20px">
+                                    <div style="font-weight:600;font-size:12px">
+                                        <i class="bi bi-file-earmark-pdf-fill me-1" style="color:#dc2626"></i>@u.FileName
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(u.ExtractedTransactionNo))
+                                    {
+                                        <div style="font-size:11px;color:var(--text-muted)">@u.ExtractedTransactionNo</div>
+                                    }
+                                </td>
+                                <td style="padding:12px 20px;font-weight:700">
+                                    @(u.MatchedCandidate?.FullName ?? "—")
+                                </td>
+                                <td style="padding:12px 20px;font-size:12px;color:var(--text-muted)">
+                                    @(u.ExtractedPassportNo ?? "—")
+                                </td>
+                                <td style="padding:12px 20px;font-size:12px;color:var(--text-muted)">
+                                    @(u.ExtractedEmployerName ?? "—")
+                                </td>
+                                <td style="padding:12px 20px">
+                                    @if (u.MatchStatus == 1)
+                                    {
+                                        <span style="background:#eff6ff;color:var(--primary);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">تلقائي</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">يدوي</span>
+                                    }
+                                </td>
+                                <td style="padding:12px 20px;font-size:12px;color:var(--text-muted)">
+                                    @u.CreatedAt.ToString("dd/MM/yyyy")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- ── Manual Match Modal ──────────────────────────────────────────────────── -->
+<div id="matchModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border-radius:var(--radius);width:460px;max-width:95vw">
+        <div style="padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <h5 style="margin:0;font-weight:800;font-size:15px">🔗 ربط يدوي</h5>
+            <button onclick="closeMatchModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted)">×</button>
+        </div>
+        <form method="post" action="/Contract/ManualMatch" style="padding:22px">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="uploadId" id="matchUploadId" />
+            <input type="hidden" name="candidateId" id="matchCandidateId" />
+
+            <div class="mb-3">
+                <label class="form-label fw-bold" style="font-size:13px">ابحث عن مرشح</label>
+                <input type="text" id="matchSearch" class="form-control" style="font-size:13px"
+                       placeholder="الاسم أو التليفون أو رقم الجواز"
+                       oninput="searchMatch(this.value)" autocomplete="off" />
+                <div id="matchResults"
+                     style="border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;display:none;background:var(--card-bg)">
+                </div>
+                <div id="matchSelected"
+                     style="display:none;margin-top:8px;background:#eff6ff;border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-weight:600;color:var(--primary)">
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button type="button" onclick="closeMatchModal()"
+                        style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit">
+                    إلغاء
+                </button>
+                <button type="submit" id="matchSubmitBtn" disabled
+                        style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;opacity:.5">
+                    <i class="bi bi-link-45deg me-1"></i> ربط
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // ── Tabs ──────────────────────────────────────────────────────────────────────
+        function switchTab(tab) {
+            document.getElementById('panel-pending').style.display = tab === 'pending' ? '' : 'none';
+            document.getElementById('panel-matched').style.display = tab === 'matched' ? '' : 'none';
+            document.getElementById('tab-pending').style.color      = tab === 'pending' ? 'var(--primary)' : 'var(--text-muted)';
+            document.getElementById('tab-matched').style.color      = tab === 'matched' ? 'var(--primary)' : 'var(--text-muted)';
+            document.getElementById('tab-pending').style.borderBottom = tab === 'pending' ? '2px solid var(--primary)' : 'none';
+            document.getElementById('tab-matched').style.borderBottom = tab === 'matched' ? '2px solid var(--primary)' : 'none';
+        }
+
+        // ── File Drop ─────────────────────────────────────────────────────────────────
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('dropZone').style.borderColor = 'var(--border)';
+            document.getElementById('dropZone').style.background  = '';
+            const dt = e.dataTransfer;
+            const input = document.getElementById('fileInput');
+            input.files = dt.files;
+            showFileList(dt.files);
+        }
+        function showFileList(files) {
+            const list = document.getElementById('fileListItems');
+            list.innerHTML = '';
+            Array.from(files).forEach(f => {
+                list.innerHTML += `
+                    <div style="display:flex;align-items:center;gap:8px;background:#f8fafc;border-radius:8px;padding:8px 12px;font-size:12px">
+                        <i class="bi bi-file-earmark-pdf-fill" style="color:#dc2626"></i>
+                        <span style="font-weight:600">${f.name}</span>
+                        <span style="color:var(--text-muted)">${(f.size/1024).toFixed(0)} KB</span>
+                    </div>`;
+            });
+            document.getElementById('fileList').style.display = files.length ? '' : 'none';
+        }
+
+        // ── Match Modal ───────────────────────────────────────────────────────────────
+        function openMatchModal(uploadId) {
+            document.getElementById('matchUploadId').value = uploadId;
+            document.getElementById('matchModal').style.display = 'flex';
+            document.getElementById('matchSearch').focus();
+        }
+        function closeMatchModal() {
+            document.getElementById('matchModal').style.display = 'none';
+            document.getElementById('matchSearch').value = '';
+            document.getElementById('matchResults').style.display = 'none';
+            document.getElementById('matchSelected').style.display = 'none';
+            document.getElementById('matchCandidateId').value = '';
+            var btn = document.getElementById('matchSubmitBtn');
+            btn.disabled = true; btn.style.opacity = '.5';
+        }
+
+        var matchTimeout;
+        function searchMatch(q) {
+            clearTimeout(matchTimeout);
+            if (!q || q.length < 2) {
+                document.getElementById('matchResults').style.display = 'none';
+                return;
+            }
+            matchTimeout = setTimeout(async function() {
+                const res  = await fetch('/Contract/SearchCandidates?q=' + encodeURIComponent(q));
+                const data = await res.json();
+                const box  = document.getElementById('matchResults');
+                if (!data.length) {
+                    box.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--text-muted)">لا توجد نتائج</div>';
+                } else {
+                    box.innerHTML = data.map(c => `
+                        <div onclick="selectMatch('${c.id}','${c.fullName}','${c.passportNumber||''}')"
+                             style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+                             onmouseover="this.style.background='var(--hover-bg)'"
+                             onmouseout="this.style.background=''">
+                            <div style="font-weight:600">${c.fullName}</div>
+                            <div style="font-size:11px;color:var(--text-muted)">${c.phone} ${c.passportNumber ? '· ' + c.passportNumber : ''}</div>
+                        </div>`).join('');
+                }
+                box.style.display = 'block';
+            }, 300);
+        }
+        function selectMatch(id, name, passport) {
+            document.getElementById('matchCandidateId').value = id;
+            document.getElementById('matchSearch').value = name;
+            document.getElementById('matchResults').style.display = 'none';
+            var sel = document.getElementById('matchSelected');
+            sel.innerHTML = `<i class="bi bi-person-check-fill me-1"></i> ${name} ${passport ? '· ' + passport : ''}`;
+            sel.style.display = 'block';
+            var btn = document.getElementById('matchSubmitBtn');
+            btn.disabled = false; btn.style.opacity = '1';
+        }
+        document.addEventListener('click', e => {
+            if (e.target === document.getElementById('matchModal')) closeMatchModal();
+        });
+    </script>
+}
