@@ -27,6 +27,8 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<IGoogleSheetsLeadImportService, GoogleSheetsLeadImportService>();
 builder.Services.AddHostedService<GoogleSheetsImportBackgroundService>();
 
+builder.Services.AddScoped<IContractParserService, ContractParserService>();
+
 builder.Services.AddScoped<RecruitmentSaaS.Services.INotificationService,
                            RecruitmentSaaS.Services.NotificationService>();
 

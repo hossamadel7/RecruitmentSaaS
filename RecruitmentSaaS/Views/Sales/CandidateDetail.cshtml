@@ -22,7 +22,10 @@
     var docRequired = currentStage?.StageType?.RequiredAction == 1
                          || currentStage?.StageType?.RequiredAction == 4
                          || (currentStage?.StageName?.Contains("جواز") == true);
-    var docUploaded = stageCompletions.Any(sc => sc.PackageStageId == (currentStage?.Id ?? Guid.Empty));
+    var requiredDocType = currentStage?.StageType?.DocumentTypeRequired;
+    var docUploaded = stageCompletions.Any(sc => sc.PackageStageId == (currentStage?.Id ?? Guid.Empty))
+                         || (requiredDocType.HasValue && documents.Any(d => d.DocumentType == requiredDocType.Value))
+                         || (!requiredDocType.HasValue && docRequired && documents.Any());
     var docBlocked = docRequired && !docUploaded && !Model.IsCompleted && nextStage != null;
 
     var canMove = !Model.IsCompleted && nextStage != null && !docBlocked
@@ -864,34 +867,75 @@
 </div>
 
 <!-- ── Upload Document Modal ─────────────────────────────────────────── -->
+@{
+    // Determine forced document type based on current stage
+    var stageCode = currentStage?.StageType?.StageCode ?? "";
+    var forcedDocType = stageCode == "PASSPORT_SUBMIT" ? "1" :
+                         stageCode == "CONTRACT_ISSUED" ? "3" :
+                         stageCode == "MEDICAL_CHECK" ? "4" :
+                         stageCode == "FLIGHT_BOOKING" ? "5" :
+                         stageCode == "VISA_ISSUED" ? "2" : "";
+    var forcedDocName = forcedDocType == "1" ? "جواز السفر" :
+                         forcedDocType == "3" ? "عقد العمل" :
+                         forcedDocType == "4" ? "كشف طبي" :
+                         forcedDocType == "5" ? "تذكرة سفر" :
+                         forcedDocType == "2" ? "تأشيرة" : "";
+
+    // Check if same doc type already uploaded
+    var existingDoc = forcedDocType != ""
+        ? documents.FirstOrDefault(d => d.DocumentType == byte.Parse(forcedDocType))
+        : null;
+}
 <div class="modal fade" id="uploadDocModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content" style="border-radius:var(--radius);border:none">
             <div class="modal-header" style="border-bottom:1px solid var(--border)">
                 <h5 class="modal-title" style="font-weight:700;font-size:15px">
-                    <i class="bi bi-upload" style="color:#7C3AED;margin-left:8px"></i> رفع مستند
+                    <i class="bi bi-upload" style="color:#7C3AED;margin-left:8px"></i>
+                    @(forcedDocType != "" ? $"رفع {forcedDocName}" : "رفع مستند")
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
+            @if (existingDoc != null)
+            {
+                <div style="background:#fffbeb;border-bottom:1px solid #fde68a;padding:10px 20px;font-size:12px;color:#92400e;display:flex;align-items:center;gap:8px">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    يوجد <strong>@existingDoc.FileName</strong> مرفوع بالفعل لمرحلة <strong>@(currentStage?.StageName ?? "")</strong> — سيتم استبداله برفع ملف جديد
+                </div>
+            }
             <form asp-action="UploadDocument" asp-controller="Sales" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="candidateId" value="@Model.Id" />
+                <input type="hidden" name="replaceExisting" value="true" />
                 <div class="modal-body" style="padding:24px">
-                    <div class="mb-3">
-                        <label class="form-label">نوع المستند <span style="color:var(--danger)">*</span></label>
-                        <select name="documentType" id="docTypeSelect" class="form-select" required
-                                onchange="onDocTypeChange(this.value)">
-                            <option value="1">جواز السفر</option>
-                            <option value="2">تأشيرة</option>
-                            <option value="3">عقد</option>
-                            <option value="4">كشف طبي</option>
-                            <option value="5">تذكرة سفر</option>
-                            <option value="6">بطاقة شخصية</option>
-                            <option value="7">مؤهل دراسي</option>
-                            <option value="8">شهادة خبرة</option>
-                            <option value="9">أخرى</option>
-                        </select>
-                    </div>
+                    @if (forcedDocType != "")
+                    {
+                        <!-- Forced doc type — hidden, no dropdown -->
+                        <input type="hidden" name="documentType" id="docTypeSelect" value="@forcedDocType" />
+                        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#16a34a;font-weight:600">
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            نوع المستند: <strong>@forcedDocName</strong>
+                            <span style="font-size:11px;color:var(--text-muted);font-weight:400;margin-right:8px">(مرحلة: @currentStage?.StageName)</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">نوع المستند <span style="color:var(--danger)">*</span></label>
+                            <select name="documentType" id="docTypeSelect" class="form-select" required
+                                    onchange="onDocTypeChange(this.value)">
+                                <option value="1">جواز السفر</option>
+                                <option value="2">تأشيرة</option>
+                                <option value="3">عقد</option>
+                                <option value="4">كشف طبي</option>
+                                <option value="5">تذكرة سفر</option>
+                                <option value="6">بطاقة شخصية</option>
+                                <option value="7">مؤهل دراسي</option>
+                                <option value="8">شهادة خبرة</option>
+                                <option value="9">أخرى</option>
+                            </select>
+                        </div>
+                    }
 
                     <!-- Passport fields -->
                     <div id="passportFields" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px;margin-bottom:14px">
@@ -948,26 +992,30 @@
             if (modal && e.target === modal) modal.style.display = 'none';
         });
 
-        // ── Open passport upload modal ───────────────────────────────────────────────
+        // ── Open passport upload modal ────────────────────────────────────────
         function openPassportUpload() {
-            var select = document.getElementById('docTypeSelect');
-            if (select) select.value = '1';
-            onDocTypeChange('1');
             var modalEl = document.getElementById('uploadDocModal');
             var modal   = bootstrap.Modal.getOrCreateInstance(modalEl);
             modal.show();
-            // Ensure fields visible after show
-            setTimeout(function() { onDocTypeChange('1'); }, 100);
+            setTimeout(function() {
+                // Get doc type — hidden input (forced) or select
+                var typeEl = document.querySelector('#uploadDocModal input[name="documentType"][type="hidden"]') ||
+                             document.getElementById('docTypeSelect');
+                var val = typeEl ? typeEl.value : '1';
+                if (document.getElementById('docTypeSelect')?.tagName === 'SELECT')
+                    document.getElementById('docTypeSelect').value = '1';
+                onDocTypeChange(val || '1');
+            }, 100);
         }
 
-        // ── Document Type Change ─────────────────────────────────────────────────────
+        // ── Document Type Change ───────────────────────────────────────────────
         function onDocTypeChange(val) {
             var passportFields = document.getElementById('passportFields');
             var passportNum    = document.getElementById('passportNumberInput');
             var passportExpiry = document.getElementById('passportExpiryInput');
             var fileInput      = document.getElementById('docFileInput');
 
-            if (!passportFields) return; // modal not rendered yet
+            if (!passportFields) return;
 
             if (val === '1') {
                 passportFields.style.display = 'block';
@@ -984,13 +1032,15 @@
 
         // Initialize on modal open
         document.getElementById('uploadDocModal')?.addEventListener('show.bs.modal', function() {
-            var val = document.getElementById('docTypeSelect')?.value || '1';
+            var typeEl = document.querySelector('#uploadDocModal input[name="documentType"][type="hidden"]') ||
+                         document.getElementById('docTypeSelect');
+            var val = typeEl ? typeEl.value : '1';
             onDocTypeChange(val);
         });
 
-        // Also run on page load
         document.addEventListener('DOMContentLoaded', function() {
-            onDocTypeChange(document.getElementById('docTypeSelect')?.value || '1');
+            var select = document.getElementById('docTypeSelect');
+            if (select && select.tagName === 'SELECT') onDocTypeChange(select.value || '1');
         });
     </script>
 }

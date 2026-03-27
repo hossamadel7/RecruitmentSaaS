@@ -187,46 +187,30 @@ namespace RecruitmentSaaS.Controllers
 
                 var newCandidateId = (Guid)candidateIdParam.Value;
 
-                // reload context before touching any entities
-                _context.ChangeTracker.Clear();
+                var candidate = await _context.Candidates.FindAsync(newCandidateId);
+                if (candidate != null)
+                {
+                    candidate.AssignedSalesId = userId;
+                    await _context.SaveChangesAsync();
+                }
 
-                // ── Auto-calculate commission from tiers ──────────────────────
+                // Auto-create commission for this deal (Status=1 pending admin approval)
                 var existingCommission = await _context.Commissions
                     .AnyAsync(c => c.CandidateId == newCandidateId);
 
                 if (!existingCommission)
                 {
-                    var now = DateTime.UtcNow;
-                    var monthStart = new DateOnly(now.Year, now.Month, 1);
-
-                    // Count deals this month for this sales user (pending/approved/paid — exclude reversed)
-                    int dealsThisMonth = await _context.Commissions
-                        .CountAsync(c => c.SalesUserId == userId
-                                      && c.CommissionMonth == monthStart
-                                      && c.Status != 4) + 1; // +1 for current deal
-
-                    // Find the correct tier based on deal count
-                    var tier = await _context.CommissionTiers
-                        .Where(t => t.IsActive
-                                 && t.MinDeals <= dealsThisMonth
-                                 && (t.MaxDeals == null || t.MaxDeals >= dealsThisMonth))
-                        .OrderByDescending(t => t.MinDeals)
-                        .FirstOrDefaultAsync();
-
-                    decimal commissionAmount = tier?.AmountPerDeal ?? 0;
-
-                    _context.Commissions.Add(new Commission
+                    _context.Commissions.Add(new RecruitmentSaaS.Models.Entities.Commission
                     {
                         Id = Guid.NewGuid(),
                         SalesUserId = userId,
                         CandidateId = newCandidateId,
-                        CommissionMonth = monthStart,
-                        AmountEgp = commissionAmount,  // ✅ محسوب من الشرائح تلقائياً
-                        DealsThisMonth = dealsThisMonth,
+                        CommissionMonth = DateOnly.FromDateTime(DateTime.UtcNow),
+                        AmountEgp = 0, // Admin sets the actual amount when approving
+                        DealsThisMonth = 1,
                         Status = 1, // Pending admin approval
-                        CreatedAt = now
+                        CreatedAt = DateTime.UtcNow
                     });
-
                     await _context.SaveChangesAsync();
                 }
 
@@ -235,10 +219,11 @@ namespace RecruitmentSaaS.Controllers
             }
             catch (Exception ex)
             {
-                TempData["Error"] = "حدث خطأ أثناء التحويل: " + (ex.InnerException?.Message ?? ex.Message);
+                TempData["Error"] = "حدث خطأ أثناء التحويل: " + ex.Message;
                 return RedirectToAction("LeadDetail", new { id = leadId });
             }
         }
+
         // ── GET /Sales/Candidates ─────────────────────────────────────────────
         public async Task<IActionResult> Candidates(Guid? stageId)
         {
@@ -766,7 +751,7 @@ namespace RecruitmentSaaS.Controllers
         // ── POST /Sales/UploadDocument ────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UploadDocument(Guid candidateId, byte documentType, IFormFile file, string? passportNumber = null, DateOnly? passportExpiry = null)
+        public async Task<IActionResult> UploadDocument(Guid candidateId, byte documentType, IFormFile file, string? passportNumber = null, DateOnly? passportExpiry = null, bool replaceExisting = false)
         {
             var userId = CurrentUserId;
 
@@ -826,6 +811,25 @@ namespace RecruitmentSaaS.Controllers
             // S3Key stores the relative path for now (swap with S3 key later)
             var s3Key = $"candidates/{candidateId}/{uniqueFileName}";
 
+            // Replace existing document of same type if requested
+            if (replaceExisting)
+            {
+                var existing = await _context.Documents
+                    .Where(d => d.CandidateId == candidateId && d.DocumentType == documentType)
+                    .ToListAsync();
+
+                foreach (var old in existing)
+                {
+                    // Delete old file from disk
+                    var oldPath = Path.Combine(_env.WebRootPath, "uploads", "candidates",
+                        candidateId.ToString(), Path.GetFileName(old.S3key));
+                    if (System.IO.File.Exists(oldPath))
+                        System.IO.File.Delete(oldPath);
+
+                    _context.Documents.Remove(old);
+                }
+            }
+
             _context.Documents.Add(new Document
             {
                 Id = Guid.NewGuid(),
@@ -851,16 +855,61 @@ namespace RecruitmentSaaS.Controllers
 
                 if (passportExpiry.HasValue)
                     candidate.PassportExpiry = passportExpiry.Value;
+            }
 
-                // StageActionCompletion is now recorded by sp_MoveToNextStage when candidate passes the stage
-                // No manual completion needed here — passport data saved, stage completion happens on transition
+            // ── Record StageActionCompletion so View shows stage as done ✅ ──
+            // This applies to ANY document type that matches the current stage requirement
+            if (candidate.CurrentPackageStageId.HasValue)
+            {
+                // Check if current stage requires a document of this type
+                var currentStage = await _context.PackageStages
+                    .Include(ps => ps.StageType)
+                    .FirstOrDefaultAsync(ps =>
+                        ps.Id == candidate.CurrentPackageStageId.Value &&
+                        ps.StageType != null &&
+                        (ps.StageType.RequiredAction == 1 || ps.StageType.RequiredAction == 4) &&
+                        (ps.StageType.DocumentTypeRequired == null ||
+                         ps.StageType.DocumentTypeRequired == documentType));
+
+                if (currentStage != null)
+                {
+                    var alreadyDone = await _context.StageActionCompletions
+                        .AnyAsync(s =>
+                            s.CandidateId == candidateId &&
+                            s.PackageStageId == candidate.CurrentPackageStageId.Value &&
+                            s.CompletionType == 4);
+
+                    if (!alreadyDone)
+                    {
+                        _context.StageActionCompletions.Add(new StageActionCompletion
+                        {
+                            Id = Guid.NewGuid(),
+                            CandidateId = candidateId,
+                            PackageStageId = candidate.CurrentPackageStageId.Value,
+                            CompletedAt = DateTime.UtcNow,
+                            CompletedById = userId,
+                            CompletionType = 4, // DocumentUploaded
+                            Notes = $"تم رفع المستند: {file.FileName}"
+                        });
+                    }
+                }
             }
 
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = documentType == 1
-                ? "تم رفع الجواز وحفظ البيانات بنجاح ✅"
-                : "تم رفع المستند بنجاح";
+            var stageName = candidate.CurrentPackageStage?.StageName ?? "";
+            var docTypeName = documentType switch
+            {
+                1 => "جواز السفر",
+                2 => "التأشيرة",
+                3 => "عقد العمل",
+                4 => "الكشف الطبي",
+                5 => "تذكرة السفر",
+                _ => "المستند"
+            };
+            TempData["Success"] = replaceExisting
+                ? $"تم استبدال {docTypeName} بنجاح ✅ — مرحلة: {stageName}"
+                : $"تم رفع {docTypeName} بنجاح ✅ — مرحلة: {stageName}";
             return RedirectToAction("CandidateDetail", new { id = candidateId });
         }
 

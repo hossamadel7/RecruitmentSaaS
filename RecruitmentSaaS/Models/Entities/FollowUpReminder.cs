@@ -35,7 +35,11 @@ public partial class FollowUpReminder
 
     public DateTime? UpdatedAt { get; set; }
 
+    public Guid? CandidateId { get; set; }
+
     public virtual User AssignedTo { get; set; } = null!;
+
+    public virtual Candidate? Candidate { get; set; }
 
     public virtual User CreatedBy { get; set; } = null!;
 
