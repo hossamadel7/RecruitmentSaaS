@@ -6,11 +6,11 @@
 
     var branches = ViewBag.Branches as List<RecruitmentSaaS.Models.Entities.Branch> ?? new List<RecruitmentSaaS.Models.Entities.Branch>();
     var jobPackages = ViewBag.JobPackages as List<RecruitmentSaaS.Models.Entities.JobPackage> ?? new List<RecruitmentSaaS.Models.Entities.JobPackage>();
-    bool singleBranch = branches.Count == 1;
 
     string formError = TempData["FormError"]?.ToString() ?? "";
     var wpNumber = (ViewBag.WhatsAppNumber as string) ?? "201000000000";
     var wpLabel = (ViewBag.WhatsAppLabel as string) ?? "تحدث معنا عبر واتساب";
+    var logoPath = "/uploads/images/logo fahd.png";
 }
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -19,29 +19,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>الفهد العربي — بوابتك للعمل في الخارج</title>
     <meta name="description" content="شركة الفهد العربي للتوظيف الدولي — فرص عمل حقيقية في الخارج مع دعم كامل من التسجيل حتى السفر" />
-
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
     <link href="~/css/home.css" rel="stylesheet" />
-
 </head>
 <body>
 
     <div id="scroll-progress"><div id="scroll-progress-fill"></div></div>
 
-    <!-- NAVBAR -->
+    <!-- ══════════════════════════════════════════
+         NAVBAR
+    ══════════════════════════════════════════ -->
     <nav class="navbar" id="navbar">
         <a href="/" class="nav-brand">
-            <div class="nav-logo"><i class="bi bi-shield-fill-check"></i></div>
-            <div class="nav-name">الفهد العربي<small>للتوظيف الدولي</small></div>
+            <div class="nav-logo">
+                <img src="@logoPath" alt="شعار الفهد العربي"
+                     style="padding:5px;object-fit:contain;width:100%;height:100%" />
+            </div>
+            <div class="nav-name">
+                الفهد العربي
+                <small>للتوظيف الدولي</small>
+            </div>
         </a>
         <div class="nav-right">
-            <a href="#register" class="nav-cta btn-lift" id="navCta">
+            <a href="#register" class="nav-cta" id="navCta">
                 <i class="bi bi-pencil-square"></i><span>سجّل الآن</span>
             </a>
-            <a href="https://wa.me/@wpNumber" target="_blank" rel="noopener" class="nav-wp btn-lift" id="navWp">
+            <a href="https://wa.me/@wpNumber" target="_blank" rel="noopener" class="nav-wp" id="navWp">
                 <i class="bi bi-whatsapp"></i>
                 <span class="wp-text">واتساب</span>
             </a>
@@ -51,51 +57,82 @@
         </div>
     </nav>
 
-    <!-- HERO -->
+    <!-- ══════════════════════════════════════════
+         HERO
+    ══════════════════════════════════════════ -->
     <section class="hero" id="home">
         <div class="hero-grid"></div>
-        <div class="hero-orb hero-orb-1"></div>
-        <div class="hero-orb hero-orb-2"></div>
-        <div id="hero-particles"></div>
         <div class="hero-inner">
+
             <div class="hero-eyebrow">
                 <span class="dot"></span>
-                <i class="bi bi-globe-americas" style="font-size:13px"></i>
-                السعودية · الإمارات · قطر · ألمانيا · رومانيا
+                <i class="bi bi-patch-check-fill" style="font-size:12px"></i>
+                شركة مرخصة · ١٥ عاماً خبرة · +١٢ دولة
             </div>
-            <h1>ابدأ مستقبلك المهني<br />مع <span class="highlight">الفهد العربي</span></h1>
-            <p class="hero-sub">بوابتك الموثوقة للحصول على فرص عمل حقيقية في الخارج. فريقنا يرافقك من أول خطوة حتى توقيع العقد وسفرك بسلام.</p>
+
+            <h1>
+                ابدأ مستقبلك المهني<br />
+                مع <span class="highlight">الفهد العربي</span>
+            </h1>
+
+            <p class="hero-sub">
+                بوابتك الموثوقة للحصول على فرص عمل حقيقية في الخارج.
+                فريقنا يرافقك من أول خطوة حتى توقيع العقد وسفرك بسلام.
+            </p>
+
             <div class="hero-actions">
-                <a href="#register" class="btn-lift btn-gold"><i class="bi bi-pencil-square"></i> سجّل بياناتك — مجاناً</a>
-                <a href="https://wa.me/@wpNumber" target="_blank" rel="noopener" class="btn-lift btn-ghost-white" id="heroWp"><i class="bi bi-whatsapp"></i> تواصل معنا الآن</a>
+                <a href="#register" class="btn-lift btn-gold">
+                    <i class="bi bi-pencil-square"></i> سجّل بياناتك — مجاناً
+                </a>
+                <a href="https://wa.me/@wpNumber" target="_blank" rel="noopener"
+                   class="btn-lift btn-ghost-white" id="heroWp">
+                    <i class="bi bi-whatsapp"></i> تواصل معنا الآن
+                </a>
             </div>
+
+            <div class="hero-trust-line">
+                <div class="hero-trust-item"><i class="bi bi-shield-fill-check"></i> عقود موثقة رسمياً</div>
+                <div class="hero-trust-item"><i class="bi bi-clock-fill"></i> رد خلال ٢٤ ساعة</div>
+                <div class="hero-trust-item"><i class="bi bi-currency-exchange"></i> الاستشارة مجانية</div>
+                <div class="hero-trust-item"><i class="bi bi-people-fill"></i> +٥٠٠٠ موظف تم تشغيلهم</div>
+            </div>
+
             <div class="hero-stats">
                 <div class="hero-stat">
-                    <div><span class="hero-stat-num" id="cnt1">0</span><span style="color:var(--gold);font-weight:900">+</span></div>
+                    <div><span class="hero-stat-num" id="cnt1">0</span><span style="color:var(--gold-light);font-weight:900">+</span></div>
                     <div class="hero-stat-label">موظف تم تشغيلهم</div>
                 </div>
                 <div class="hero-stat">
-                    <div><span class="hero-stat-num" id="cnt2">0</span><span style="color:var(--gold);font-weight:900">+</span></div>
+                    <div><span class="hero-stat-num" id="cnt2">0</span><span style="color:var(--gold-light);font-weight:900">+</span></div>
                     <div class="hero-stat-label">دولة استقبال</div>
                 </div>
                 <div class="hero-stat">
-                    <div><span class="hero-stat-num" id="cnt3">0</span><span style="color:var(--gold);font-weight:900">+</span></div>
+                    <div><span class="hero-stat-num" id="cnt3">0</span><span style="color:var(--gold-light);font-weight:900">+</span></div>
                     <div class="hero-stat-label">سنة خبرة</div>
                 </div>
                 <div class="hero-stat">
-                    <div><span class="hero-stat-num" id="cnt4">0</span><span style="color:var(--gold);font-weight:900">%</span></div>
+                    <div><span class="hero-stat-num" id="cnt4">0</span><span style="color:var(--gold-light);font-weight:900">%</span></div>
                     <div class="hero-stat-label">رضا العملاء</div>
                 </div>
             </div>
+
         </div>
-        <div class="scroll-hint"><span>scroll</span><div class="scroll-hint-line"></div></div>
+        <div class="scroll-hint">
+            <span>scroll</span>
+            <div class="scroll-hint-line"></div>
+        </div>
     </section>
+
+    <!-- ══════════════════════════════════════════
+         IMAGE MARQUEE — partner logos only
+    ══════════════════════════════════════════ -->
     <div class="img-marquee-section">
-        <div class="img-marquee-track" id="imgMarqueeTrack">
-            <!-- الصور هتتضاف من JS -->
-        </div>
+        <div class="img-marquee-track" id="imgMarqueeTrack"></div>
     </div>
-    <!-- TRUST STRIP -->
+
+    <!-- ══════════════════════════════════════════
+         TRUST STRIP
+    ══════════════════════════════════════════ -->
     <div class="trust-strip">
         <div class="trust-item"><i class="bi bi-patch-check-fill"></i> شركة مرخصة ومعتمدة</div>
         <div class="trust-item"><i class="bi bi-shield-fill-check"></i> عقود موثقة رسمياً</div>
@@ -104,64 +141,112 @@
         <div class="trust-item"><i class="bi bi-currency-exchange"></i> رواتب وصرف منتظم</div>
     </div>
 
-    <!-- ══════════════════ FORM ══════════════════ -->
+    <!-- ══════════════════════════════════════════
+         REGISTRATION FORM — split layout
+    ══════════════════════════════════════════ -->
     <section class="form-section" id="register">
-        <div style="max-width:700px;margin:0 auto;">
-            <div class="reveal">
+        <div style="max-width:820px;margin:0 auto">
+
+            <div class="reveal" style="margin-bottom:10px">
                 <div class="section-label"><i class="bi bi-person-plus-fill"></i> التسجيل</div>
                 <h2 class="section-heading">سجّل بياناتك الآن</h2>
                 <p class="section-sub">أدخل معلوماتك وسيتواصل معك أحد مستشارينا خلال ٢٤ ساعة — مجاناً تماماً</p>
             </div>
-            <div class="rating-badge">
-                <span class="rating-stars">★★★★★</span>
-                <span class="rating-text">٤.٩ من ٥ — بناءً على +٢٣٠٠ تقييم موثق</span>
-            </div>
 
-            <div class="form-card reveal-scale">
-                <div class="form-card-header">
-                    <div class="form-card-icon"><i class="bi bi-clipboard2-check-fill"></i></div>
-                    <div class="form-card-title">
-                        <h2>نموذج التسجيل</h2>
-                        <p>جميع الحقول المُعلّمة بـ * مطلوبة</p>
+            <div class="form-split reveal-scale">
+
+                <!-- Left: trust panel -->
+                <div class="form-trust-panel">
+                    <div class="form-trust-logo">
+                        <img src="@logoPath" alt="الفهد العربي" />
+                    </div>
+                    <div class="form-trust-title">لماذا تثق فينا؟</div>
+                    <div class="form-trust-sub">٤ أسباب تجعل الفهد العربي خيارك الأول</div>
+
+                    <div class="form-trust-points">
+                        <div class="form-trust-point">
+                            <div class="form-trust-point-icon"><i class="bi bi-patch-check-fill"></i></div>
+                            <div class="form-trust-point-text">
+                                <strong>مرخصة رسمياً</strong>
+                                معتمدون من وزارة القوى العاملة وسفارات الدول المستقبِلة
+                            </div>
+                        </div>
+                        <div class="form-trust-point">
+                            <div class="form-trust-point-icon"><i class="bi bi-file-earmark-check-fill"></i></div>
+                            <div class="form-trust-point-text">
+                                <strong>عقود شفافة</strong>
+                                كل حقوقك مكتوبة ومضمونة قبل السفر
+                            </div>
+                        </div>
+                        <div class="form-trust-point">
+                            <div class="form-trust-point-icon"><i class="bi bi-headset"></i></div>
+                            <div class="form-trust-point-text">
+                                <strong>دعم ما بعد السفر</strong>
+                                فريقنا معك حتى بعد وصولك واستقرارك
+                            </div>
+                        </div>
+                        <div class="form-trust-point">
+                            <div class="form-trust-point-icon"><i class="bi bi-cash-coin"></i></div>
+                            <div class="form-trust-point-text">
+                                <strong>الاستشارة مجانية</strong>
+                                لا رسوم مسبقة — ندفع فقط عند إتمام الإجراءات
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-trust-rating">
+                        <div class="form-trust-stars">★★★★★</div>
+                        <div class="form-trust-score">٤.٩ / ٥</div>
+                        <div class="form-trust-count">بناءً على +٢٣٠٠ تقييم موثق</div>
                     </div>
                 </div>
 
+                <!-- Right: form fields -->
                 <div class="form-body">
+                    <div class="form-body-header">
+                        <h2>
+                            <i class="bi bi-clipboard2-check-fill me-2" style="font-size:.95rem;color:#1E3055"></i>
+                            نموذج التسجيل
+                        </h2>
+                        <p>جميع الحقول المُعلّمة بـ * مطلوبة — التسجيل مجاني تماماً</p>
+                    </div>
+
                     @if (!string.IsNullOrEmpty(formError))
                     {
-                        <div class="error-banner"><i class="bi bi-exclamation-circle-fill"></i> @formError</div>
+                        <div class="error-banner">
+                            <i class="bi bi-exclamation-circle-fill"></i> @formError
+                        </div>
                     }
 
                     <form method="post" action="/Home/SubmitLead" novalidate id="leadForm">
                         @Html.AntiForgeryToken()
                         <div class="row g-3">
-                            <!-- Full Name -->
                             <div class="col-12 col-md-6">
                                 <label class="field-label">الاسم الكامل <span class="field-required">*</span></label>
-                                <input name="FullName" id="fullName" type="text" class="form-control" required maxlength="200" />
+                                <input name="FullName" id="fullName" type="text" class="form-control"
+                                       required maxlength="200" placeholder="مثال: محمد أحمد" />
                             </div>
-                            <!-- Phone -->
                             <div class="col-12 col-md-6">
                                 <label class="field-label">رقم الهاتف <span class="field-required">*</span></label>
-                                <input name="Phone" id="phone" type="tel" class="form-control" required maxlength="30" pattern="[0-9]{10,15}" />
+                                <input name="Phone" id="phone" type="tel" class="form-control"
+                                       required maxlength="30" pattern="[0-9]{10,15}" placeholder="01xxxxxxxxx" />
                             </div>
-                            <!-- Job Title -->
                             <div class="col-12 col-md-6">
                                 <label class="field-label">الوظيفة المطلوبة</label>
-                                <input name="InterestedJobTitle" type="text" class="form-control" maxlength="200" />
+                                <input name="InterestedJobTitle" type="text" class="form-control"
+                                       maxlength="200" placeholder="مثال: سائق، فني كهرباء..." />
                             </div>
-                            <!-- Country -->
                             <div class="col-12 col-md-6">
                                 <label class="field-label">الدولة المطلوبة</label>
-                                <input name="InterestedCountry" type="text" class="form-control" maxlength="100" />
+                                <input name="InterestedCountry" type="text" class="form-control"
+                                       maxlength="100" placeholder="مثال: السعودية، ألمانيا..." />
                             </div>
-                            <!-- Notes -->
                             <div class="col-12">
                                 <label class="field-label">ملاحظات</label>
-                                <textarea name="Notes" id="notesField" class="form-control"></textarea>
+                                <textarea name="Notes" id="notesField" class="form-control"
+                                          placeholder="أي معلومات إضافية تريد إضافتها..."></textarea>
                             </div>
-                            <!-- Submit -->
-                            <div class="col-12" style="margin-top:4px;">
+                            <div class="col-12" style="margin-top:4px">
                                 <button type="submit" class="btn-submit" id="submitBtn">
                                     <i class="bi bi-send-fill"></i> أرسل طلبك الآن
                                 </button>
@@ -169,48 +254,79 @@
                         </div>
                     </form>
 
-                    <div class="form-note"><i class="bi bi-lock-fill"></i> بياناتك محمية — الاستشارة الأولى مجانية تماماً</div>
+                    <div class="form-note">
+                        <i class="bi bi-lock-fill"></i> بياناتك محمية — الاستشارة الأولى مجانية تماماً
+                    </div>
                 </div>
-            </div>
+
+            </div><!-- /form-split -->
         </div>
     </section>
 
-    <!-- WHY US -->
+    <!-- ══════════════════════════════════════════
+         WHY US
+    ══════════════════════════════════════════ -->
     <section class="why-section">
-        <div style="max-width:1100px;margin:0 auto;">
+        <div style="max-width:1100px;margin:0 auto">
             <div class="section-intro reveal">
                 <div class="section-label"><i class="bi bi-award-fill"></i> مميزاتنا</div>
                 <h2 class="section-heading">لماذا تختار الفهد العربي؟</h2>
                 <p class="section-sub">نرافقك في كل خطوة — من أول اتصال حتى استقرارك في بلد العمل</p>
             </div>
             <div class="why-grid reveal">
-                <div class="why-card"><div class="why-card-icon"><i class="bi bi-trophy-fill"></i></div><div class="why-card-title">خبرة أكثر من ١٥ سنة</div><div class="why-card-desc">شركة رائدة في مجال التوظيف الدولي بسجل حافل وسمعة موثوقة عبر السنوات.</div></div>
-                <div class="why-card"><div class="why-card-icon"><i class="bi bi-globe-americas"></i></div><div class="why-card-title">شبكة واسعة في الخارج</div><div class="why-card-desc">علاقات مباشرة مع أصحاب عمل معتمدين في أكثر من ١٢ دولة حول العالم.</div></div>
-                <div class="why-card"><div class="why-card-icon"><i class="bi bi-file-earmark-check-fill"></i></div><div class="why-card-title">إجراءات شفافة وسريعة</div><div class="why-card-desc">متابعة كاملة لجميع المعاملات من التوثيق والفحوصات إلى تأشيرة السفر.</div></div>
-                <div class="why-card"><div class="why-card-icon"><i class="bi bi-headset"></i></div><div class="why-card-title">دعم ما بعد السفر</div><div class="why-card-desc">فريق دعم متاح لمساعدتك بعد وصولك لضمان استقرارك في بلد العمل.</div></div>
-                <div class="why-card"><div class="why-card-icon"><i class="bi bi-cash-coin"></i></div><div class="why-card-title">رواتب ومزايا تنافسية</div><div class="why-card-desc">نتفاوض نيابةً عنك للحصول على أفضل عروض العمل والمزايا المالية.</div></div>
-                <div class="why-card"><div class="why-card-icon"><i class="bi bi-shield-lock-fill"></i></div><div class="why-card-title">عقود موثقة وآمنة</div><div class="why-card-desc">جميع العقود موثقة رسمياً وتضمن حقوقك القانونية كاملةً قبل السفر.</div></div>
+                <div class="why-card">
+                    <div class="why-card-icon"><i class="bi bi-trophy-fill"></i></div>
+                    <div class="why-card-title">خبرة أكثر من ١٥ سنة</div>
+                    <div class="why-card-desc">شركة رائدة في مجال التوظيف الدولي بسجل حافل وسمعة موثوقة عبر السنوات.</div>
+                </div>
+                <div class="why-card">
+                    <div class="why-card-icon"><i class="bi bi-globe-americas"></i></div>
+                    <div class="why-card-title">شبكة واسعة في الخارج</div>
+                    <div class="why-card-desc">علاقات مباشرة مع أصحاب عمل معتمدين في أكثر من ١٢ دولة حول العالم.</div>
+                </div>
+                <div class="why-card">
+                    <div class="why-card-icon"><i class="bi bi-file-earmark-check-fill"></i></div>
+                    <div class="why-card-title">إجراءات شفافة وسريعة</div>
+                    <div class="why-card-desc">متابعة كاملة لجميع المعاملات من التوثيق والفحوصات إلى تأشيرة السفر.</div>
+                </div>
+                <div class="why-card">
+                    <div class="why-card-icon"><i class="bi bi-headset"></i></div>
+                    <div class="why-card-title">دعم ما بعد السفر</div>
+                    <div class="why-card-desc">فريق دعم متاح لمساعدتك بعد وصولك لضمان استقرارك في بلد العمل.</div>
+                </div>
+                <div class="why-card">
+                    <div class="why-card-icon"><i class="bi bi-cash-coin"></i></div>
+                    <div class="why-card-title">رواتب ومزايا تنافسية</div>
+                    <div class="why-card-desc">نتفاوض نيابةً عنك للحصول على أفضل عروض العمل والمزايا المالية.</div>
+                </div>
+                <div class="why-card">
+                    <div class="why-card-icon"><i class="bi bi-shield-lock-fill"></i></div>
+                    <div class="why-card-title">عقود موثقة وآمنة</div>
+                    <div class="why-card-desc">جميع العقود موثقة رسمياً وتضمن حقوقك القانونية كاملةً قبل السفر.</div>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- LOGOS -->
+    <!-- ══════════════════════════════════════════
+         PARTNER LOGOS MARQUEE
+    ══════════════════════════════════════════ -->
     <section class="logos-section">
         <p class="logos-heading reveal">جهات الاعتماد والشراكة</p>
         <div class="logos-track-wrap reveal">
             <div class="logos-track" id="logosTrack">
                 @{
                     var logos = new[] {
-                new { icon = "bi-bank2",               name = "وزارة القوى العاملة",   tag = "جهة حكومية" },
-                new { icon = "bi-airplane",            name = "الخطوط المصرية",         tag = "شريك سفر" },
-                new { icon = "bi-building-fill",       name = "شركة بن لادن السعودية", tag = "صاحب عمل" },
-                new { icon = "bi-hospital-fill",       name = "مستشفيات الخليج",        tag = "صاحب عمل" },
-                new { icon = "bi-truck-front-fill",    name = "DHL الشرق الأوسط",      tag = "صاحب عمل" },
-                new { icon = "bi-buildings-fill",      name = "مجموعة الفطيم",          tag = "صاحب عمل" },
-                new { icon = "bi-gear-wide-connected", name = "Siemens Middle East",    tag = "شريك تقني" },
+                new { icon = "bi-bank2",               name = "وزارة القوى العاملة",   tag = "جهة حكومية"  },
+                new { icon = "bi-airplane",            name = "الخطوط المصرية",         tag = "شريك سفر"    },
+                new { icon = "bi-building-fill",       name = "شركة بن لادن السعودية", tag = "صاحب عمل"    },
+                new { icon = "bi-hospital-fill",       name = "مستشفيات الخليج",        tag = "صاحب عمل"    },
+                new { icon = "bi-truck-front-fill",    name = "DHL الشرق الأوسط",      tag = "صاحب عمل"    },
+                new { icon = "bi-buildings-fill",      name = "مجموعة الفطيم",          tag = "صاحب عمل"    },
+                new { icon = "bi-gear-wide-connected", name = "Siemens Middle East",    tag = "شريك تقني"   },
                 new { icon = "bi-globe2",              name = "IOM المنظمة الدولية",    tag = "منظمة دولية" },
-                new { icon = "bi-clipboard2-data",     name = "هيئة تنمية الصادرات",   tag = "جهة حكومية" },
-                new { icon = "bi-bank",                name = "بنك مصر",               tag = "شريك مالي" },
+                new { icon = "bi-clipboard2-data",     name = "هيئة تنمية الصادرات",   tag = "جهة حكومية"  },
+                new { icon = "bi-bank",                name = "بنك مصر",               tag = "شريك مالي"   },
                 };
                 }
                 @for (int p = 0; p < 2; p++)
@@ -228,11 +344,13 @@
         </div>
     </section>
 
-    <!-- DESTINATIONS -->
+    <!-- ══════════════════════════════════════════
+         DESTINATIONS
+    ══════════════════════════════════════════ -->
     @if (jobPackages.Any())
     {
         <section class="dest-section">
-            <div style="max-width:1100px;margin:0 auto;">
+            <div style="max-width:1100px;margin:0 auto">
                 <div class="section-intro reveal">
                     <div class="section-label"><i class="bi bi-geo-alt-fill"></i> الوجهات</div>
                     <h2 class="section-heading">وجهاتنا الحالية</h2>
@@ -271,25 +389,49 @@
         </section>
     }
 
-    <!-- STEPS -->
+    <!-- ══════════════════════════════════════════
+         STEPS
+    ══════════════════════════════════════════ -->
     <section class="steps-section">
-        <div style="max-width:1100px;margin:0 auto;position:relative;z-index:1;">
+        <div style="max-width:1100px;margin:0 auto;position:relative;z-index:1">
             <div class="section-intro reveal">
-                <div class="section-label gold"><i class="bi bi-diagram-3-fill"></i> كيف نعمل؟</div>
+                <div class="section-label white"><i class="bi bi-diagram-3-fill"></i> كيف نعمل؟</div>
                 <h2 class="section-heading">٥ خطوات بسيطة للسفر</h2>
                 <p class="section-sub">رحلتك منظمة ومتابعة بالكامل من أول يوم</p>
             </div>
             <div class="steps-grid reveal">
-                <div class="step-card"><div class="step-num">١</div><div class="step-title">سجّل بياناتك</div><div class="step-desc">أدخل معلوماتك في النموذج أعلاه أو زُر أحد فروعنا مباشرة.</div></div>
-                <div class="step-card"><div class="step-num">٢</div><div class="step-title">مقابلة المستشار</div><div class="step-desc">يتواصل معك مستشار متخصص لفهم احتياجاتك واختيار الوظيفة المناسبة.</div></div>
-                <div class="step-card"><div class="step-num">٣</div><div class="step-title">إتمام الأوراق</div><div class="step-desc">نساعدك في استكمال جميع المستندات والفحوصات الطبية المطلوبة.</div></div>
-                <div class="step-card"><div class="step-num">٤</div><div class="step-title">توقيع العقد</div><div class="step-desc">عقد عمل رسمي موثق يضمن راتبك وحقوقك كاملةً قبل السفر.</div></div>
-                <div class="step-card"><div class="step-num">٥</div><div class="step-title">السفر والاستقرار</div><div class="step-desc">نرتب سفرك ونتابع معك بعد الوصول حتى تستقر في عملك الجديد.</div></div>
+                <div class="step-card">
+                    <div class="step-num">١</div>
+                    <div class="step-title">سجّل بياناتك</div>
+                    <div class="step-desc">أدخل معلوماتك في النموذج أعلاه أو زُر أحد فروعنا مباشرة.</div>
+                </div>
+                <div class="step-card">
+                    <div class="step-num">٢</div>
+                    <div class="step-title">مقابلة المستشار</div>
+                    <div class="step-desc">يتواصل معك مستشار متخصص لفهم احتياجاتك واختيار الوظيفة المناسبة.</div>
+                </div>
+                <div class="step-card">
+                    <div class="step-num">٣</div>
+                    <div class="step-title">إتمام الأوراق</div>
+                    <div class="step-desc">نساعدك في استكمال جميع المستندات والفحوصات الطبية المطلوبة.</div>
+                </div>
+                <div class="step-card">
+                    <div class="step-num">٤</div>
+                    <div class="step-title">توقيع العقد</div>
+                    <div class="step-desc">عقد عمل رسمي موثق يضمن راتبك وحقوقك كاملةً قبل السفر.</div>
+                </div>
+                <div class="step-card">
+                    <div class="step-num">٥</div>
+                    <div class="step-title">السفر والاستقرار</div>
+                    <div class="step-desc">نرتب سفرك ونتابع معك بعد الوصول حتى تستقر في عملك الجديد.</div>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- TESTIMONIALS -->
+    <!-- ══════════════════════════════════════════
+         TESTIMONIALS
+    ══════════════════════════════════════════ -->
     <section class="testimonials-section">
         <div class="testimonials-intro">
             <div class="section-intro reveal">
@@ -317,13 +459,13 @@
         </div>
     </section>
 
-    <!-- HISTORY TIMELINE -->
+    <!-- ══════════════════════════════════════════
+         HISTORY TIMELINE
+    ══════════════════════════════════════════ -->
     <section class="history-section">
-        <div class="hist-orb hist-orb-1"></div>
-        <div class="hist-orb hist-orb-2"></div>
         <div class="hist-inner">
             <div class="section-intro reveal">
-                <div class="section-label gold"><i class="bi bi-hourglass-split"></i> تاريخنا</div>
+                <div class="section-label white"><i class="bi bi-hourglass-split"></i> تاريخنا</div>
                 <h2 class="section-heading">رحلة ١٥ عاماً من النجاح</h2>
                 <p class="section-sub">من مكتب صغير في القاهرة إلى شركة رائدة تُشغّل آلاف العمال في ١٢ دولة</p>
             </div>
@@ -331,54 +473,67 @@
         </div>
     </section>
 
-    <!-- FAQ -->
+    <!-- ══════════════════════════════════════════
+         FAQ
+    ══════════════════════════════════════════ -->
     <section class="faq-section">
-        <div style="max-width:1100px;margin:0 auto;">
-            <div class="section-intro reveal" style="text-align:center;">
-                <div class="section-label" style="margin:0 auto 14px;"><i class="bi bi-question-circle-fill"></i> أسئلة شائعة</div>
+        <div style="max-width:1100px;margin:0 auto">
+            <div class="section-intro reveal" style="text-align:center">
+                <div class="section-label" style="margin:0 auto 14px">
+                    <i class="bi bi-question-circle-fill"></i> أسئلة شائعة
+                </div>
                 <h2 class="section-heading">كل ما تريد معرفته</h2>
-                <p class="section-sub" style="margin:0 auto;">نجاوب على أكثر الأسئلة التي يسألها المتقدمون قبل التسجيل</p>
+                <p class="section-sub" style="margin:0 auto">نجاوب على أكثر الأسئلة التي يسألها المتقدمون قبل التسجيل</p>
             </div>
         </div>
         <div class="faq-list reveal">
             <div class="faq-item">
                 <div class="faq-question">هل الوظائف حقيقية ١٠٠٪ وموثوقة؟<div class="faq-icon"><i class="bi bi-plus-lg"></i></div></div>
-                <div class="faq-answer"><p>نعم. جميع الوظائف التي نعرضها مرتبطة بعقود عمل رسمية مع أصحاب عمل معتمدين لدى وزارة القوى العاملة وسفارات الدول المستقبِلة. <span class="highlight-ans">لا نتعامل مع وسطاء غير رسميين</span>، ولا نُسوّق لأي وظيفة دون التحقق من المُشغِّل مسبقاً.</p></div>
+                <div class="faq-answer"><p>نعم. جميع الوظائف مرتبطة بعقود رسمية مع أصحاب عمل معتمدين. <span class="highlight-ans">لا نتعامل مع وسطاء غير رسميين</span>، ولا نُسوّق لأي وظيفة دون التحقق المسبق.</p></div>
             </div>
             <div class="faq-item">
-                <div class="faq-question">كيف يستلم المتقدم راتبه والمقابل المادي؟<div class="faq-icon"><i class="bi bi-plus-lg"></i></div></div>
-                <div class="faq-answer"><p>يُحدَّد الراتب بدقة في العقد قبل السفر ويُصرف مباشرةً من صاحب العمل عبر حساب بنكي. <span class="highlight-ans">لا توجد أي خصومات مخفية</span> من الراتب. في حالة تأخر الراتب، فريقنا يتدخل فوراً للمتابعة.</p></div>
+                <div class="faq-question">كيف يستلم المتقدم راتبه؟<div class="faq-icon"><i class="bi bi-plus-lg"></i></div></div>
+                <div class="faq-answer"><p>يُحدَّد الراتب في العقد قبل السفر ويُصرف من صاحب العمل عبر حساب بنكي. <span class="highlight-ans">لا توجد خصومات مخفية</span>. في حالة تأخر الراتب نتدخل فوراً.</p></div>
             </div>
             <div class="faq-item">
-                <div class="faq-question">متى يتم التواصل معي بعد تسجيل بياناتي؟<div class="faq-icon"><i class="bi bi-plus-lg"></i></div></div>
-                <div class="faq-answer"><p>يتواصل معك أحد مستشارينا <span class="highlight-ans">خلال ٢٤ ساعة كحد أقصى</span> من تسجيلك — وغالباً خلال ساعات قليلة في أيام العمل. إذا لم تتلقَّ اتصالاً، تواصل معنا مباشرة عبر واتساب.</p></div>
+                <div class="faq-question">متى يتم التواصل معي بعد التسجيل؟<div class="faq-icon"><i class="bi bi-plus-lg"></i></div></div>
+                <div class="faq-answer"><p>يتواصل معك مستشار <span class="highlight-ans">خلال ٢٤ ساعة كحد أقصى</span>. إذا لم تتلقَّ اتصالاً تواصل عبر واتساب مباشرة.</p></div>
             </div>
             <div class="faq-item">
-                <div class="faq-question">هل هناك رسوم على التسجيل أو الخدمة؟<div class="faq-icon"><i class="bi bi-plus-lg"></i></div></div>
-                <div class="faq-answer"><p>التسجيل والاستشارة الأولى <span class="highlight-ans">مجانية تماماً</span>. الرسوم الوحيدة هي تكاليف الأوراق الرسمية كالفحوصات الطبية والتأشيرة — وهي رسوم حكومية موحدة يتم إبلاغك بها بشفافية قبل البدء.</p></div>
+                <div class="faq-question">هل هناك رسوم على التسجيل؟<div class="faq-icon"><i class="bi bi-plus-lg"></i></div></div>
+                <div class="faq-answer"><p>التسجيل والاستشارة <span class="highlight-ans">مجانية تماماً</span>. الرسوم الوحيدة هي تكاليف الأوراق الرسمية (فحوصات، تأشيرة) ويتم إبلاغك بها بشفافية مسبقاً.</p></div>
             </div>
             <div class="faq-item">
-                <div class="faq-question">ماذا يحدث لو واجهت مشكلة بعد وصولي لبلد العمل؟<div class="faq-icon"><i class="bi bi-plus-lg"></i></div></div>
-                <div class="faq-answer"><p>لديك خط دعم مباشر مع فريقنا حتى بعد السفر. إذا كانت المشكلة مع صاحب العمل، نتدخل للوساطة وحل النزاع. <span class="highlight-ans">في الحالات الحرجة</span> نُنسّق مع السفارة ونضمن عودتك بأمان.</p></div>
+                <div class="faq-question">ماذا يحدث لو واجهت مشكلة بعد السفر؟<div class="faq-icon"><i class="bi bi-plus-lg"></i></div></div>
+                <div class="faq-answer"><p>لديك خط دعم مباشر معنا حتى بعد السفر. نتدخل للوساطة وحل النزاعات. <span class="highlight-ans">في الحالات الحرجة</span> نُنسّق مع السفارة ونضمن عودتك بأمان.</p></div>
             </div>
             <div class="faq-item">
-                <div class="faq-question">ما شروط السن والمؤهل للتقديم؟<div class="faq-icon"><i class="bi bi-plus-lg"></i></div></div>
-                <div class="faq-answer"><p>تتفاوت الشروط حسب الوظيفة، لكن بشكل عام: <span class="highlight-ans">من ٢٢ إلى ٤٥ سنة</span> للغالبية العظمى من الوظائف، ولا يُشترط مؤهل عالٍ لكثير من المجالات (بناء، سياقة، صناعة).</p></div>
+                <div class="faq-question">ما شروط السن والمؤهل؟<div class="faq-icon"><i class="bi bi-plus-lg"></i></div></div>
+                <div class="faq-answer"><p>بشكل عام <span class="highlight-ans">من ٢٢ إلى ٤٥ سنة</span>. لا يُشترط مؤهل عالٍ لكثير من المجالات كالبناء والسياقة والصناعة.</p></div>
             </div>
         </div>
     </section>
 
-    <!-- FINAL CTA -->
+    <!-- ══════════════════════════════════════════
+         FINAL CTA
+    ══════════════════════════════════════════ -->
     <section class="cta-section">
         <h2>هل أنت مستعد للخطوة الأولى؟</h2>
         <p>سجّل الآن مجاناً — سيتواصل معك مستشارنا خلال ٢٤ ساعة</p>
-        <a href="#register" class="btn-lift btn-white"><i class="bi bi-arrow-up-circle-fill"></i> سجّل بياناتك الآن</a>
+        <a href="#register" class="btn-lift btn-gold">
+            <i class="bi bi-arrow-up-circle-fill"></i> سجّل بياناتك الآن
+        </a>
     </section>
 
-    <!-- FOOTER -->
+    <!-- ══════════════════════════════════════════
+         FOOTER
+    ══════════════════════════════════════════ -->
     <footer class="footer">
         <a href="/" class="footer-brand">
-            <div class="nav-logo" style="width:34px;height:34px;font-size:.9rem;"><i class="bi bi-shield-fill-check"></i></div>
+            <div class="nav-logo" style="width:34px;height:34px">
+                <img src="@logoPath" alt="الفهد العربي"
+                     style="padding:4px;object-fit:contain;width:100%;height:100%" />
+            </div>
             <span class="footer-brand-name">الفهد العربي للتوظيف الدولي</span>
         </a>
         <div class="footer-links">
@@ -389,47 +544,52 @@
         <span class="footer-copy">© @DateTime.Now.Year جميع الحقوق محفوظة</span>
     </footer>
 
-    <!-- WHATSAPP FAB -->
-    <a class="wp-fab" href="https://wa.me/@wpNumber?text=مرحباً" id="wpFab" target="_blank" rel="noopener noreferrer" aria-label="@wpLabel">
-        <i class="bi bi-whatsapp" style="font-size:1.3rem;"></i>
+    <!-- ══════════════════════════════════════════
+         WHATSAPP FAB
+    ══════════════════════════════════════════ -->
+    <a class="wp-fab" href="https://wa.me/@wpNumber?text=مرحباً"
+       id="wpFab" target="_blank" rel="noopener noreferrer" aria-label="@wpLabel">
+        <i class="bi bi-whatsapp" style="font-size:1.3rem"></i>
         <span class="wp-text">@wpLabel</span>
     </a>
 
+    <!-- ══════════════════════════════════════════
+         SCRIPTS
+    ══════════════════════════════════════════ -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         (function () {
             'use strict';
-        /* ── Image Marquee ── */
-        var marqueeImages = [
+
+                 var marqueeImages = [
             '/uploads/images/part1-rcxai8li4u8v3bygsjos5pdf99jw6q5t5s1sert2w8.png',
             '/uploads/images/part10-rd0e9iajjh0vw346nae5hz2p3flw9s0w0sztw4ij8o.webp',
             '/uploads/images/part12-rd0ebjlzkel472z4u09rhfl02zbyc1chl6z1g5g2qw.png',
             '/uploads/images/Zeyut-Logo-sticky.png',
-            '/uploads/images/شعار فلسطين.avif'
+          '/uploads/images/brand.png',
+          '/uploads/images/logo-blue.svg'
         ];
-
-        var marqueeTrack = document.getElementById('imgMarqueeTrack');
-        if (marqueeTrack) {
-            var marqueeHtml = '';
-            // نكرر الصور مرتين عشان الـ loop يبان seamless
-            for (var r = 0; r < 2; r++) {
-                marqueeImages.forEach(function(src) {
-                    marqueeHtml += '<div class="img-marquee-item"><img src="' + src + '" alt="شريك" loading="lazy" /></div>';
-                });
+            var marqueeTrack = document.getElementById('imgMarqueeTrack');
+            if (marqueeTrack) {
+                var mHtml = '';
+                for (var r = 0; r < 2; r++) {
+                    marqueeImages.forEach(function (src) {
+                        mHtml += '<div class="img-marquee-item"><img src="' + src + '" alt="شريك" loading="lazy" /></div>';
+                    });
+                }
+                marqueeTrack.innerHTML = mHtml;
             }
-            marqueeTrack.innerHTML = marqueeHtml;
-        }
 
             var wpNumber = '@wpNumber';
 
-            /* ── Scroll progress ── */
+            /* ── Scroll progress bar ── */
             var progressFill = document.getElementById('scroll-progress-fill');
             window.addEventListener('scroll', function () {
                 var pct = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight) * 100;
                 progressFill.style.width = Math.min(100, pct) + '%';
             }, { passive: true });
 
-            /* ── Navbar scroll ── */
+            /* ── Navbar on scroll ── */
             var navbar = document.getElementById('navbar');
             window.addEventListener('scroll', function () {
                 navbar.classList.toggle('scrolled', window.scrollY > 60);
@@ -443,12 +603,12 @@
             }, { threshold: 0.1 });
             document.querySelectorAll('.reveal, .reveal-scale').forEach(function (el) { revealObs.observe(el); });
 
-            /* ── Counter animation ── */
+            /* ── Animated counters ── */
             var counters = [
                 { id: 'cnt1', target: 5000 },
-                { id: 'cnt2', target: 12 },
-                { id: 'cnt3', target: 15 },
-                { id: 'cnt4', target: 98 }
+                { id: 'cnt2', target: 12   },
+                { id: 'cnt3', target: 15   },
+                { id: 'cnt4', target: 98   }
             ];
             var countersStarted = false;
             function startCounters() {
@@ -458,7 +618,7 @@
                     var el = document.getElementById(c.id);
                     if (!el) return;
                     var dur = 1800, start = performance.now();
-                    function ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+                    function ease(t) { return t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
                     (function tick() {
                         var t = Math.min(1, (performance.now() - start) / dur);
                         el.textContent = Math.round(ease(t) * c.target).toLocaleString('ar-EG');
@@ -466,18 +626,8 @@
                     })();
                 });
             }
-            setTimeout(startCounters, 500);
+            setTimeout(startCounters, 600);
             window.addEventListener('scroll', function () { if (window.scrollY > 50) startCounters(); }, { passive: true });
-
-            /* ── Hero particles ── */
-            var ptclContainer = document.getElementById('hero-particles');
-            for (var i = 0; i < 20; i++) {
-                var p = document.createElement('div');
-                p.className = 'hero-particle';
-                var sz = Math.random() * 3 + 2;
-                p.style.cssText = 'width:' + sz + 'px;height:' + sz + 'px;left:' + (Math.random() * 90 + 5) + '%;bottom:0;animation-duration:' + (Math.random() * 8 + 6) + 's;animation-delay:' + (Math.random() * 8) + 's;';
-                ptclContainer.appendChild(p);
-            }
 
             /* ── Prevent double submit ── */
             var leadForm  = document.getElementById('leadForm');
@@ -490,25 +640,25 @@
                 });
             }
 
-            /* ── WhatsApp dynamic prefill ── */
+            /* ── WhatsApp dynamic URL ── */
             function buildWpUrl() {
-                var name  = (document.getElementById('fullName')  ? document.getElementById('fullName').value.trim()  : '');
-                var phone = (document.getElementById('phone')     ? document.getElementById('phone').value.trim()     : '');
-                var note  = (document.getElementById('notesField')? document.getElementById('notesField').value.trim(): '');
-                var msg = 'مرحباً، أرغب في الاستفسار عن فرص العمل عبر الفهد العربي';
-                if (name)  msg += ' — الاسم: ' + name;
-                if (phone) msg += ' — الهاتف: ' + phone;
-                if (note)  msg += ' — ' + (note.length > 60 ? note.substring(0, 60) + '...' : note);
+                var name  = (document.getElementById('fullName')   || {}).value || '';
+                var phone = (document.getElementById('phone')      || {}).value || '';
+                var note  = (document.getElementById('notesField') || {}).value || '';
+                var msg   = 'مرحباً، أرغب في الاستفسار عن فرص العمل عبر الفهد العربي';
+                if (name.trim())  msg += ' — الاسم: '  + name.trim();
+                if (phone.trim()) msg += ' — الهاتف: ' + phone.trim();
+                if (note.trim())  msg += ' — ' + (note.length > 60 ? note.substring(0, 60) + '...' : note.trim());
                 return 'https://wa.me/' + wpNumber + '?text=' + encodeURIComponent(msg);
             }
             function updateWpLinks() {
                 var url = buildWpUrl();
-                ['wpFab','navWp','heroWp'].forEach(function (id) {
+                ['wpFab', 'navWp', 'heroWp'].forEach(function (id) {
                     var el = document.getElementById(id);
                     if (el) el.setAttribute('href', url);
                 });
             }
-            ['fullName','phone','notesField'].forEach(function (id) {
+            ['fullName', 'phone', 'notesField'].forEach(function (id) {
                 var el = document.getElementById(id);
                 if (el) el.addEventListener('input', updateWpLinks);
             });
@@ -534,48 +684,72 @@
 
             /* ── Testimonials marquee ── */
             var testimonials = [
-                { name:'محمد السيد',  role:'سائق',           dest:'السعودية', text:'الفهد العربي غيّر حياتي. من أول اتصال حتى وصولي للرياض كان الفريق معي في كل خطوة. الراتب منتظم والمعاملة محترمة.', color:'#1B4FD8', init:'م' },
-                { name:'أحمد رمضان', role:'عامل مصنع',      dest:'ألمانيا',  text:'صراحة ما توقعت إن الأوراق تتم بسرعة كده. في أقل من شهرين كنت على الطيارة. شركة محترمة ومتعاونة جداً.',         color:'#C9A84C', init:'أ' },
-                { name:'كريم عبدالله',role:'فني كهرباء',     dest:'قطر',      text:'كنت خايف بس الفهد العربي مختلف. عقد واضح وحقوقي محفوظة من اليوم الأول.',                                         color:'#10B981', init:'ك' },
-                { name:'عمر حسن',    role:'ممرض',           dest:'الكويت',   text:'فريق التيلي سيلز بتاعهم محترفين جداً. ردوا على كل أسئلتي بصبر وأنا أنصح كل واحد بيدور على فرصة.',              color:'#8B5CF6', init:'ع' },
-                { name:'إسلام فاروق',role:'سائق شاحنة',     dest:'الإمارات', text:'ثلاث سنين وأنا بأجدد العقد معهم. ده دليل على إنهم ناس تقدر تثق فيهم وتبني عليهم مستقبلك.',                     color:'#EF4444', init:'إ' },
-                { name:'مصطفى علي', role:'عامل بناء',       dest:'رومانيا',  text:'الراتب أحسن بكتير والأكل والسكن متوفرين. الفهد العربي وفّوا بكل وعد قالوه.',                                    color:'#F59E0B', init:'م' },
-                { name:'يوسف محمود',role:'مهندس ميكانيكي', dest:'البحرين',  text:'تعاملت مع شركات تانية بس مفيش زي الفهد. كل حاجة شفافة ومحترمة وما فيش مصاريف مخفية خالص.',                   color:'#06B6D4', init:'ي' },
-                { name:'طارق نصر',  role:'نجار',           dest:'بولندا',   text:'أول مرة أسافر برا مصر وكانت تجربة رائعة بفضل الفهد العربي. شركة بجد بتهتم بالعمال.',                           color:'#84CC16', init:'ط' },
-                { name:'وليد جمال', role:'سباك',           dest:'السعودية', text:'من يوم ما سجلت وأنا محسوس إن في حد بيتابعني. المستشار كان دايماً متاح.',                                       color:'#1B4FD8', init:'و' },
-                { name:'حسام الدين',role:'كهربائي',         dest:'الإمارات', text:'الحمد لله كل حاجة تمت بسرعة وبدون مشاكل. الوثائق والتأشيرة والسفر كله اتنظم من خلالهم.',                       color:'#C9A84C', init:'ح' },
+                { name:'محمد السيد',   role:'سائق',           dest:'السعودية', color:'#1E3055', init:'م', text:'الفهد العربي غيّر حياتي. من أول اتصال حتى وصولي للرياض كان الفريق معي في كل خطوة. الراتب منتظم والمعاملة محترمة.' },
+                { name:'أحمد رمضان',  role:'عامل مصنع',      dest:'ألمانيا',  color:'#7C5D1E', init:'أ', text:'ما توقعت إن الأوراق تتم بسرعة كده. في أقل من شهرين كنت على الطيارة. شركة محترمة ومتعاونة جداً.' },
+                { name:'كريم عبدالله',role:'فني كهرباء',      dest:'قطر',      color:'#0B7A4A', init:'ك', text:'كنت خايف بس الفهد العربي مختلف. عقد واضح وحقوقي محفوظة من اليوم الأول.' },
+                { name:'عمر حسن',     role:'ممرض',           dest:'الكويت',   color:'#4C2D82', init:'ع', text:'فريق التيلي سيلز بتاعهم محترفين جداً. ردوا على كل أسئلتي بصبر.' },
+                { name:'إسلام فاروق', role:'سائق شاحنة',     dest:'الإمارات', color:'#8B1A1A', init:'إ', text:'ثلاث سنين وأنا بأجدد العقد معهم. ده دليل على إنهم ناس تقدر تثق فيهم.' },
+                { name:'مصطفى علي',  role:'عامل بناء',       dest:'رومانيا',  color:'#7C5D1E', init:'م', text:'الراتب أحسن بكتير والأكل والسكن متوفرين. الفهد العربي وفّوا بكل وعد.' },
+                { name:'يوسف محمود', role:'مهندس ميكانيكي',  dest:'البحرين',  color:'#0A5A6E', init:'ي', text:'تعاملت مع شركات تانية بس مفيش زي الفهد. كل حاجة شفافة وما فيش مصاريف مخفية.' },
+                { name:'طارق نصر',   role:'نجار',            dest:'بولندا',   color:'#3D6B1E', init:'ط', text:'أول مرة أسافر برا مصر وكانت تجربة رائعة بفضل الفهد العربي.' },
+                { name:'وليد جمال',  role:'سباك',            dest:'السعودية', color:'#1E3055', init:'و', text:'من يوم ما سجلت وأنا محسوس إن في حد بيتابعني. المستشار كان دايماً متاح.' },
+                { name:'حسام الدين', role:'كهربائي',          dest:'الإمارات', color:'#7C5D1E', init:'ح', text:'الوثائق والتأشيرة والسفر كله اتنظم من خلالهم بدون أي مشاكل.' },
             ];
             function mkCard(t) {
-                return '<div class="tcard"><div class="tcard-top"><div class="tcard-stars">★★★★★</div><div class="tcard-dest"><i class="bi bi-geo-alt-fill" style="font-size:10px"></i>' + t.dest + '</div></div><p class="tcard-text">"' + t.text + '"</p><div class="tcard-author"><div class="tcard-avatar" style="background:' + t.color + '">' + t.init + '</div><div><div class="tcard-name">' + t.name + '</div><div class="tcard-role">' + t.role + '</div><div class="tcard-verified"><i class="bi bi-patch-check-fill" style="font-size:10px"></i> موظف موثق</div></div></div></div>';
+                return '<div class="tcard">'
+                     + '<div class="tcard-top"><div class="tcard-stars">★★★★★</div>'
+                     + '<div class="tcard-dest"><i class="bi bi-geo-alt-fill" style="font-size:10px"></i>' + t.dest + '</div></div>'
+                     + '<p class="tcard-text">"' + t.text + '"</p>'
+                     + '<div class="tcard-author">'
+                     + '<div class="tcard-avatar" style="background:' + t.color + '">' + t.init + '</div>'
+                     + '<div><div class="tcard-name">' + t.name + '</div>'
+                     + '<div class="tcard-role">' + t.role + '</div>'
+                     + '<div class="tcard-verified"><i class="bi bi-patch-check-fill" style="font-size:10px"></i> موظف موثق</div>'
+                     + '</div></div></div>';
             }
             var half = Math.ceil(testimonials.length / 2);
-            var row1 = testimonials.slice(0, half), row2 = testimonials.slice(half);
-            var html1 = '', html2 = '';
-            row1.forEach(function (t) { html1 += mkCard(t); });
-            row2.forEach(function (t) { html2 += mkCard(t); });
-            document.getElementById('mqRow1').innerHTML = html1 + html1;
-            document.getElementById('mqRow2').innerHTML = html2 + html2;
+            var h1 = '', h2 = '';
+            testimonials.slice(0, half).forEach(function (t) { h1 += mkCard(t); });
+            testimonials.slice(half).forEach(function (t)    { h2 += mkCard(t); });
+            document.getElementById('mqRow1').innerHTML = h1 + h1;
+            document.getElementById('mqRow2').innerHTML = h2 + h2;
 
-            /* ── Timeline ── */
+            /* ── History timeline ── */
             var history = [
-                { year:'٢٠٠٨', icon:'bi-building',      title:'التأسيس في القاهرة',        desc:'بدأت الشركة بمكتب صغير في القاهرة مع فريق من ٥ أشخاص وحلم كبير — توظيف العمالة المصرية في الخارج بطريقة شريفة وآمنة.',           stats:[{n:'٥',l:'موظفين'},{n:'١',l:'دولة'},{n:'٨٠',l:'عميل أول سنة'}],   milestone:null },
-                { year:'٢٠١١', icon:'bi-globe-americas', title:'التوسع الخليجي',            desc:'حصلنا على اعتماد وزارة القوى العاملة وبدأنا الشراكة مع أصحاب عمل في السعودية والكويت والإمارات. أول ١٠٠٠ موظف تم تشغيلهم.', stats:[{n:'٣',l:'دول خليجية'},{n:'+١٠٠٠',l:'موظف'},{n:'١٥',l:'شريك عمل'}], milestone:'أول ١٠٠٠ موظف' },
-                { year:'٢٠١٥', icon:'bi-award-fill',     title:'جائزة أفضل شركة توظيف',    desc:'حصلنا على جائزة أفضل شركة توظيف دولي من اتحاد الغرف التجارية المصرية. توسعنا لنضم قطر والبحرين وعُمان لشبكتنا.',              stats:[{n:'٦',l:'دول'},{n:'+٢٥٠٠',l:'موظف'},{n:'٩٥٪',l:'رضا العملاء'}],  milestone:'جائزة أفضل شركة' },
-                { year:'٢٠١٩', icon:'bi-airplane-fill',  title:'الانطلاق نحو أوروبا',       desc:'فتحنا باب التوظيف في ألمانيا ورومانيا وبولندا. شراكات مع شركات صناعية وإنشائية كبرى في القارة.',                               stats:[{n:'١٠',l:'دول'},{n:'+٤٠٠٠',l:'موظف'},{n:'٣',l:'دول أوروبية'}],   milestone:'أول توظيف أوروبي' },
-                { year:'٢٠٢٤', icon:'bi-trophy-fill',    title:'القمة — ١٥ عاماً من الثقة', desc:'اليوم نفخر بتشغيل أكثر من ٥٠٠٠ موظف في ١٢ دولة، مع تقييم ٤.٩ من ٥. رحلة ١٥ سنة من الالتزام والنزاهة.',                    stats:[{n:'+٥٠٠٠',l:'موظف نشط'},{n:'١٢',l:'دولة'},{n:'٩٨٪',l:'رضا العملاء'}], milestone:'١٥ عاماً من النجاح' },
+                { year:'٢٠٠٨', icon:'bi-building',      title:'التأسيس في القاهرة',        desc:'بدأت بمكتب صغير في القاهرة مع فريق من ٥ أشخاص — توظيف العمالة المصرية في الخارج بطريقة شريفة وآمنة.',           stats:[{n:'٥',l:'موظفين'},{n:'١',l:'دولة'},{n:'٨٠',l:'عميل'}],          milestone:null },
+                { year:'٢٠١١', icon:'bi-globe-americas', title:'التوسع الخليجي',            desc:'حصلنا على اعتماد وزارة القوى العاملة وبدأنا الشراكة مع أصحاب عمل في السعودية والكويت والإمارات.',               stats:[{n:'٣',l:'دول خليجية'},{n:'+١٠٠٠',l:'موظف'},{n:'١٥',l:'شريك'}],  milestone:'أول ١٠٠٠ موظف' },
+                { year:'٢٠١٥', icon:'bi-award-fill',     title:'جائزة أفضل شركة توظيف',    desc:'حصلنا على جائزة أفضل شركة توظيف دولي. توسعنا لنضم قطر والبحرين وعُمان لشبكتنا.',                                stats:[{n:'٦',l:'دول'},{n:'+٢٥٠٠',l:'موظف'},{n:'٩٥٪',l:'رضا'}],         milestone:'جائزة أفضل شركة' },
+                { year:'٢٠١٩', icon:'bi-airplane-fill',  title:'الانطلاق نحو أوروبا',       desc:'فتحنا باب التوظيف في ألمانيا ورومانيا وبولندا مع شراكات مع شركات صناعية كبرى.',                                  stats:[{n:'١٠',l:'دول'},{n:'+٤٠٠٠',l:'موظف'},{n:'٣',l:'دول أوروبية'}], milestone:'أول توظيف أوروبي' },
+                { year:'٢٠٢٤', icon:'bi-trophy-fill',    title:'القمة — ١٥ عاماً من الثقة', desc:'نفخر بتشغيل أكثر من ٥٠٠٠ موظف في ١٢ دولة مع تقييم ٤.٩ من ٥. رحلة ١٥ سنة من الالتزام والنزاهة.',              stats:[{n:'+٥٠٠٠',l:'موظف نشط'},{n:'١٢',l:'دولة'},{n:'٩٨٪',l:'رضا'}],  milestone:'١٥ عاماً من النجاح' },
             ];
             var tl = document.getElementById('timeline');
             history.forEach(function (h, idx) {
-                var statsHtml = h.stats.map(function (s) { return '<div class="tl-stat"><div class="tl-stat-num">' + s.n + '</div><div class="tl-stat-label">' + s.l + '</div></div>'; }).join('');
-                var milHtml   = h.milestone ? '<div class="tl-milestone"><i class="bi bi-star-fill" style="font-size:9px"></i>' + h.milestone + '</div>' : '';
+                var statsHtml = h.stats.map(function (s) {
+                    return '<div class="tl-stat"><div class="tl-stat-num">' + s.n + '</div><div class="tl-stat-label">' + s.l + '</div></div>';
+                }).join('');
+                var milHtml = h.milestone
+                    ? '<div class="tl-milestone"><i class="bi bi-star-fill" style="font-size:9px"></i>' + h.milestone + '</div>'
+                    : '';
                 var item = document.createElement('div');
                 item.className = 'tl-item';
                 item.style.transitionDelay = (idx * 0.12) + 's';
-                item.innerHTML = '<div class="tl-dot"><div class="tl-dot-inner"></div></div><div class="tl-year"><i class="bi bi-calendar3" style="font-size:11px"></i>' + h.year + '</div><div class="tl-card"><div class="tl-card-head"><div class="tl-icon"><i class="bi ' + h.icon + '"></i></div><div class="tl-head-text"><h3>' + h.title + '</h3><p>' + h.desc + '</p></div></div><div class="tl-stats-row">' + statsHtml + '</div>' + milHtml + '</div>';
+                item.innerHTML =
+                    '<div class="tl-dot"><div class="tl-dot-inner"></div></div>'
+                  + '<div class="tl-year"><i class="bi bi-calendar3" style="font-size:11px"></i>' + h.year + '</div>'
+                  + '<div class="tl-card">'
+                  +   '<div class="tl-card-head">'
+                  +     '<div class="tl-icon"><i class="bi ' + h.icon + '"></i></div>'
+                  +     '<div class="tl-head-text"><h3>' + h.title + '</h3><p>' + h.desc + '</p></div>'
+                  +   '</div>'
+                  +   '<div class="tl-stats-row">' + statsHtml + '</div>'
+                  +   milHtml
+                  + '</div>';
                 tl.appendChild(item);
             });
             var tlObs = new IntersectionObserver(function (entries) {
-                entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('visible'); tlObs.unobserve(e.target); } });
+                entries.forEach(function (e) {
+                    if (e.isIntersecting) { e.target.classList.add('visible'); tlObs.unobserve(e.target); }
+                });
             }, { threshold: 0.15 });
             document.querySelectorAll('.tl-item').forEach(function (el) { tlObs.observe(el); });
 

@@ -319,6 +319,8 @@ namespace RecruitmentSaaS.Models.DTOs
         public DateOnly? SnoozedUntil { get; set; }
         public int SnoozeCount { get; set; }
         public string? Notes { get; set; }
+        public Guid? CandidateId { get; set; }
+
         public DateTime CreatedAt { get; set; }
     }
 

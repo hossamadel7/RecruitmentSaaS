@@ -8,488 +8,613 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>تسجيل الدخول — الفهد العربي</title>
-
-    <!-- Bootstrap 5 RTL -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
-    <!-- Google Fonts: Cairo -->
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet" />
-    <!-- Bootstrap Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@@300;400;600;700;900&display=swap" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
-
     <style>
-        * {
-            font-family: 'Cairo', sans-serif;
+        *, *::before, *::after {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
-        body, html {
+        :root {
+            --gold: #C9A84C;
+            --gold-lt: #F0D080;
+            --dark: #080E1E;
+            --dark2: #0D1829;
+            --blue: #1B4FD8;
+            --blue-dk: #1340B0;
+            --white: #ffffff;
+            --muted: rgba(255,255,255,.45);
+            --border: rgba(255,255,255,.1);
+        }
+
+        html, body {
             height: 100%;
-            margin: 0;
+            font-family: 'Cairo', sans-serif;
             overflow: hidden;
         }
 
-        /* ─── Animated Gradient Background ─── */
-        .bg-animated {
-            min-height: 100vh;
-            background: linear-gradient(-45deg, #0f2027, #1a3a4a, #1b6ca8, #0d3d6e, #164e63);
-            background-size: 400% 400%;
-            animation: gradientShift 12s ease infinite;
+        /* ── Split Layout ── */
+        .page {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* ── Left Panel — Branding ── */
+        .panel-left {
+            flex: 1.1;
+            background: var(--dark);
             position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+            overflow: hidden;
+        }
+
+            /* Grid texture */
+            .panel-left::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+                background-size: 44px 44px;
+                pointer-events: none;
+            }
+
+        /* Gold orb */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+        }
+
+        .orb-1 {
+            width: 480px;
+            height: 480px;
+            background: radial-gradient(circle, rgba(201,168,76,.22), transparent 70%);
+            top: -120px;
+            left: -120px;
+            animation: orbFloat 9s ease-in-out infinite;
+        }
+
+        .orb-2 {
+            width: 320px;
+            height: 320px;
+            background: radial-gradient(circle, rgba(27,79,216,.18), transparent 70%);
+            bottom: -80px;
+            right: -60px;
+            animation: orbFloat 12s ease-in-out infinite reverse;
+        }
+        @@keyframes orbFloat {
+            0%,100%
+
+        {
+            transform: translate(0,0) scale(1);
+        }
+
+        50% {
+            transform: translate(24px,-24px) scale(1.06);
+        }
+
+        }
+
+        .panel-left-inner {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+        }
+
+        /* Logo */
+        .logo-wrap {
+            width: 160px;
+            height: 160px;
+            margin: 0 auto 28px;
+            border-radius: 28px;
+            background: rgba(255,255,255,.05);
+            border: 1px solid rgba(201,168,76,.25);
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            box-shadow: 0 0 60px rgba(201,168,76,.18);
+            animation: logoIn .8s cubic-bezier(.22,1,.36,1) both;
         }
 
-        @@keyframes gradientShift {
-            0%
+            .logo-wrap img {
+                width: 130px;
+                height: 130px;
+                object-fit: contain;
+                filter: drop-shadow(0 4px 16px rgba(201,168,76,.35));
+            }
 
-        {
-            background-position: 0% 50%;
-        }
-
-        50% {
-            background-position: 100% 50%;
-        }
-
-        100% {
-            background-position: 0% 50%;
-        }
-
-        }
-
-        /* ─── Floating Blobs ─── */
-        .blob {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(80px);
-            opacity: 0.25;
-            animation: blobFloat 8s ease-in-out infinite alternate;
-        }
-
-        .blob-1 {
-            width: 420px;
-            height: 420px;
-            background: #38bdf8;
-            top: -100px;
-            left: -120px;
-            animation-duration: 9s;
-        }
-
-        .blob-2 {
-            width: 300px;
-            height: 300px;
-            background: #facc15;
-            bottom: -80px;
-            right: -80px;
-            animation-duration: 11s;
-        }
-
-        .blob-3 {
-            width: 200px;
-            height: 200px;
-            background: #818cf8;
-            top: 40%;
-            right: 10%;
-            animation-duration: 7s;
-        }
-
-        @@keyframes blobFloat {
-            0%
-
-        {
-            transform: translate(0, 0) scale(1);
-        }
-
-        100% {
-            transform: translate(30px, 40px) scale(1.1);
-        }
-
-        }
-
-        /* ─── Glass Card ─── */
-        .glass-card {
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 24px;
-            padding: 2.8rem 2.4rem;
-            width: 100%;
-            max-width: 430px;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
-            animation: cardIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-            position: relative;
-            z-index: 10;
-        }
-
-        @@keyframes cardIn {
+        @@keyframes logoIn {
             from
 
         {
             opacity: 0;
-            transform: translateY(40px) scale(0.97);
+            transform: scale(.8) translateY(20px);
         }
 
         to {
             opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-
-        }
-
-        /* ─── Brand ─── */
-        .brand-wrapper {
-            text-align: center;
-            margin-bottom: 1.8rem;
-        }
-
-        .brand-icon {
-            width: 72px;
-            height: 72px;
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            border-radius: 20px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            margin-bottom: 0.75rem;
-            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.45);
-            animation: iconPulse 3s ease-in-out infinite;
-        }
-
-        @@keyframes iconPulse {
-            0%, 100%
-
-        {
-            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.45);
-        }
-
-        50% {
-            box-shadow: 0 8px 36px rgba(245, 158, 11, 0.75);
+            transform: scale(1) translateY(0);
         }
 
         }
 
         .brand-name {
-            font-size: 1.7rem;
+            font-size: 2.2rem;
             font-weight: 900;
-            color: #fff;
-            letter-spacing: 0.5px;
-            line-height: 1.2;
+            color: var(--white);
+            line-height: 1.15;
+            animation: fadeUp .8s .1s both;
+        }
+
+            .brand-name span {
+                background: linear-gradient(90deg, var(--gold), var(--gold-lt), var(--gold));
+                background-size: 200%;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                animation: shimmer 3s infinite linear;
+            }
+        @@keyframes shimmer {
+            0%
+
+        {
+            background-position: 0%;
+        }
+
+        100% {
+            background-position: 200%;
+        }
+
         }
 
         .brand-sub {
-            font-size: 0.82rem;
-            color: rgba(255, 255, 255, 0.55);
+            font-size: .9rem;
+            color: var(--muted);
+            margin-top: 8px;
             font-weight: 400;
-            margin-top: 2px;
+            animation: fadeUp .8s .2s both;
         }
 
-        /* ─── Divider ─── */
-        .section-title {
+        /* Stats strip */
+        .stats-strip {
+            display: flex;
+            gap: 0;
+            margin-top: 48px;
+            border-top: 1px solid var(--border);
+            animation: fadeUp .8s .3s both;
+        }
+
+        .stat {
+            flex: 1;
+            padding: 20px 16px;
+            border-left: 1px solid var(--border);
             text-align: center;
-            color: rgba(255,255,255,0.9);
-            font-size: 1.05rem;
-            font-weight: 700;
-            margin-bottom: 1.6rem;
-            position: relative;
         }
 
-            .section-title::before,
-            .section-title::after {
+            .stat:last-child {
+                border-left: none;
+            }
+
+        .stat-num {
+            font-size: 1.6rem;
+            font-weight: 900;
+            color: var(--gold);
+            line-height: 1;
+        }
+
+        .stat-lbl {
+            font-size: .68rem;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        /* Trust badges */
+        .badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 32px;
+            animation: fadeUp .8s .4s both;
+        }
+
+        .badge-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,.05);
+            border: 1px solid var(--border);
+            border-radius: 99px;
+            padding: 5px 14px;
+            font-size: .72rem;
+            color: rgba(255,255,255,.65);
+            font-weight: 600;
+        }
+
+            .badge-item i {
+                color: var(--gold);
+                font-size: .85rem;
+            }
+
+        @@keyframes fadeUp {
+            from
+
+        {
+            opacity: 0;
+            transform: translateY(18px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        }
+
+        /* ── Right Panel — Form ── */
+        .panel-right {
+            width: 460px;
+            flex-shrink: 0;
+            background: var(--dark2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 40px;
+            position: relative;
+            border-right: 1px solid var(--border);
+        }
+
+            .panel-right::before {
                 content: '';
                 position: absolute;
-                top: 50%;
-                width: 28%;
-                height: 1px;
-                background: rgba(255,255,255,0.2);
+                inset: 0;
+                background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(27,79,216,.08), transparent 60%);
+                pointer-events: none;
             }
 
-            .section-title::before {
-                right: 0;
-            }
-
-            .section-title::after {
-                left: 0;
-            }
-
-        /* ─── Form Inputs ─── */
-        .input-group-custom {
+        .form-wrap {
+            width: 100%;
             position: relative;
-            margin-bottom: 1.2rem;
+            z-index: 1;
+            animation: fadeUp .7s .15s both;
         }
 
-            .input-group-custom label {
+        .form-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--white);
+            margin-bottom: 6px;
+        }
+
+        .form-sub {
+            font-size: .82rem;
+            color: var(--muted);
+            margin-bottom: 32px;
+        }
+
+        /* Field */
+        .field {
+            margin-bottom: 20px;
+        }
+
+            .field label {
                 display: block;
-                color: rgba(255,255,255,0.75);
-                font-size: 0.85rem;
-                font-weight: 600;
-                margin-bottom: 6px;
+                font-size: .82rem;
+                font-weight: 700;
+                color: rgba(255,255,255,.75);
+                margin-bottom: 7px;
             }
 
-        .input-icon-wrapper {
+        .field-wrap {
             position: relative;
         }
 
-            .input-icon-wrapper .field-icon {
+            .field-wrap .f-icon {
                 position: absolute;
                 top: 50%;
                 right: 14px;
                 transform: translateY(-50%);
-                color: rgba(255,255,255,0.45);
-                font-size: 1rem;
+                color: rgba(255,255,255,.3);
+                font-size: .95rem;
                 pointer-events: none;
-                transition: color 0.3s;
+                transition: color .25s;
             }
 
-            .input-icon-wrapper .toggle-pw {
+            .field-wrap .pw-toggle {
                 position: absolute;
                 top: 50%;
                 left: 14px;
                 transform: translateY(-50%);
-                color: rgba(255,255,255,0.45);
-                font-size: 1rem;
-                cursor: pointer;
-                pointer-events: all;
-                transition: color 0.3s;
                 background: none;
                 border: none;
+                color: rgba(255,255,255,.3);
+                font-size: .95rem;
+                cursor: pointer;
+                transition: color .25s;
                 padding: 0;
             }
 
-        .form-field {
+            .field-wrap:focus-within .f-icon,
+            .pw-toggle:hover {
+                color: var(--gold);
+            }
+
+        .field input {
             width: 100%;
-            padding: 0.75rem 2.6rem 0.75rem 2.6rem;
-            background: rgba(255,255,255,0.07);
-            border: 1.5px solid rgba(255,255,255,0.15);
+            padding: 13px 42px 13px 42px;
+            background: rgba(255,255,255,.06);
+            border: 1.5px solid rgba(255,255,255,.12);
             border-radius: 12px;
-            color: #fff;
-            font-size: 0.95rem;
+            color: var(--white);
+            font-size: .9rem;
             font-family: 'Cairo', sans-serif;
-            transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
             outline: none;
+            transition: border-color .25s, background .25s, box-shadow .25s;
         }
 
-            .form-field::placeholder {
-                color: rgba(255,255,255,0.3);
+            .field input::placeholder {
+                color: rgba(255,255,255,.25);
             }
 
-            .form-field:focus {
-                border-color: #f59e0b;
-                background: rgba(255,255,255,0.12);
-                box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+            .field input:focus {
+                border-color: var(--gold);
+                background: rgba(255,255,255,.09);
+                box-shadow: 0 0 0 3px rgba(201,168,76,.15);
             }
 
-                .form-field:focus + .field-icon,
-                .input-icon-wrapper:focus-within .field-icon {
-                    color: #f59e0b;
-                }
-
-        .validation-msg {
+        /* Error */
+        .error-box {
+            background: rgba(239,68,68,.12);
+            border: 1px solid rgba(239,68,68,.3);
+            border-radius: 10px;
             color: #fca5a5;
-            font-size: 0.78rem;
+            font-size: .82rem;
+            padding: 10px 14px;
+            margin-bottom: 20px;
+        }
+
+        .val-msg {
+            color: #fca5a5;
+            font-size: .75rem;
             margin-top: 4px;
             display: block;
         }
 
-        /* ─── Error Alert ─── */
-        .alert-glass {
-            background: rgba(239, 68, 68, 0.18);
-            border: 1px solid rgba(239, 68, 68, 0.4);
-            border-radius: 12px;
-            color: #fecaca;
-            font-size: 0.85rem;
-            padding: 0.75rem 1rem;
-            margin-bottom: 1.2rem;
-        }
-
-        /* ─── Submit Button ─── */
+        /* Button */
         .btn-login {
             width: 100%;
-            padding: 0.8rem;
-            background: linear-gradient(135deg, #f59e0b, #d97706);
+            padding: 14px;
+            background: linear-gradient(135deg, var(--gold), #B8922E);
             border: none;
             border-radius: 12px;
-            color: #1a1a1a;
+            color: var(--dark);
             font-size: 1rem;
-            font-weight: 700;
+            font-weight: 800;
             font-family: 'Cairo', sans-serif;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.3s, filter 0.3s;
-            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
-            position: relative;
-            overflow: hidden;
-            margin-top: 0.5rem;
+            transition: transform .2s, box-shadow .25s, filter .25s;
+            box-shadow: 0 6px 24px rgba(201,168,76,.35);
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
-            .btn-login::after {
-                content: '';
-                position: absolute;
-                inset: 0;
-                background: rgba(255,255,255,0);
-                transition: background 0.2s;
-            }
-
             .btn-login:hover {
-                filter: brightness(1.1);
+                filter: brightness(1.08);
                 transform: translateY(-2px);
-                box-shadow: 0 10px 28px rgba(245, 158, 11, 0.55);
+                box-shadow: 0 10px 32px rgba(201,168,76,.5);
             }
 
             .btn-login:active {
                 transform: translateY(0);
             }
 
-        /* ─── Footer text ─── */
-        .card-footer-text {
-            text-align: center;
-            color: rgba(255,255,255,0.45);
-            font-size: 0.78rem;
-            margin-top: 1.6rem;
+        /* Divider */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 28px 0 20px;
         }
 
-        /* ─── Responsive ─── */
-        @@media (max-width: 480px) {
-            .glass-card
+        .divider-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .divider-text {
+            font-size: .72rem;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        /* Footer */
+        .form-footer {
+            text-align: center;
+            font-size: .74rem;
+            color: var(--muted);
+            margin-top: 28px;
+        }
+
+        /* Responsive */
+       @@media (max-width: 768px) {
+            .panel-left
 
         {
-            padding: 2rem 1.4rem;
-            margin: 1rem;
+            display: none;
         }
 
-        .brand-name {
-            font-size: 1.4rem;
+        .panel-right {
+            width: 100%;
+            padding: 32px 24px;
         }
 
         }
     </style>
 </head>
 <body>
-    <div class="bg-animated">
+    <div class="page">
 
-        <!-- Decorative blobs -->
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
-        <div class="blob blob-3"></div>
+        <!-- ── Left: Branding ── -->
+        <div class="panel-left">
+            <div class="orb orb-1"></div>
+            <div class="orb orb-2"></div>
+            <div class="panel-left-inner">
+                <div class="logo-wrap">
+                    <img src="/uploads/images/logo fahd.png" alt="الفهد العربي" />
+                </div>
+                <div class="brand-name">
+                    <span>الفهد العربي</span>
+                </div>
+                <div class="brand-sub">منصة إدارة التوظيف الدولي الذكية</div>
 
-        <div class="glass-card">
+                <div class="stats-strip">
+                    <div class="stat">
+                        <div class="stat-num">+5K</div>
+                        <div class="stat-lbl">موظف مُشغَّل</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-num">12</div>
+                        <div class="stat-lbl">دولة</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-num">15+</div>
+                        <div class="stat-lbl">سنة خبرة</div>
+                    </div>
+                </div>
 
-            <!-- Brand -->
-            <div class="brand-wrapper">
-                <div class="brand-icon">🐆</div>
-                <div class="brand-name">الفهد العربي</div>
-                <div class="brand-sub">منصة التوظيف الذكية</div>
+                <div class="badges">
+                    <div class="badge-item"><i class="bi bi-patch-check-fill"></i> شركة مرخصة</div>
+                    <div class="badge-item"><i class="bi bi-shield-fill-check"></i> عقود موثقة</div>
+                    <div class="badge-item"><i class="bi bi-headset"></i> دعم ٢٤/٧</div>
+                </div>
             </div>
+        </div>
 
-            <!-- Section title -->
-            <div class="section-title">تسجيل الدخول</div>
+        <!-- ── Right: Form ── -->
+        <div class="panel-right">
+            <div class="form-wrap">
+                <div class="form-title">مرحباً بعودتك 👋</div>
+                <div class="form-sub">سجّل الدخول للوصول إلى لوحة التحكم</div>
 
-            <!-- Validation errors -->
-            @if (!ViewData.ModelState.IsValid)
-            {
-                <div class="alert-glass">
-                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                    {
-                        <div>⚠️ @error.ErrorMessage</div>
-                    }
-                </div>
-            }
-
-            <!-- Login Form -->
-            <form asp-action="Login" method="post" id="loginForm" novalidate>
-                @Html.AntiForgeryToken()
-
-                <!-- Email -->
-                <div class="input-group-custom">
-                    <label asp-for="Email">البريد الإلكتروني</label>
-                    <div class="input-icon-wrapper">
-                        <input asp-for="Email"
-                               class="form-field"
-                               placeholder="example@domain.com"
-                               autocomplete="email"
-                               dir="ltr" />
-                        <i class="bi bi-envelope field-icon"></i>
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="error-box">
+                        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                        {
+                            <div>⚠️ @error.ErrorMessage</div>
+                        }
                     </div>
-                    <span asp-validation-for="Email" class="validation-msg"></span>
-                </div>
+                }
 
-                <!-- Password -->
-                <div class="input-group-custom">
-                    <label asp-for="Password">كلمة المرور</label>
-                    <div class="input-icon-wrapper">
-                        <input asp-for="Password"
-                               type="password"
-                               id="passwordInput"
-                               class="form-field"
-                               placeholder="••••••••••"
-                               autocomplete="current-password" />
-                        <i class="bi bi-lock field-icon"></i>
-                        <button type="button" class="toggle-pw" onclick="togglePassword()" id="togglePwBtn" aria-label="إظهار كلمة المرور">
-                            <i class="bi bi-eye" id="eyeIcon"></i>
-                        </button>
+                <form asp-action="Login" method="post" id="loginForm" novalidate>
+                    @Html.AntiForgeryToken()
+
+                    <div class="field">
+                        <label asp-for="Email">البريد الإلكتروني</label>
+                        <div class="field-wrap">
+                            <input asp-for="Email"
+                                   placeholder="example@domain.com"
+                                   autocomplete="email"
+                                   dir="ltr" />
+                            <i class="bi bi-envelope f-icon"></i>
+                        </div>
+                        <span asp-validation-for="Email" class="val-msg"></span>
                     </div>
-                    <span asp-validation-for="Password" class="validation-msg"></span>
+
+                    <div class="field">
+                        <label asp-for="Password">كلمة المرور</label>
+                        <div class="field-wrap">
+                            <input asp-for="Password"
+                                   type="password"
+                                   id="pwInput"
+                                   placeholder="••••••••••"
+                                   autocomplete="current-password" />
+                            <i class="bi bi-lock f-icon"></i>
+                            <button type="button" class="pw-toggle" onclick="togglePw()" aria-label="إظهار كلمة المرور">
+                                <i class="bi bi-eye" id="eyeIcon"></i>
+                            </button>
+                        </div>
+                        <span asp-validation-for="Password" class="val-msg"></span>
+                    </div>
+
+                    <button type="submit" class="btn-login" id="submitBtn">
+                        <i class="bi bi-box-arrow-in-right"></i>
+                        دخول إلى حسابي
+                    </button>
+                </form>
+
+                <div class="divider">
+                    <div class="divider-line"></div>
+                    <div class="divider-text">نظام التوظيف الذكي</div>
+                    <div class="divider-line"></div>
                 </div>
 
-                <!-- Submit -->
-                <button type="submit" class="btn-login">
-                    <i class="bi bi-box-arrow-in-right me-1"></i>
-                    دخول إلى حسابي
-                </button>
-            </form>
+                <div style="display:flex;gap:12px;text-align:center;">
+                    <div style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);
+                            border-radius:10px;padding:12px 8px;">
+                        <i class="bi bi-people-fill" style="color:var(--gold);font-size:1.2rem;"></i>
+                        <div style="font-size:.7rem;color:var(--muted);margin-top:4px;">إدارة المرشحين</div>
+                    </div>
+                    <div style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);
+                            border-radius:10px;padding:12px 8px;">
+                        <i class="bi bi-graph-up-arrow" style="color:var(--gold);font-size:1.2rem;"></i>
+                        <div style="font-size:.7rem;color:var(--muted);margin-top:4px;">تقارير مالية</div>
+                    </div>
+                    <div style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);
+                            border-radius:10px;padding:12px 8px;">
+                        <i class="bi bi-globe-americas" style="color:var(--gold);font-size:1.2rem;"></i>
+                        <div style="font-size:.7rem;color:var(--muted);margin-top:4px;">توظيف دولي</div>
+                    </div>
+                </div>
 
-            <div class="card-footer-text">
-                &copy; @DateTime.Now.Year الفهد العربي — جميع الحقوق محفوظة
+                <div class="form-footer">
+                    &copy; @DateTime.Now.Year الفهد العربي للتوظيف الدولي — جميع الحقوق محفوظة
+                </div>
             </div>
         </div>
 
     </div>
 
     <script>
-        function togglePassword() {
-            const input = document.getElementById('passwordInput');
-            const icon  = document.getElementById('eyeIcon');
-            if (input.type === 'password') {
-                input.type = 'text';
+        function togglePw() {
+            const inp  = document.getElementById('pwInput');
+            const icon = document.getElementById('eyeIcon');
+            if (inp.type === 'password') {
+                inp.type = 'text';
                 icon.classList.replace('bi-eye', 'bi-eye-slash');
             } else {
-                input.type = 'password';
+                inp.type = 'password';
                 icon.classList.replace('bi-eye-slash', 'bi-eye');
             }
         }
 
-        // Subtle shake animation on failed submit
-        const form = document.getElementById('loginForm');
-        const hasErrors = document.querySelector('.alert-glass');
-        if (hasErrors) {
-            const card = document.querySelector('.glass-card');
-            card.style.animation = 'cardIn 0.7s cubic-bezier(0.22,1,0.36,1) both, shake 0.4s ease';
-        }
+        // Disable button on submit
+        document.getElementById('loginForm').addEventListener('submit', function () {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;"></span> جارٍ الدخول...';
+        });
     </script>
-
     <style>
-        @@keyframes shake {
-            0%, 100%
+        @@keyframes spin {
+            to
 
         {
-            transform: translateX(0);
-        }
-
-        20% {
-            transform: translateX(-8px);
-        }
-
-        40% {
-            transform: translateX(8px);
-        }
-
-        60% {
-            transform: translateX(-5px);
-        }
-
-        80% {
-            transform: translateX(5px);
+            transform: rotate(360deg);
         }
 
         }

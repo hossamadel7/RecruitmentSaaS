@@ -20,8 +20,20 @@ namespace RecruitmentSaaS.Controllers
         }
 
         // ── GET / ─────────────────────────────────────────────────────────
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index([FromQuery(Name = "ref")] string? salesRef)
         {
+            // لو في ref — نحتفظ بيه في الـ Cookie عشان الـ SubmitLead يقراه
+            if (!string.IsNullOrWhiteSpace(salesRef)
+                && Guid.TryParse(salesRef, out var salesId))
+            {
+                Response.Cookies.Append("sales_ref", salesId.ToString(), new CookieOptions
+                {
+                    HttpOnly = true,
+                    SameSite = SameSiteMode.Lax,
+                    Expires = DateTimeOffset.UtcNow.AddHours(2)
+                });
+            }
+
             ViewBag.Branches = await _context.Branches
                 .Where(b => b.IsActive)
                 .OrderBy(b => b.Name)
@@ -36,7 +48,7 @@ namespace RecruitmentSaaS.Controllers
             return View();
         }
 
-        // POST /Home/SubmitLead
+        // ── POST /Home/SubmitLead ─────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SubmitLead(
@@ -46,21 +58,29 @@ namespace RecruitmentSaaS.Controllers
             string? interestedCountry,
             string? notes)
         {
-            // 1. Find first active branch (for website, assume just one)
-            var activeBranches = await _context.Branches.Where(b => b.IsActive).OrderBy(b => b.Name).ToListAsync();
-            var resolvedBranchId = activeBranches.Count > 0 ? activeBranches[0].Id : (Guid?)null;
+            // 1. Find first active branch
+            var activeBranches = await _context.Branches
+                .Where(b => b.IsActive)
+                .OrderBy(b => b.Name)
+                .ToListAsync();
+
+            var resolvedBranchId = activeBranches.Count > 0
+                ? activeBranches[0].Id
+                : (Guid?)null;
+
             if (resolvedBranchId == null)
             {
                 TempData["FormError"] = "لا يوجد فرع متاح";
                 return RedirectToAction("Index");
             }
 
-            // 2. Determine RegisteredById (first admin, system user)
+            // 2. Determine RegisteredById (first admin)
             var systemUserId = await _context.Users
                 .Where(u => u.Role == 1 && u.IsActive)
                 .OrderBy(u => u.CreatedAt)
                 .Select(u => (Guid?)u.Id)
                 .FirstOrDefaultAsync();
+
             if (systemUserId == null)
             {
                 TempData["FormError"] = "حدث خطأ في النظام";
@@ -72,7 +92,25 @@ namespace RecruitmentSaaS.Controllers
             if (await _context.Leads.AnyAsync(l => l.Phone == phone))
                 return RedirectToAction("ThankYou");
 
-            // 4. Create Lead (fill other fields automatically)
+            // 4. جيب الـ TeleSales ID من الـ Cookie لو موجود
+            Guid? assignedSalesId = null;
+            if (Request.Cookies.TryGetValue("sales_ref", out var refCookie)
+                && Guid.TryParse(refCookie, out var refSalesId))
+            {
+                // تحقق إن الـ User ده موجود وـ Role = 3 (TeleSales)
+                var salesExists = await _context.Users
+                    .AnyAsync(u => u.Id == refSalesId
+                               && u.Role == 3
+                               && u.IsActive);
+
+                if (salesExists)
+                    assignedSalesId = refSalesId;
+
+                // امسح الـ Cookie بعد الاستخدام
+                Response.Cookies.Delete("sales_ref");
+            }
+
+            // 5. Create Lead
             _context.Leads.Add(new Lead
             {
                 Id = Guid.NewGuid(),
@@ -80,11 +118,12 @@ namespace RecruitmentSaaS.Controllers
                 RegisteredById = systemUserId.Value,
                 FullName = fullName?.Trim() ?? "",
                 Phone = phone,
-                LeadSource = 2, // "موقع إلكتروني"
-                Status = 1, // New
+                LeadSource = 2,  // موقع إلكتروني
+                Status = 1,  // New
                 InterestedJobTitle = interestedJobTitle?.Trim(),
                 InterestedCountry = interestedCountry?.Trim(),
                 Notes = notes?.Trim(),
+                AssignedSalesId = assignedSalesId, // ← TeleSales — null لو مفيش ref
                 CreatedAt = DateTime.UtcNow
             });
 
@@ -98,6 +137,9 @@ namespace RecruitmentSaaS.Controllers
 
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error() =>
-View(new RecruitmentSaaS.Models.ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+            View(new RecruitmentSaaS.Models.ErrorViewModel
+            {
+                RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier
+            });
     }
 }
