@@ -46,8 +46,14 @@ namespace RecruitmentSaaS.Controllers
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         // ── GET /Admin/Index ────────────────────────────────────────────────
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int? month, int? year)
         {
+            var now = DateTime.UtcNow;
+            var selMonth = month ?? now.Month;
+            var selYear = year ?? now.Year;
+            var monthStart = new DateTime(selYear, selMonth, 1);
+            var monthEnd = monthStart.AddMonths(1);
+
             var totalLeads = await _context.Leads.CountAsync();
             var totalCandidates = await _context.Candidates.CountAsync();
             var totalUsers = await _context.Users.CountAsync();
@@ -61,28 +67,42 @@ namespace RecruitmentSaaS.Controllers
                 .Where(p => p.Status == 2 && p.TransactionType == 1)
                 .SumAsync(p => (decimal?)p.AmountEgp) ?? 0;
 
-            // Leads by status
-            var leadsByStatus = await _context.Leads
+            // Funnel statuses only: 1,2,4,5,8 + 7(تحويل)
+            var funnelStatuses = new byte[] { 1, 2, 4, 5, 8, 7 };
+
+            var leadsThisMonth = await _context.Leads
+                .Where(l => l.CreatedAt >= monthStart && l.CreatedAt < monthEnd)
                 .GroupBy(l => l.Status)
                 .Select(g => new { Status = g.Key, Count = g.Count() })
-                .OrderBy(g => g.Status)
                 .ToListAsync();
 
-            // Candidates by stage
+            // Build ordered list with 0 for missing statuses
+            var leadsByStatus = funnelStatuses.Select(s => new
+            {
+                Status = (int)s,
+                Count = leadsThisMonth.FirstOrDefault(x => x.Status == s)?.Count ?? 0
+            }).ToList();
+
             var candidatesByStage = await _context.Candidates
-                .Where(c => c.IsCompleted != true && c.CurrentPackageStageId != null)
+                .Where(c => c.IsCompleted != true
+                         && c.CurrentPackageStageId != null
+                         && c.CreatedAt >= monthStart
+                         && c.CreatedAt < monthEnd)
                 .GroupBy(c => c.CurrentPackageStage!.StageName)
                 .Select(g => new { Stage = g.Key, Count = g.Count() })
-                .OrderBy(g => g.Stage)
+                .OrderByDescending(g => g.Count)
                 .ToListAsync();
 
-            // Recent leads (last 5)
             var recentLeads = await _context.Leads
                 .Include(l => l.Campaign)
                 .Include(l => l.AssignedSales)
+                .Where(l => l.CreatedAt >= monthStart && l.CreatedAt < monthEnd)
                 .OrderByDescending(l => l.CreatedAt)
-                .Take(5)
+                .Take(10)
                 .ToListAsync();
+
+            var monthLeadsTotal = leadsThisMonth.Sum(x => x.Count);
+            var monthCandidatesTotal = candidatesByStage.Sum(x => x.Count);
 
             ViewBag.TotalLeads = totalLeads;
             ViewBag.TotalCandidates = totalCandidates;
@@ -95,10 +115,13 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.LeadsByStatus = leadsByStatus;
             ViewBag.CandidatesByStage = candidatesByStage;
             ViewBag.RecentLeads = recentLeads;
+            ViewBag.SelectedMonth = selMonth;
+            ViewBag.SelectedYear = selYear;
+            ViewBag.MonthLeadsTotal = monthLeadsTotal;
+            ViewBag.MonthCandidatesTotal = monthCandidatesTotal;
 
             return View();
         }
-
         // ── GET /Admin/Users ────────────────────────────────────────────────
         public async Task<IActionResult> Users(string? q, int? role)
         {

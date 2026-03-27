@@ -65,9 +65,13 @@ public partial class Candidate
 
     public virtual Company? Company { get; set; }
 
+    public virtual ICollection<ContractUpload> ContractUploads { get; set; } = new List<ContractUpload>();
+
     public virtual PackageStage? CurrentPackageStage { get; set; }
 
     public virtual ICollection<Document> Documents { get; set; } = new List<Document>();
+
+    public virtual ICollection<FollowUpReminder> FollowUpReminders { get; set; } = new List<FollowUpReminder>();
 
     public virtual JobPackage JobPackage { get; set; } = null!;
 

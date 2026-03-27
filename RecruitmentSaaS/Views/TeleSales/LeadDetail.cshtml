@@ -101,24 +101,79 @@
                     تحديث الحالة
                 </div>
                 <div class="card-body">
-                    <form asp-action="UpdateStatus" asp-controller="TeleSales" method="post">
+                    <form asp-action="UpdateStatus" asp-controller="TeleSales" method="post" id="statusForm">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="leadId" value="@Model.Id" />
                         <div class="mb-3">
                             <label class="form-label">الحالة الجديدة</label>
-                           <select name="newStatus" class="form-select form-select-sm">
-    @foreach (var opt in new[] {
-        (val: "2", label: "تم التواصل",  st: (byte)2),
-        (val: "3", label: "استجاب",      st: (byte)3),
-        (val: "4", label: "مهتم",        st: (byte)4),
-        (val: "5", label: "موعد مجدول", st: (byte)5),
-        (val: "8", label: "خسارة",       st: (byte)8),
-    })
-    {
-        @Html.Raw($"<option value=\"{opt.val}\"{(Model.Status == opt.st ? " selected" : "")}>{opt.label}</option>")
-    }
-</select>
+                            @{
+                                // Funnel order — only show statuses ahead of current
+                                // خسارة(8) always available
+                                var funnelOrder = new Dictionary<byte, int>
+                                {
+                                    {1,1},{2,2},{4,3},{5,4},{7,5}
+                                };
+                                var allOpts = new[]
+                                {
+                                    (val: "2", label: "تم التواصل", st: (byte)2),
+                                    (val: "4", label: "مهتم",       st: (byte)4),
+                                    (val: "5", label: "موعد مجدول", st: (byte)5),
+                                    (val: "8", label: "خسارة",      st: (byte)8),
+                                };
+                                var currentOrder = funnelOrder.GetValueOrDefault(Model.Status, 0);
+                                // Filter: only show statuses strictly ahead OR خسارة
+                                var visibleOpts = allOpts.Where(o =>
+                                    o.st == 8 ||
+                                    (funnelOrder.TryGetValue(o.st, out var oOrder) && oOrder > currentOrder)
+                                ).ToList();
+                            }
+                            @if (!visibleOpts.Any())
+                            {
+                                <div style="font-size:13px;color:var(--text-muted);padding:8px 0">
+                                    <i class="bi bi-check-circle-fill me-1" style="color:var(--success)"></i>
+                                    الحالة الحالية: <strong>@statusName</strong> — لا توجد خطوات أمامية
+                                </div>
+                            }
+                            else
+                            {
+                                <select name="newStatus" id="statusSelect" class="form-select form-select-sm"
+                                        onchange="onStatusChange(this.value)">
+                                    @foreach (var opt in visibleOpts)
+                                    {
+                                        <option value="@opt.val">@opt.label</option>
+                                    }
+                                </select>
+                            }
                         </div>
+
+                        <!-- Appointment date — shown only when موعد مجدول is selected -->
+                        <div id="appointmentDateSection" style="display:none;margin-bottom:16px">
+                            <label class="form-label">
+                                تاريخ ووقت الموعد <span style="color:var(--danger)">*</span>
+                            </label>
+                            @{
+                                // Pre-fill if appointment already set
+                                var existingAppt = Model.AppointmentDate.HasValue
+                                    ? Model.AppointmentDate.Value.ToString("yyyy-MM-ddTHH:mm")
+                                    : "";
+                            }
+                            <input type="datetime-local" name="appointmentDate" id="appointmentDateInput"
+                                   class="form-control form-control-sm"
+                                   min="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")"
+                                   value="@existingAppt" />
+                            @if (Model.AppointmentDate.HasValue)
+                            {
+                                <div style="font-size:11px;color:#16a34a;margin-top:4px;font-weight:600">
+                                    <i class="bi bi-calendar-check-fill me-1"></i>
+                                    الموعد الحالي: @Model.AppointmentDate.Value.ToString("dd/MM/yyyy — HH:mm")
+                                </div>
+                            }
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                                <i class="bi bi-bell-fill me-1" style="color:var(--accent)"></i>
+                                سيتم إرسال تذكير تلقائي قبل الموعد بيوم
+                            </div>
+                        </div>
+
                         <button type="submit" class="btn btn-sm w-100"
                                 style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE;font-weight:600">
                             <i class="bi bi-arrow-repeat"></i> تحديث الحالة
@@ -309,3 +364,41 @@
     </div>
 
 </div>
+
+@section Scripts {
+<script>
+function onStatusChange(val) {
+    var section = document.getElementById('appointmentDateSection');
+    var input   = document.getElementById('appointmentDateInput');
+    if (!section) return;
+
+    if (val === '5') {
+        // موعد مجدول — show date picker and make it required
+        section.style.display = 'block';
+        if (input) input.required = true;
+    } else {
+        // Other status — hide and remove required
+        section.style.display = 'none';
+        if (input) { input.required = false; input.value = ''; }
+    }
+}
+
+// Run on page load in case status is already 5
+document.addEventListener('DOMContentLoaded', function() {
+    var select = document.getElementById('statusSelect');
+    if (select) onStatusChange(select.value);
+});
+
+// Validate before submit
+document.getElementById('statusForm')?.addEventListener('submit', function(e) {
+    var select = document.getElementById('statusSelect');
+    var input  = document.getElementById('appointmentDateInput');
+    if (select?.value === '5' && (!input?.value)) {
+        e.preventDefault();
+        input.focus();
+        input.style.borderColor = 'var(--danger)';
+        input.style.boxShadow   = '0 0 0 3px rgba(239,68,68,.15)';
+    }
+});
+</script>
+}
