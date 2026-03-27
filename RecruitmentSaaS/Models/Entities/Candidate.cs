@@ -92,6 +92,9 @@ public partial class Candidate
     [InverseProperty("Candidates")]
     public virtual Company? Company { get; set; }
 
+    [InverseProperty("MatchedCandidate")]
+    public virtual ICollection<ContractUpload> ContractUploads { get; set; } = new List<ContractUpload>();
+
     [ForeignKey("CurrentPackageStageId")]
     [InverseProperty("Candidates")]
     public virtual PackageStage? CurrentPackageStage { get; set; }

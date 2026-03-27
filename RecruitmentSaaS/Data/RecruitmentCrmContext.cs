@@ -264,28 +264,14 @@ public partial class RecruitmentCrmContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PK_demorecruitment_ContractUploads");
 
-            entity.ToTable("ContractUploads", "demorecruitment");
-
             entity.HasIndex(e => e.MatchedCandidateId, "IX_demorecruitment_ContractUploads_Candidate").HasFilter("([MatchedCandidateId] IS NOT NULL)");
 
-            entity.HasIndex(e => e.MatchStatus, "IX_demorecruitment_ContractUploads_Status");
-
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.CreatedAt)
-                .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
-            entity.Property(e => e.ExtractedEmployerName).HasMaxLength(200);
-            entity.Property(e => e.ExtractedPassportNo).HasMaxLength(50);
-            entity.Property(e => e.ExtractedTransactionNo).HasMaxLength(100);
-            entity.Property(e => e.FileKey).HasMaxLength(500);
-            entity.Property(e => e.FileName).HasMaxLength(255);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
 
-            entity.HasOne(d => d.MatchedCandidate).WithMany(p => p.ContractUploads)
-                .HasForeignKey(d => d.MatchedCandidateId)
-                .HasConstraintName("FK_demorecruitment_ContractUploads_Candidate");
+            entity.HasOne(d => d.MatchedCandidate).WithMany(p => p.ContractUploads).HasConstraintName("FK_demorecruitment_ContractUploads_Candidate");
 
             entity.HasOne(d => d.UploadedBy).WithMany(p => p.ContractUploads)
-                .HasForeignKey(d => d.UploadedById)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_demorecruitment_ContractUploads_User");
         });
@@ -318,9 +304,7 @@ public partial class RecruitmentCrmContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_demorecruitment_FUR_At");
 
-            entity.HasOne(d => d.Candidate).WithMany(p => p.FollowUpReminders)
-                .HasForeignKey(d => d.CandidateId)
-                .HasConstraintName("FK_FollowUpReminders_Candidates");
+            entity.HasOne(d => d.Candidate).WithMany(p => p.FollowUpReminders).HasConstraintName("FK_FollowUpReminders_Candidates");
 
             entity.HasOne(d => d.CreatedBy).WithMany(p => p.FollowUpReminderCreatedBies)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -411,8 +395,6 @@ public partial class RecruitmentCrmContext : DbContext
         modelBuilder.Entity<LeadFunnelHistory>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK_demorecruitment_LFH");
-
-            entity.ToTable("LeadFunnelHistory", "demorecruitment", tb => tb.HasTrigger("trg_LFH_WriteActivity"));
 
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");

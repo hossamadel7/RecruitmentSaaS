@@ -1,19 +1,18 @@
 @model List<RecruitmentSaaS.Controllers.SalaryUserDto>
 @{
     ViewData["Title"] = "المرتبات";
-    int    selMonth      = (int)ViewBag.SelectedMonth;
-    int    selYear       = (int)ViewBag.SelectedYear;
-    decimal totalBase    = (decimal)ViewBag.TotalBaseSalary;
-    decimal totalAdj     = (decimal)ViewBag.TotalAdjustment;
+    int selMonth = (int)ViewBag.SelectedMonth;
+    int selYear = (int)ViewBag.SelectedYear;
+    decimal totalBase = (decimal)ViewBag.TotalBaseSalary;
+    decimal totalAdj = (decimal)ViewBag.TotalAdjustment;
     decimal totalPayroll = (decimal)ViewBag.TotalPayroll;
-    int    pendingCount  = (int)ViewBag.PendingCount;
-    int    approvedCount = (int)ViewBag.ApprovedCount;
-    int    paidCount     = (int)ViewBag.PaidCount;
-    int    notCreated    = (int)ViewBag.NotCreatedCount;
+    int pendingCount = (int)ViewBag.PendingCount;
+    int approvedCount = (int)ViewBag.ApprovedCount;
+    int paidCount = (int)ViewBag.PaidCount;
+    int notCreated = (int)ViewBag.NotCreatedCount;
 
     var monthName = new DateTime(selYear, selMonth, 1).ToString("MMMM yyyy");
 
-    // Previous / next month navigation
     var prev = new DateTime(selYear, selMonth, 1).AddMonths(-1);
     var next = new DateTime(selYear, selMonth, 1).AddMonths(1);
 }
@@ -109,7 +108,7 @@
             <form asp-action="ApproveAllSalaries" method="post">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="month" value="@selMonth" />
-                <input type="hidden" name="year"  value="@selYear"  />
+                <input type="hidden" name="year" value="@selYear" />
                 <button type="submit" class="btn btn-success"
                         onclick="return confirm('هل تريد الموافقة على مرتبات كل الموظفين لشهر @monthName؟')">
                     <i class="bi bi-check-all me-2"></i>
@@ -138,42 +137,42 @@
                         <th>مكافأة / خصم</th>
                         <th>الإجمالي</th>
                         <th>الحالة</th>
-                        <th style="width:200px">الإجراءات</th>
+                        <th style="width:280px">الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var u in Model)
                     {
-                        var rowBg = u.Status switch {
+                        var rowBg = u.Status switch
+                        {
                             3 => "background:#F0FDF4",
                             2 => "background:#EFF6FF",
                             _ => ""
                         };
 
                         <tr style="@rowBg">
+
+                            @* ── Employee ── *@
                             <td>
                                 <div style="font-weight:600;font-size:13.5px">@u.FullName</div>
                                 <div style="font-size:11.5px;color:var(--text-muted)">@u.Email</div>
                             </td>
+
+                            @* ── Role ── *@
                             <td>
                                 <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;
                                              background:#EEF2FF;color:#1B4FD8">
                                     @u.RoleName
                                 </span>
                             </td>
+
+                            @* ── Base Salary (display only — edit via Actions) ── *@
                             <td>
                                 <span style="font-weight:600">@u.BaseSalary.ToString("N0")</span>
                                 <span style="font-size:11px;color:var(--text-muted)"> ج.م</span>
-                                @if (u.Status != 3)
-                                {
-                                    <button class="btn btn-link btn-sm p-0 ms-1"
-                                            style="font-size:11px;color:var(--text-muted)"
-                                            onclick="openSetSalary('@u.UserId','@u.FullName','@u.BaseSalary')"
-                                            title="تعديل المرتب الأساسي">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
-                                }
                             </td>
+
+                            @* ── Adjustment (display only — edit via Actions) ── *@
                             <td>
                                 @if (u.Adjustment != 0)
                                 {
@@ -189,15 +188,9 @@
                                 {
                                     <span style="color:var(--text-muted);font-size:12px">—</span>
                                 }
-                                @if (u.Status != 3)
-                                {
-                                    <button class="btn btn-link btn-sm p-0 ms-1"
-                                            style="font-size:11px;color:var(--text-muted)"
-                                            onclick="openAdjust('@u.UserId','@u.FullName','@u.Adjustment','@u.AdjustmentNote')">
-                                        <i class="bi bi-plus-slash-minus"></i>
-                                    </button>
-                                }
                             </td>
+
+                            @* ── Total ── *@
                             <td>
                                 <span style="font-weight:700;font-size:15px;
                                              color:@(u.IsPaid ? "#16A34A" : "#1B4FD8")">
@@ -205,9 +198,12 @@
                                 </span>
                                 <span style="font-size:11px;color:var(--text-muted)"> ج.م</span>
                             </td>
+
+                            @* ── Status Badge ── *@
                             <td>
                                 @{
-                                    var (badgeBg, badgeColor, badgeText) = u.Status switch {
+                                    var (badgeBg, badgeColor, badgeText) = u.Status switch
+                                    {
                                         3 => ("#ECFDF5", "#059669", "✓ مدفوع"),
                                         2 => ("#EFF6FF", "#2563EB", "معتمد"),
                                         1 => ("#FFFBEB", "#D97706", "معلق"),
@@ -219,30 +215,56 @@
                                     @badgeText
                                 </span>
                             </td>
+
+                            @* ── Actions ── *@
                             <td>
-                                @if (u.Status != 3)
-                                {
-                                    <form asp-action="ApproveSalary" method="post" class="d-inline">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="userId" value="@u.UserId" />
-                                        <input type="hidden" name="month"  value="@selMonth"  />
-                                        <input type="hidden" name="year"   value="@selYear"   />
-                                        <button type="submit"
-                                                class="btn btn-sm @(u.Status == 2 ? "btn-outline-success" : "btn-success")"
-                                                style="font-size:12px;padding:4px 12px"
-                                                @(u.Status == 2 ? "disabled" : "")>
-                                            <i class="bi bi-check-lg me-1"></i>
-                                            @(u.Status == 2 ? "تم الاعتماد" : "اعتماد الصرف")
-                                        </button>
-                                    </form>
-                                }
-                                else
+                                @if (u.Status == 3)
                                 {
                                     <span style="font-size:12px;color:#059669">
                                         <i class="bi bi-check-circle-fill me-1"></i>تم الصرف
                                     </span>
                                 }
+                                else
+                                {
+                                    <div class="d-flex align-items-center gap-1 flex-wrap">
+
+                                        @* Edit Base Salary *@
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary"
+                                                style="font-size:11.5px;padding:4px 10px"
+                                                onclick="openSetSalary('@u.UserId','@u.FullName','@u.BaseSalary')"
+                                                title="تعديل المرتب الأساسي">
+                                            <i class="bi bi-pencil-fill me-1"></i>المرتب
+                                        </button>
+
+                                        @* Bonus / Deduction — turns solid amber when adjustment already exists *@
+                                        <button type="button"
+                                                class="btn btn-sm @(u.Adjustment != 0 ? "btn-warning" : "btn-outline-warning")"
+                                                style="font-size:11.5px;padding:4px 10px"
+                                                onclick="openAdjust('@u.UserId','@u.FullName','@u.Adjustment','@u.AdjustmentNote')"
+                                                title="@(u.Adjustment != 0 ? "تعديل المكافأة / الخصم" : "إضافة مكافأة أو خصم")">
+                                            <i class="bi bi-plus-slash-minus me-1"></i>تعديل
+                                        </button>
+
+                                        @* Approve *@
+                                        <form asp-action="ApproveSalary" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userId" value="@u.UserId" />
+                                            <input type="hidden" name="month" value="@selMonth" />
+                                            <input type="hidden" name="year" value="@selYear" />
+                                            <button type="submit"
+                                                    class="btn btn-sm @(u.Status == 2 ? "btn-outline-success" : "btn-success")"
+                                                    style="font-size:11.5px;padding:4px 10px"
+                                            @(u.Status == 2 ? "disabled" : "")>
+                                                <i class="bi bi-check-lg me-1"></i>
+                                                @(u.Status == 2 ? "معتمد" : "اعتماد")
+                                            </button>
+                                        </form>
+
+                                    </div>
+                                }
                             </td>
+
                         </tr>
                     }
                 </tbody>
@@ -269,7 +291,9 @@
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" style="font-size:15px">تعديل المرتب الأساسي</h5>
+                <h5 class="modal-title" style="font-size:15px">
+                    <i class="bi bi-pencil-fill me-2 text-primary"></i>تعديل المرتب الأساسي
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form asp-action="SetBaseSalary" method="post">
@@ -303,14 +327,16 @@
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" style="font-size:15px">مكافأة / خصم</h5>
+                <h5 class="modal-title" style="font-size:15px">
+                    <i class="bi bi-plus-slash-minus me-2 text-warning"></i>مكافأة / خصم
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form asp-action="AdjustSalary" method="post">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="userId" id="adjustUserId" />
-                <input type="hidden" name="month"  value="@selMonth"  />
-                <input type="hidden" name="year"   value="@selYear"   />
+                <input type="hidden" name="month" value="@selMonth" />
+                <input type="hidden" name="year" value="@selYear" />
                 <div class="modal-body">
                     <p id="adjustName" style="font-weight:600;font-size:13.5px;margin-bottom:12px"></p>
                     <div class="alert alert-warning" style="font-size:12px;padding:8px 12px">
@@ -319,17 +345,17 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label" style="font-size:13px;font-weight:600">النوع</label>
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-3">
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="adjType"
-                                       id="typeBonus" value="bonus" checked onchange="updateAdjSign()" />
+                                       id="typeBonus" value="bonus" checked />
                                 <label class="form-check-label" for="typeBonus" style="font-size:13px">
                                     مكافأة ➕
                                 </label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="adjType"
-                                       id="typeDeduct" value="deduct" onchange="updateAdjSign()" />
+                                       id="typeDeduct" value="deduct" />
                                 <label class="form-check-label" for="typeDeduct" style="font-size:13px">
                                     خصم ➖
                                 </label>
@@ -364,36 +390,35 @@
 </div>
 
 @section Scripts {
-<script>
-function openSetSalary(userId, name, current) {
-    document.getElementById('setSalaryUserId').value  = userId;
-    document.getElementById('setSalaryName').textContent = name;
-    document.getElementById('setSalaryAmount').value  = current;
-    new bootstrap.Modal(document.getElementById('setSalaryModal')).show();
-}
+    <script>
+        function openSetSalary(userId, name, current) {
+            document.getElementById('setSalaryUserId').value     = userId;
+            document.getElementById('setSalaryName').textContent = name;
+            document.getElementById('setSalaryAmount').value     = current;
+            new bootstrap.Modal(document.getElementById('setSalaryModal')).show();
+        }
 
-function openAdjust(userId, name, currentAdj, currentNote) {
-    document.getElementById('adjustUserId').value = userId;
-    document.getElementById('adjustName').textContent = name;
-    document.getElementById('adjustNote').value   = currentNote || '';
+        function openAdjust(userId, name, currentAdj, currentNote) {
+            document.getElementById('adjustUserId').value        = userId;
+            document.getElementById('adjustName').textContent    = name;
+            document.getElementById('adjustNote').value          = currentNote || '';
 
-    const absVal = Math.abs(parseFloat(currentAdj) || 0);
-    document.getElementById('adjustAmountInput').value = absVal;
+            const absVal = Math.abs(parseFloat(currentAdj) || 0);
+            document.getElementById('adjustAmountInput').value   = absVal;
 
-    // Set radio based on current adjustment sign
-    if (parseFloat(currentAdj) < 0) {
-        document.getElementById('typeDeduct').checked = true;
-    } else {
-        document.getElementById('typeBonus').checked = true;
-    }
+            if (parseFloat(currentAdj) < 0) {
+                document.getElementById('typeDeduct').checked = true;
+            } else {
+                document.getElementById('typeBonus').checked = true;
+            }
 
-    new bootstrap.Modal(document.getElementById('adjustModal')).show();
-}
+            new bootstrap.Modal(document.getElementById('adjustModal')).show();
+        }
 
-function prepareAdjustment() {
-    const amount  = parseFloat(document.getElementById('adjustAmountInput').value) || 0;
-    const isBonus = document.getElementById('typeBonus').checked;
-    document.getElementById('adjustmentFinal').value = isBonus ? amount : -amount;
-}
-</script>
+        function prepareAdjustment() {
+            const amount  = parseFloat(document.getElementById('adjustAmountInput').value) || 0;
+            const isBonus = document.getElementById('typeBonus').checked;
+            document.getElementById('adjustmentFinal').value = isBonus ? amount : -amount;
+        }
+    </script>
 }
