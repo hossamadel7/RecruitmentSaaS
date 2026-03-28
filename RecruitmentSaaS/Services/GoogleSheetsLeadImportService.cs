@@ -113,13 +113,31 @@ namespace RecruitmentSaaS.Services
                 return -1;
             }
 
-            // Map columns — handles Facebook export naming + Arabic headers
-            var colName = Col("full_name", "name", "الاسم الكامل", "الاسم");
-            var colPhone = Col("phone_number", "phone", "mobile", "الهاتف", "رقم الهاتف");
-            var colNotes = Col("any_notes", "notes", "ملاحظات");
-            var colJobTitle = Col("job_title", "interested_job", "المسمى الوظيفي");
-            var colCountry = Col("country", "interested_country", "الدولة");
-            var colCampaignName = Col("campaign_name", "campaign", "الحملة");
+            // ── Column mapping — covers English + all Arabic variants ──────────
+            var colName = Col(
+                "full_name", "name",
+                "الاسم الكامل", "الاسم",
+                "الاسم_بالكامل", "الاسم بالكامل");
+
+            var colPhone = Col(
+                "phone_number", "phone", "mobile",
+                "الهاتف", "رقم الهاتف", "رقم_الهاتف");
+
+            var colNotes = Col(
+                "any_notes", "notes",
+                "ملاحظات");
+
+            var colJobTitle = Col(
+                "job_title", "interested_job",
+                "المسمى الوظيفي", "الوظيفة المطلوبة", "المهنة");
+
+            var colCountry = Col(
+                "country", "interested_country",
+                "الدولة");
+
+            var colCampaignName = Col(
+                "campaign_name", "campaign",
+                "الحملة");
 
             // ── Fetch data rows starting after last imported row ───────────────
             var startRow = sheet.LastImportedRow + 1;
@@ -206,7 +224,7 @@ namespace RecruitmentSaaS.Services
                     LeadSource = 1,         // Facebook
                     CampaignId = campaignId,
                     GoogleSheetId = sheet.Id,
-                    AssignedSalesId = null,      // goes to Pool
+                    AssignedSalesId = null,       // goes to Pool
                     IsConverted = false,
                     IsDuplicate = false,
                     CreatedAt = DateTime.UtcNow,
