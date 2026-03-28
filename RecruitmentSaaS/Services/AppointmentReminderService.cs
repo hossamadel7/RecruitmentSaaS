@@ -18,7 +18,7 @@ namespace RecruitmentSaaS.Services
             ILogger<AppointmentReminderService> logger)
         {
             _services = services;
-            _logger   = logger;
+            _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,9 +28,9 @@ namespace RecruitmentSaaS.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 // Calculate time until next 9:00 AM
-                var now       = DateTime.Now;
-                var nextRun   = now.Date.AddDays(1).AddHours(9);
-                var delay     = nextRun - now;
+                var now = DateTime.Now;
+                var nextRun = now.Date.AddDays(1).AddHours(9);
+                var delay = nextRun - now;
 
                 // If it's before 9 AM today, run today at 9 AM
                 if (now.Hour < 9)
@@ -56,12 +56,12 @@ namespace RecruitmentSaaS.Services
 
         private async Task SendRemindersAsync(CancellationToken ct)
         {
-            using var scope       = _services.CreateScope();
-            var context           = scope.ServiceProvider.GetRequiredService<RecruitmentCrmContext>();
-            var notificationSvc   = scope.ServiceProvider.GetRequiredService<INotificationService>();
+            using var scope = _services.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<RecruitmentCrmContext>();
+            var notificationSvc = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
             var tomorrow = DateTime.Today.AddDays(1);
-            var today    = DateTime.Today;
+            var today = DateTime.Today;
 
             // ── 1. Appointments tomorrow (Status = 5) ──────────────────────
             var tomorrowAppointments = await context.Leads
@@ -83,11 +83,11 @@ namespace RecruitmentSaaS.Services
             {
                 var time = lead.AppointmentDate!.Value.ToString("HH:mm");
                 await notificationSvc.SendAsync(
-                    userId:  lead.SalesId,
-                    title:   $"📅 تذكير: موعد غداً",
+                    userId: lead.SalesId,
+                    title: $"📅 تذكير: موعد غداً",
                     message: $"{lead.FullName} ({lead.Phone}) — غداً الساعة {time}. تذكر الاتصال لتأكيد الحضور",
-                    link:    $"/TeleSales/LeadDetail/{lead.Id}",
-                    type:    NotificationType.General
+                    link: $"/TeleSales/LeadDetail/{lead.Id}",
+                    type: NotificationType.General
                 );
             }
 
@@ -103,22 +103,33 @@ namespace RecruitmentSaaS.Services
                 {
                     r.Id,
                     r.AssignedToId,
-                    LeadName  = r.Lead.FullName,
-                    LeadPhone = r.Lead.Phone,
-                    LeadId    = r.LeadId,
+                    LeadName = r.Lead != null ? r.Lead.FullName : null,
+                    LeadPhone = r.Lead != null ? r.Lead.Phone : null,
+                    LeadId = r.LeadId,
                     r.Notes
                 })
                 .ToListAsync(ct);
 
             foreach (var reminder in dueReminders)
             {
+                // Build message — use Notes if no lead info available
+                var msgTitle = "🔔 متابعة مستحقة اليوم";
+                var msgBody = !string.IsNullOrEmpty(reminder.LeadName)
+                    ? $"{reminder.LeadName} ({reminder.LeadPhone})" +
+                      (string.IsNullOrEmpty(reminder.Notes) ? "" : $" — {reminder.Notes}")
+                    : reminder.Notes ?? "لديك تذكير مستحق اليوم";
+
+                // Link: Sales candidate link if no lead, else TeleSales lead link
+                var link = reminder.LeadId != Guid.Empty && reminder.LeadName != null
+                    ? $"/TeleSales/LeadDetail/{reminder.LeadId}"
+                    : "/Sales/Candidates";
+
                 await notificationSvc.SendAsync(
-                    userId:  reminder.AssignedToId,
-                    title:   $"🔔 متابعة مستحقة اليوم",
-                    message: $"{reminder.LeadName} ({reminder.LeadPhone})" +
-                             (string.IsNullOrEmpty(reminder.Notes) ? "" : $" — {reminder.Notes}"),
-                    link:    $"/TeleSales/LeadDetail/{reminder.LeadId}",
-                    type:    NotificationType.General
+                    userId: reminder.AssignedToId,
+                    title: msgTitle,
+                    message: msgBody,
+                    link: link,
+                    type: NotificationType.General
                 );
             }
 
