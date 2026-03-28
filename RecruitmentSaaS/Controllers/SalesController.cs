@@ -971,31 +971,37 @@ namespace RecruitmentSaaS.Controllers
             // ── Reminder: day before flight ───────────────────────────────────
             var reminderDate = DateOnly.FromDateTime(flightDate.AddDays(-1));
 
-            // Remove old flight reminder if exists
-            var oldReminder = await _context.FollowUpReminders
-                .FirstOrDefaultAsync(r => r.LeadId == null
-                    && r.AssignedToId == userId
-                    && r.Notes != null
-                    && r.Notes.Contains(candidate.FullName)
-                    && r.Notes.Contains("طيران")
-                    && r.Status == 1);
+            // Get linked lead
+            var linkedLeadId = await _context.Leads
+                .Where(l => l.ConvertedCandidateId == candidateId)
+                .Select(l => (Guid?)l.Id)
+                .FirstOrDefaultAsync();
 
-            // Use CandidateActivities to store reminder instead
-            // Send notification to sales the day before
-            _context.FollowUpReminders.Add(new FollowUpReminder
+            // Remove old flight reminder if exists
+            if (linkedLeadId.HasValue)
             {
-                Id = Guid.NewGuid(),
-                LeadId = (await _context.Leads
-                    .Where(l => l.ConvertedCandidateId == candidateId)
-                    .Select(l => l.Id)
-                    .FirstOrDefaultAsync()),
-                AssignedToId = userId,
-                CreatedById = userId,
-                ReminderDate = reminderDate,
-                Notes = $"تذكير: رحلة {candidate.FullName} غداً الساعة {flightDate:HH:mm}",
-                Status = 1,
-                CreatedAt = DateTime.UtcNow
-            });
+                var oldReminders = await _context.FollowUpReminders
+                    .Where(r => r.LeadId == linkedLeadId.Value
+                             && r.AssignedToId == userId
+                             && r.Notes != null
+                             && r.Notes.Contains("طيران")
+                             && r.Status == 1)
+                    .ToListAsync();
+                _context.FollowUpReminders.RemoveRange(oldReminders);
+
+                // Add new reminder
+                _context.FollowUpReminders.Add(new FollowUpReminder
+                {
+                    Id = Guid.NewGuid(),
+                    LeadId = linkedLeadId.Value,
+                    AssignedToId = userId,
+                    CreatedById = userId,
+                    ReminderDate = reminderDate,
+                    Notes = $"تذكير: رحلة {candidate.FullName} غداً الساعة {flightDate:HH:mm}",
+                    Status = 1,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
 
             // Immediate notification
             await _notifications.SendAsync(
@@ -1034,17 +1040,20 @@ namespace RecruitmentSaaS.Controllers
                 .Select(l => (Guid?)l.Id)
                 .FirstOrDefaultAsync();
 
-            _context.FollowUpReminders.Add(new FollowUpReminder
+            if (leadId.HasValue)
             {
-                Id = Guid.NewGuid(),
-                LeadId = leadId ?? Guid.Empty,
-                AssignedToId = userId,
-                CreatedById = userId,
-                ReminderDate = reminderDate,
-                Notes = notes,
-                Status = 1,
-                CreatedAt = DateTime.UtcNow
-            });
+                _context.FollowUpReminders.Add(new FollowUpReminder
+                {
+                    Id = Guid.NewGuid(),
+                    LeadId = leadId.Value,
+                    AssignedToId = userId,
+                    CreatedById = userId,
+                    ReminderDate = reminderDate,
+                    Notes = notes,
+                    Status = 1,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
 
             await _context.SaveChangesAsync();
 
