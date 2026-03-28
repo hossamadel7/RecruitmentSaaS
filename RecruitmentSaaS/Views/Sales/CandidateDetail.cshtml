@@ -245,7 +245,7 @@
                                 <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@doc.FileName</div>
                                 <div style="font-size:10px;color:var(--text-muted)">@(doc.FileSizeBytes / 1024) KB · @doc.UploadedByName</div>
                             </div>
-                            <a href="/Sales/DownloadDocument/@doc.Id" style="color:var(--text-muted);font-size:15px" title="تحميل">
+                            <a href="@(User.IsInRole("1") ? $"/Admin/DownloadDocument/{doc.Id}" : $"/Sales/DownloadDocument/{doc.Id}")" style="color:var(--text-muted);font-size:15px" title="تحميل">
                                 <i class="bi bi-download"></i>
                             </a>
                         </div>
