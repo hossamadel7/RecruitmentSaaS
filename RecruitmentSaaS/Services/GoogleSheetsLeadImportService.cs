@@ -82,7 +82,7 @@ namespace RecruitmentSaaS.Services
 
             if (sheet == null) return result;
 
-            // ── Fetch header row first to map columns dynamically ─────────────
+            // ── Fetch header row to map columns dynamically ───────────────────
             var headerRange = Uri.EscapeDataString($"{sheet.SheetName}!A1:Z1");
             var headerUrl = $"https://sheets.googleapis.com/v4/spreadsheets/{sheet.SpreadsheetId}/values/{headerRange}?key={apiKey}";
             var headerResp = await _http.GetAsync(headerUrl);
@@ -102,7 +102,7 @@ namespace RecruitmentSaaS.Services
                     .Select(h => h.GetString()?.ToLower().Trim() ?? "")
                     .ToList();
 
-            // Find column index by any of the given header names
+            // Find column index by any matching header name
             int Col(params string[] names)
             {
                 foreach (var n in names)
@@ -160,99 +160,115 @@ namespace RecruitmentSaaS.Services
             var rows = values.EnumerateArray().ToList();
             if (!rows.Any()) return result;
 
-            // ── Process each row ──────────────────────────────────────────────
+            // ── Process each row individually ─────────────────────────────────
             int lastRow = sheet.LastImportedRow;
 
             foreach (var row in rows)
             {
                 lastRow++;
-                var cells = row.EnumerateArray()
-                    .Select(c => c.GetString()?.Trim() ?? "")
-                    .ToList();
-
-                string Get(int idx) => idx >= 0 && idx < cells.Count ? cells[idx] : "";
-
-                var name = Get(colName);
-                var phone = NormalizePhone(Get(colPhone));
-
-                // Skip empty rows
-                if (string.IsNullOrWhiteSpace(phone) && string.IsNullOrWhiteSpace(name))
+                try
                 {
-                    result.Skipped++;
-                    continue;
-                }
+                    var cells = row.EnumerateArray()
+                        .Select(c => c.GetString()?.Trim() ?? "")
+                        .ToList();
 
-                // Skip test leads
-                if (name.ToLower().Contains("test") || phone == "01000000000")
-                {
-                    result.Skipped++;
-                    continue;
-                }
+                    string Get(int idx) => idx >= 0 && idx < cells.Count ? cells[idx] : "";
 
-                // Duplicate check by phone
-                if (!string.IsNullOrWhiteSpace(phone))
-                {
-                    var exists = await context.Leads.AnyAsync(l => l.Phone == phone);
-                    if (exists)
+                    var name = Get(colName);
+                    var phone = NormalizePhone(Get(colPhone));
+
+                    // Skip empty rows
+                    if (string.IsNullOrWhiteSpace(phone) && string.IsNullOrWhiteSpace(name))
                     {
-                        result.Duplicates++;
+                        result.Skipped++;
                         continue;
                     }
+
+                    // Skip test leads
+                    if (name.ToLower().Contains("test") || phone == "01000000000")
+                    {
+                        result.Skipped++;
+                        continue;
+                    }
+
+                    // Duplicate check by normalized phone
+                    if (!string.IsNullOrWhiteSpace(phone))
+                    {
+                        var exists = await context.Leads.AnyAsync(l => l.Phone == phone);
+                        if (exists)
+                        {
+                            result.Duplicates++;
+                            continue;
+                        }
+                    }
+
+                    // Try to match campaign by name from sheet row
+                    Guid? campaignId = sheet.CampaignId;
+                    var campaignName = Get(colCampaignName);
+                    if (!string.IsNullOrWhiteSpace(campaignName))
+                    {
+                        var matched = await context.Campaigns
+                            .FirstOrDefaultAsync(c => c.Name == campaignName);
+                        if (matched != null)
+                            campaignId = matched.Id;
+                    }
+
+                    // Create lead
+                    var lead = new Lead
+                    {
+                        Id = Guid.NewGuid(),
+                        FullName = name,
+                        Phone = phone,
+                        Notes = Get(colNotes),
+                        InterestedJobTitle = Get(colJobTitle),
+                        InterestedCountry = Get(colCountry),
+                        Status = 1,        // New
+                        LeadSource = 1,        // Facebook
+                        CampaignId = campaignId,
+                        GoogleSheetId = sheet.Id,
+                        AssignedSalesId = null,     // goes to Pool
+                        IsConverted = false,
+                        IsDuplicate = false,
+                        CreatedAt = DateTime.UtcNow,
+                        BranchId = DefaultBranchId,
+                        RegisteredById = SystemUserId,
+                    };
+
+                    context.Leads.Add(lead);
+
+                    context.LeadFunnelHistories.Add(new LeadFunnelHistory
+                    {
+                        Id = Guid.NewGuid(),
+                        LeadId = lead.Id,
+                        FromStatus = null,
+                        ToStatus = 1,
+                        ChangedById = SystemUserId,
+                        CreatedAt = DateTime.UtcNow,
+                    });
+
+                    // Save each lead individually — one failure won't block others
+                    await context.SaveChangesAsync();
+                    result.Imported++;
                 }
-
-                // ── Try to match campaign by name from sheet row ──────────────
-                Guid? campaignId = sheet.CampaignId; // default from sheet config
-                var campaignName = Get(colCampaignName);
-                if (!string.IsNullOrWhiteSpace(campaignName))
+                catch (Exception ex)
                 {
-                    var matched = await context.Campaigns
-                        .FirstOrDefaultAsync(c => c.Name == campaignName);
-                    if (matched != null)
-                        campaignId = matched.Id;
+                    result.Duplicates++;
+                    _logger.LogWarning("Skipped row {Row} — {Msg}", lastRow, ex.Message);
+
+                    // Detach any failed tracked entities so context stays clean
+                    foreach (var entry in context.ChangeTracker.Entries()
+                        .Where(e => e.State == EntityState.Added)
+                        .ToList())
+                    {
+                        entry.State = EntityState.Detached;
+                    }
                 }
-
-                // ── Create lead ───────────────────────────────────────────────
-                var lead = new Lead
-                {
-                    Id = Guid.NewGuid(),
-                    FullName = name,
-                    Phone = phone,
-                    Notes = Get(colNotes),
-                    InterestedJobTitle = Get(colJobTitle),
-                    InterestedCountry = Get(colCountry),
-                    Status = 1,         // New
-                    LeadSource = 1,         // Facebook
-                    CampaignId = campaignId,
-                    GoogleSheetId = sheet.Id,
-                    AssignedSalesId = null,       // goes to Pool
-                    IsConverted = false,
-                    IsDuplicate = false,
-                    CreatedAt = DateTime.UtcNow,
-                    BranchId = DefaultBranchId,
-                    RegisteredById = SystemUserId,
-                };
-
-                context.Leads.Add(lead);
-
-                // Funnel history entry
-                context.LeadFunnelHistories.Add(new LeadFunnelHistory
-                {
-                    Id = Guid.NewGuid(),
-                    LeadId = lead.Id,
-                    FromStatus = null,
-                    ToStatus = 1,
-                    ChangedById = SystemUserId,
-                    CreatedAt = DateTime.UtcNow,
-                });
-
-                result.Imported++;
             }
 
-            // ── Save progress back to sheet record ────────────────────────────
+            // ── Save sheet progress ───────────────────────────────────────────
             sheet.LastImportedRow = lastRow;
             sheet.LastImportedAt = DateTime.UtcNow;
             sheet.TotalImported += result.Imported;
-
             await context.SaveChangesAsync();
 
             _logger.LogInformation(
