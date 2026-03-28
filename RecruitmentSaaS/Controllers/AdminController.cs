@@ -46,9 +46,14 @@ namespace RecruitmentSaaS.Controllers
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         // ── GET /Admin/Index ────────────────────────────────────────────────
-        // ── GET /Admin/Index ────────────────────────────────────────────────
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int? month, int? year)
         {
+            var now = DateTime.UtcNow;
+            var selMonth = month ?? now.Month;
+            var selYear = year ?? now.Year;
+            var monthStart = new DateTime(selYear, selMonth, 1);
+            var monthEnd = monthStart.AddMonths(1);
+
             var totalLeads = await _context.Leads.CountAsync();
             var totalCandidates = await _context.Candidates.CountAsync();
             var totalUsers = await _context.Users.CountAsync();
@@ -63,27 +68,53 @@ namespace RecruitmentSaaS.Controllers
                 .Where(p => p.Status == 2 && p.TransactionType == 1)
                 .SumAsync(p => (decimal?)p.AmountEgp) ?? 0;
 
-            // Leads by status
-            var leadsByStatus = await _context.Leads
+            // Funnel statuses only: 1,2,4,5,8 + 7(تحويل)
+            var funnelStatuses = new byte[] { 1, 2, 4, 5, 8, 7 };
+
+            var leadsThisMonth = await _context.Leads
+                .Where(l => l.CreatedAt >= monthStart && l.CreatedAt < monthEnd)
                 .GroupBy(l => l.Status)
                 .Select(g => new { Status = g.Key, Count = g.Count() })
-                .OrderBy(g => g.Status)
                 .ToListAsync();
 
-            // Candidates by stage
+            var leadsByStatus = funnelStatuses.Select(s => new
+            {
+                Status = (int)s,
+                Count = leadsThisMonth.FirstOrDefault(x => x.Status == s)?.Count ?? 0
+            }).ToList();
+
             var candidatesByStage = await _context.Candidates
-                .Where(c => c.IsCompleted != true && c.CurrentPackageStageId != null)
+                .Where(c => c.IsCompleted != true
+                         && c.CurrentPackageStageId != null
+                         && c.CreatedAt >= monthStart
+                         && c.CreatedAt < monthEnd)
                 .GroupBy(c => c.CurrentPackageStage!.StageName)
                 .Select(g => new { Stage = g.Key, Count = g.Count() })
-                .OrderBy(g => g.Stage)
+                .OrderByDescending(g => g.Count)
                 .ToListAsync();
 
-            // Recent leads (last 5)
             var recentLeads = await _context.Leads
                 .Include(l => l.Campaign)
                 .Include(l => l.AssignedSales)
+                .Where(l => l.CreatedAt >= monthStart && l.CreatedAt < monthEnd)
                 .OrderByDescending(l => l.CreatedAt)
-                .Take(5)
+                .Take(10)
+                .ToListAsync();
+
+            var monthLeadsTotal = leadsThisMonth.Sum(x => x.Count);
+            var monthCandidatesTotal = candidatesByStage.Sum(x => x.Count);
+
+            // ── Today's office sales appointments (from LeadVisits) ──────────
+            var todayStart = DateTime.UtcNow.Date;
+            var todayEnd = todayStart.AddDays(1);
+
+            var todayAppointments = await _context.LeadVisits
+                .Include(v => v.Lead)
+                    .ThenInclude(l => l.Campaign)
+                .Include(v => v.AssignedSalesUser)
+                .Include(v => v.ReceptionUser)
+                .Where(v => v.VisitDateTime >= todayStart && v.VisitDateTime < todayEnd)
+                .OrderBy(v => v.VisitDateTime)
                 .ToListAsync();
 
             ViewBag.TotalLeads = totalLeads;
@@ -98,6 +129,11 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.LeadsByStatus = leadsByStatus;
             ViewBag.CandidatesByStage = candidatesByStage;
             ViewBag.RecentLeads = recentLeads;
+            ViewBag.SelectedMonth = selMonth;
+            ViewBag.SelectedYear = selYear;
+            ViewBag.MonthLeadsTotal = monthLeadsTotal;
+            ViewBag.MonthCandidatesTotal = monthCandidatesTotal;
+            ViewBag.TodayAppointments = todayAppointments;
 
             return View();
         }
@@ -195,15 +231,72 @@ namespace RecruitmentSaaS.Controllers
         }
 
         // ── GET /Admin/Leads ────────────────────────────────────────────────
-        public async Task<IActionResult> Leads(string? q, int? status, Guid? campaignId, int page = 1)
+        public async Task<IActionResult> Leads(string? q, int? status, Guid? campaignId,
+                                               Guid? teleSalesId, int? month, int? year, int page = 1)
         {
             const int pageSize = 25;
 
+            var now = DateTime.UtcNow;
+            var selMonth = month ?? now.Month;
+            var selYear = year ?? now.Year;
+
+            var monthStart = new DateTime(selYear, selMonth, 1, 0, 0, 0, DateTimeKind.Utc);
+            var monthEnd = monthStart.AddMonths(1);
+
+            // ── Stats queries (scoped to selected month) ─────────────────────
+
+            // 1. New leads this month
+            var newLeadsThisMonth = await _context.Leads
+                .CountAsync(l => l.CreatedAt >= monthStart && l.CreatedAt < monthEnd);
+
+            // 2. Converted leads this month
+            var convertedThisMonth = await _context.Leads
+                .CountAsync(l => l.IsConverted
+                              && l.ConvertedAt.HasValue
+                              && l.ConvertedAt.Value >= monthStart
+                              && l.ConvertedAt.Value < monthEnd);
+
+            // 3. Leads by status this month
+            var leadsByStatus = await _context.Leads
+                .Where(l => l.CreatedAt >= monthStart && l.CreatedAt < monthEnd)
+                .GroupBy(l => l.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .OrderBy(g => g.Status)
+                .ToListAsync();
+
+            // 4. Top 3 TeleSales by assigned leads this month (Role = 3)
+            var topSales = await _context.Leads
+                .Where(l => l.CreatedAt >= monthStart
+                          && l.CreatedAt < monthEnd
+                          && l.AssignedSalesId != null
+                          && l.AssignedSales!.Role == 3)
+                .GroupBy(l => new { l.AssignedSalesId, l.AssignedSales!.FullName })
+                .Select(g => new
+                {
+                    SalesId = g.Key.AssignedSalesId,
+                    SalesName = g.Key.FullName,
+                    LeadCount = g.Count(),
+                    Converted = g.Count(l => l.IsConverted)
+                })
+                .OrderByDescending(g => g.LeadCount)
+                .Take(3)
+                .ToListAsync();
+
+            // ── Table query (existing filters, no month scope unless explicitly set) ──
             var query = _context.Leads
                 .Include(l => l.Campaign)
                 .Include(l => l.AssignedSales)
                 .Include(l => l.AssignedOfficeSales)
                 .AsQueryable();
+
+            // Apply month filter to table when explicitly provided
+            if (month.HasValue || year.HasValue)
+            {
+                query = query.Where(l => l.CreatedAt >= monthStart && l.CreatedAt < monthEnd);
+            }
+
+            if (teleSalesId.HasValue)
+                query = query.Where(l => l.AssignedSalesId == teleSalesId.Value);
 
             if (!string.IsNullOrWhiteSpace(q))
                 query = query.Where(l =>
@@ -229,27 +322,111 @@ namespace RecruitmentSaaS.Controllers
                 .OrderBy(c => c.Name)
                 .ToListAsync();
 
+            var teleSalesList = await _context.Users
+                .Where(u => u.Role == 3 && u.IsActive)
+                .OrderBy(u => u.FullName)
+                .Select(u => new { u.Id, u.FullName })
+                .ToListAsync();
+
+            // ── Conversion rate ──────────────────────────────────────────────
+            double convRate = newLeadsThisMonth > 0
+                ? Math.Round((double)convertedThisMonth / newLeadsThisMonth * 100, 1)
+                : 0;
+
+            // ── ViewBag ──────────────────────────────────────────────────────
             ViewBag.Q = q;
             ViewBag.Status = status;
             ViewBag.CampaignId = campaignId;
+            ViewBag.TeleSalesId = teleSalesId;
+            ViewBag.SelectedMonth = selMonth;
+            ViewBag.SelectedYear = selYear;
             ViewBag.Page = page;
             ViewBag.Total = total;
             ViewBag.TotalPages = (int)Math.Ceiling(total / (double)pageSize);
             ViewBag.Campaigns = campaigns;
+            ViewBag.TeleSalesList = teleSalesList;
+
+            // Stats
+            ViewBag.NewLeadsThisMonth = newLeadsThisMonth;
+            ViewBag.ConvertedThisMonth = convertedThisMonth;
+            ViewBag.ConversionRate = convRate;
+            ViewBag.LeadsByStatus = leadsByStatus;
+            ViewBag.TopSales = topSales;
+            ViewBag.MonthLabel = new DateTime(selYear, selMonth, 1).ToString("MMMM yyyy", new System.Globalization.CultureInfo("ar-EG"));
 
             return View(leads);
         }
 
         // ── GET /Admin/Candidates ───────────────────────────────────────────
-        public async Task<IActionResult> Candidates(string? q, Guid? stageId, int page = 1)
+        public async Task<IActionResult> Candidates(string? q, Guid? stageId,
+                                                    int? month, int? year, int page = 1)
         {
             const int pageSize = 25;
 
+            var now = DateTime.UtcNow;
+            var selMonth = month ?? now.Month;
+            var selYear = year ?? now.Year;
+
+            var monthStart = new DateTime(selYear, selMonth, 1, 0, 0, 0, DateTimeKind.Utc);
+            var monthEnd = monthStart.AddMonths(1);
+
+            // ── Stats (scoped to selected month) ────────────────────────────
+
+            // 1. New candidates this month
+            var newThisMonth = await _context.Candidates
+                .CountAsync(c => c.CreatedAt >= monthStart && c.CreatedAt < monthEnd);
+
+            // 2. Completed this month
+            var completedThisMonth = await _context.Candidates
+                .CountAsync(c => c.IsCompleted == true
+                              && c.CompletedAt.HasValue
+                              && c.CompletedAt.Value >= monthStart
+                              && c.CompletedAt.Value < monthEnd);
+
+            // 3. Total collected this month (approved payments)
+            var collectedThisMonth = await _context.Payments
+                .Where(p => p.Status == 2
+                          && p.TransactionType == 1
+                          && p.CreatedAt >= monthStart
+                          && p.CreatedAt < monthEnd)
+                .SumAsync(p => (decimal?)p.AmountEgp) ?? 0;
+
+            // 4. Candidates by stage this month (active, not completed)
+            var byStage = await _context.Candidates
+                .Where(c => c.CreatedAt >= monthStart
+                          && c.CreatedAt < monthEnd
+                          && c.IsCompleted != true
+                          && c.CurrentPackageStageId != null)
+                .GroupBy(c => c.CurrentPackageStage!.StageName)
+                .Select(g => new { Stage = g.Key, Count = g.Count() })
+                .OrderByDescending(g => g.Count)
+                .Take(6)
+                .ToListAsync();
+
+            // 5. Top 3 sales by candidates registered this month
+            var topSales = await _context.Candidates
+                .Where(c => c.CreatedAt >= monthStart
+                          && c.CreatedAt < monthEnd)
+                .GroupBy(c => new { c.AssignedSalesId, c.AssignedSales.FullName })
+                .Select(g => new
+                {
+                    SalesName = g.Key.FullName,
+                    CandCount = g.Count(),
+                    Completed = g.Count(c => c.IsCompleted == true)
+                })
+                .OrderByDescending(g => g.CandCount)
+                .Take(3)
+                .ToListAsync();
+
+            // ── Table query ──────────────────────────────────────────────────
             var query = _context.Candidates
                 .Include(c => c.JobPackage)
                 .Include(c => c.AssignedSales)
                 .Include(c => c.CurrentPackageStage)
                 .AsQueryable();
+
+            if (month.HasValue || year.HasValue)
+                query = query.Where(c => c.CreatedAt >= monthStart && c.CreatedAt < monthEnd);
 
             if (!string.IsNullOrWhiteSpace(q))
                 query = query.Where(c =>
@@ -268,11 +445,32 @@ namespace RecruitmentSaaS.Controllers
                 .Take(pageSize)
                 .ToListAsync();
 
+            // ── Stages dropdown ──────────────────────────────────────────────
+            var stages = await _context.PackageStages
+                .Where(s => s.IsActive == true)
+                .Select(s => new { s.Id, s.StageName })
+                .Distinct()
+                .OrderBy(s => s.StageName)
+                .ToListAsync();
+
+            // ── ViewBag ──────────────────────────────────────────────────────
             ViewBag.Q = q;
             ViewBag.StageId = stageId;
+            ViewBag.SelectedMonth = selMonth;
+            ViewBag.SelectedYear = selYear;
             ViewBag.Page = page;
             ViewBag.Total = total;
             ViewBag.TotalPages = (int)Math.Ceiling(total / (double)pageSize);
+            ViewBag.Stages = stages;
+
+            // Stats
+            ViewBag.NewThisMonth = newThisMonth;
+            ViewBag.CompletedThisMonth = completedThisMonth;
+            ViewBag.CollectedThisMonth = collectedThisMonth;
+            ViewBag.ByStage = byStage;
+            ViewBag.TopSales = topSales;
+            ViewBag.MonthLabel = new DateTime(selYear, selMonth, 1)
+                                            .ToString("MMMM yyyy", new System.Globalization.CultureInfo("ar-EG"));
 
             return View(candidates);
         }
@@ -1863,7 +2061,7 @@ namespace RecruitmentSaaS.Controllers
             return RedirectToAction("Salaries", new { month, year });
         }
 
-     
+
 
         public async Task<IActionResult> DownloadPassportsZip(Guid? packageId, Guid? id, bool newOnly = false)
         {

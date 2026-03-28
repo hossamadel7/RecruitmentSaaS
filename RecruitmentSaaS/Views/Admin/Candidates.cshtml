@@ -9,7 +9,16 @@
     int page = ViewBag.Page;
     int total = ViewBag.Total;
     int totalPages = ViewBag.TotalPages;
+    int selMonth = ViewBag.SelectedMonth;
+    int selYear = ViewBag.SelectedYear;
+    string monthLabel = ViewBag.MonthLabel;
 
+    int newThisMonth = ViewBag.NewThisMonth;
+    int completedThisMonth = ViewBag.CompletedThisMonth;
+    decimal collected = ViewBag.CollectedThisMonth;
+    var byStage = ViewBag.ByStage as IEnumerable<dynamic>;
+    var topSales = ViewBag.TopSales as IEnumerable<dynamic>;
+    var stages = ViewBag.Stages as IEnumerable<dynamic>;
 }
 
 <div class="page-header">
@@ -22,27 +31,191 @@
     </div>
 </div>
 
-@* Filters *@
+@* ── Stats Cards ────────────────────────────────────────────────────────── *@
+<div class="row g-3 mb-4">
+
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">مرشحون جدد</div>
+                <div style="font-size:2rem;font-weight:700;line-height:1;color:#3b82f6;">@newThisMonth.ToString("N0")</div>
+                <div style="font-size:.73rem;color:var(--text-muted);margin-top:4px;">@monthLabel</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">مكتملون</div>
+                <div style="font-size:2rem;font-weight:700;line-height:1;color:#22c55e;">@completedThisMonth.ToString("N0")</div>
+                <div style="font-size:.73rem;color:var(--text-muted);margin-top:4px;">أتموا جميع المراحل</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">إجمالي المحصّل</div>
+                <div style="font-size:1.6rem;font-weight:700;line-height:1;color:#f59e0b;">@collected.ToString("N0")</div>
+                <div style="font-size:.73rem;color:var(--text-muted);margin-top:4px;">ج.م — @monthLabel</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">توزيع المراحل</div>
+                @if (byStage != null && byStage.Any())
+                {
+                    int maxCount = (int)byStage.First().Count;
+                    <div style="display:flex;flex-direction:column;gap:5px;">
+                        @foreach (var item in byStage)
+                        {
+                            int cnt = (int)item.Count;
+                            double w = maxCount > 0 ? Math.Round((double)cnt / maxCount * 100, 0) : 0;
+                            <div style="font-size:.72rem;">
+                                <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+                                    <span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:75%;">@item.Stage</span>
+                                    <span style="font-weight:700;">@cnt</span>
+                                </div>
+                                <div style="background:#e2e8f0;border-radius:99px;height:4px;overflow:hidden;">
+                                    <div style="width:@w%;background:#3b82f6;height:100%;border-radius:99px;"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div style="font-size:.75rem;color:var(--text-muted);">لا توجد بيانات</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Top 3 Sales ──────────────────────────────────────────────────────────── *@
+@if (topSales != null && topSales.Any())
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px;">
+                🏆 أفضل المبيعات — @monthLabel
+            </div>
+            <div class="row g-2">
+                @{
+                    int rank = 0;
+                }
+                @foreach (var s in topSales)
+                {
+                    rank++;
+                    string sName = (string)s.SalesName;
+                    int sCands = (int)s.CandCount;
+                    int sComp = (int)s.Completed;
+                    double sRate = sCands > 0 ? Math.Round((double)sComp / sCands * 100, 0) : 0;
+                    int maxC = (int)topSales.First().CandCount;
+                    double barW = maxC > 0 ? Math.Round((double)sCands / maxC * 100, 0) : 0;
+                    string medal = rank == 1 ? "🥇" : rank == 2 ? "🥈" : "🥉";
+                    string barCol = rank == 1 ? "#f59e0b" : rank == 2 ? "#94a3b8" : "#cd7c2f";
+
+                    <div class="col-12 col-md-4">
+                        <div style="border:1px solid var(--bs-border-color,#e2e8f0);border-radius:10px;padding:12px 14px;">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                                <span style="font-size:1.1rem;">@medal</span>
+                                <span style="font-weight:700;font-size:.88rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@sName</span>
+                                <span style="font-size:1.05rem;font-weight:800;color:#3b82f6;">@sCands</span>
+                            </div>
+                            <div style="background:#e2e8f0;border-radius:99px;height:5px;overflow:hidden;margin-bottom:6px;">
+                                <div style="width:@barW%;background:@barCol;height:100%;border-radius:99px;"></div>
+                            </div>
+                            <div style="font-size:.72rem;color:var(--text-muted);display:flex;justify-content:space-between;">
+                                <span>@sCands مرشح</span>
+                                <span>@sComp مكتمل (@sRate%)</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Filters ──────────────────────────────────────────────────────────────── *@
 <div class="card mb-4">
     <div class="card-body">
         <form method="get" action="/Admin/Candidates" class="row g-2 align-items-end">
-            <div class="col-md-5">
+            <div class="col-md-3">
                 <label class="form-label form-label-sm">بحث</label>
                 <input name="q" value="@q" class="form-control form-control-sm" placeholder="اسم، هاتف، رقم قومي..." />
             </div>
+
             <div class="col-md-3">
-                <label class="form-label form-label-sm">المرحلة الحالية</label>
-                <input name="q" value="@q" class="form-control form-control-sm" placeholder="بحث بالاسم أو الهاتف..." style="display:none" />
-                <select class="form-select form-select-sm" disabled>
-                    <option>فلتر المراحل — قريباً</option>
+                <label class="form-label form-label-sm">المرحلة</label>
+                <select name="stageId" class="form-select form-select-sm">
+                    <option value="">كل المراحل</option>
+                    @if (stages != null)
+                    {
+                        @foreach (var st in stages)
+                        {
+                            if ((Guid?)st.Id == stageId)
+                            {
+                                <option value="@st.Id" selected>@st.StageName</option>
+                            }
+                            else
+                            {
+                                <option value="@st.Id">@st.StageName</option>
+                            }
+                        }
+                    }
                 </select>
             </div>
+
+            <div class="col-md-2">
+                <label class="form-label form-label-sm">الشهر</label>
+                <select name="month" class="form-select form-select-sm">
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        var ml = new DateTime(selYear, m, 1).ToString("MMMM", new System.Globalization.CultureInfo("ar-EG"));
+                        if (m == selMonth)
+                        {
+                            <option value="@m" selected>@ml</option>
+                        }
+                        else
+                        {
+                            <option value="@m">@ml</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-1">
+                <label class="form-label form-label-sm">السنة</label>
+                <select name="year" class="form-select form-select-sm">
+                    @for (int y = DateTime.UtcNow.Year; y >= DateTime.UtcNow.Year - 3; y--)
+                    {
+                        if (y == selYear)
+                        {
+                            <option value="@y" selected>@y</option>
+                        }
+                        else
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    }
+                </select>
+            </div>
+
             <div class="col-md-2">
                 <button type="submit" class="btn btn-primary btn-sm w-100">بحث</button>
             </div>
-            @if (!string.IsNullOrWhiteSpace(q) || stageId.HasValue)
+
+            @if (!string.IsNullOrWhiteSpace(q) || stageId.HasValue
+            || selMonth != DateTime.UtcNow.Month || selYear != DateTime.UtcNow.Year)
             {
-                <div class="col-md-2">
+                <div class="col-md-1">
                     <a href="/Admin/Candidates" class="btn btn-ghost btn-sm w-100">مسح</a>
                 </div>
             }
@@ -50,6 +223,7 @@
     </div>
 </div>
 
+@* ── Table ────────────────────────────────────────────────────────────────── *@
 <div class="card">
     <div class="card-body p-0">
         @if (!Model.Any())
@@ -78,11 +252,6 @@
                     <tbody>
                         @foreach (var c in Model)
                         {
-                            string label = c.CurrentPackageStage?.StageName ?? "—";
-                            string color = "#1B4FD8";
-                            string colorBg = "#EEF2FF";
-                            string colorBorder = "#93C5FD";
-
                             <tr>
                                 <td>
                                     <div style="font-weight:600;">@c.FullName</div>
@@ -100,16 +269,14 @@
                                     }
                                     else
                                     {
-                                        <span style="background:@colorBg;color:@color;border:1px solid @colorBorder;font-size:.7rem;padding:3px 10px;border-radius:99px;font-weight:700;">
-                                            @label
+                                        <span style="background:#EEF2FF;color:#1B4FD8;border:1px solid #93C5FD;font-size:.7rem;padding:3px 10px;border-radius:99px;font-weight:700;">
+                                            @(c.CurrentPackageStage?.StageName ?? "—")
                                         </span>
                                     }
                                 </td>
                                 <td style="font-size:.82rem;">@(c.AssignedSales?.FullName ?? "—")</td>
                                 <td style="font-weight:700;color:#16a34a;">@c.TotalPaidEgp.ToString("N0")</td>
-                                <td style="font-size:.78rem;color:var(--text-muted);">
-                                    @c.CreatedAt.ToString("dd/MM/yyyy")
-                                </td>
+                                <td style="font-size:.78rem;color:var(--text-muted);">@c.CreatedAt.ToString("dd/MM/yyyy")</td>
                                 <td>
                                     <a href="/Admin/CandidateDetail/@c.Id" class="btn btn-ghost btn-sm">
                                         <i class="bi bi-eye"></i>
@@ -130,7 +297,7 @@
                             @if (page > 1)
                             {
                                 <li class="page-item">
-                                    <a class="page-link" href="?q=@q&stageId=@stageId&page=@(page - 1)">
+                                    <a class="page-link" href="?q=@q&stageId=@stageId&month=@selMonth&year=@selYear&page=@(page-1)">
                                         <i class="bi bi-chevron-right"></i>
                                     </a>
                                 </li>
@@ -138,13 +305,13 @@
                             @for (int p = Math.Max(1, page - 2); p <= Math.Min(totalPages, page + 2); p++)
                             {
                                 <li class="page-item @(p == page ? "active" : "")">
-                                    <a class="page-link" href="?q=@q&stageId=@stageId&page=@p">@p</a>
+                                    <a class="page-link" href="?q=@q&stageId=@stageId&month=@selMonth&year=@selYear&page=@p">@p</a>
                                 </li>
                             }
                             @if (page < totalPages)
                             {
                                 <li class="page-item">
-                                    <a class="page-link" href="?q=@q&stageId=@stageId&page=@(page + 1)">
+                                    <a class="page-link" href="?q=@q&stageId=@stageId&month=@selMonth&year=@selYear&page=@(page+1)">
                                         <i class="bi bi-chevron-left"></i>
                                     </a>
                                 </li>

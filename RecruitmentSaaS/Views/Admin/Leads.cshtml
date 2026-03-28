@@ -7,10 +7,20 @@
     string? q = ViewBag.Q;
     int? status = ViewBag.Status;
     Guid? campId = ViewBag.CampaignId;
+    Guid? teleSalesId = ViewBag.TeleSalesId as Guid?;
     int page = ViewBag.Page;
     int total = ViewBag.Total;
     int totalPages = ViewBag.TotalPages;
+    int selMonth = ViewBag.SelectedMonth;
+    int selYear = ViewBag.SelectedYear;
+    string monthLabel = ViewBag.MonthLabel;
     var campaigns = (IEnumerable<Campaign>)ViewBag.Campaigns;
+    var teleSalesList = ViewBag.TeleSalesList as IEnumerable<dynamic>;
+
+    int newLeads = ViewBag.NewLeadsThisMonth;
+    int converted = ViewBag.ConvertedThisMonth;
+    double convRate = ViewBag.ConversionRate;
+    var topSales = ViewBag.TopSales as IEnumerable<dynamic>;
 
     string[] statusLabels = { "", "عميل جديد", "تم التواصل", "مهتم", "يفكر", "وعد بالزيارة", "زيارة", "تحويل", "ملغى" };
     string[] statusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626" };
@@ -26,14 +36,100 @@
     </div>
 </div>
 
-@* Filters *@
+@* ── Stats Cards ────────────────────────────────────────────────────────── *@
+<div class="row g-3 mb-4">
+
+    <div class="col-6 col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">ليدز جديدة</div>
+                <div style="font-size:2rem;font-weight:700;line-height:1;color:#3b82f6;">@newLeads.ToString("N0")</div>
+                <div style="font-size:.73rem;color:var(--text-muted);margin-top:4px;">@monthLabel</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">تحويل لمرشحين</div>
+                <div style="font-size:2rem;font-weight:700;line-height:1;color:#22c55e;">@converted.ToString("N0")</div>
+                <div style="font-size:.73rem;color:var(--text-muted);margin-top:4px;">من إجمالي الليدز</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">معدل التحويل</div>
+                <div style="font-size:2rem;font-weight:700;line-height:1;color:@(convRate >= 20 ? "#22c55e" : convRate >= 10 ? "#f59e0b" : "#ef4444");">
+                    @convRate<span style="font-size:1rem;">%</span>
+                </div>
+                <div style="margin-top:8px;background:#e2e8f0;border-radius:99px;height:5px;overflow:hidden;">
+                    <div style="width:@Math.Min(convRate,100)%;background:@(convRate>=20?"#22c55e":convRate>=10?"#f59e0b":"#ef4444");height:100%;border-radius:99px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Top 3 Sales ─────────────────────────────────────────────────────────── *@
+@if (topSales != null && topSales.Any())
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px;">
+                🏆 أفضل التيلي سيلز — @monthLabel
+            </div>
+            <div class="row g-2">
+                @{
+                    int rank = 0;
+                }
+                @foreach (var s in topSales)
+                {
+                    rank++;
+                    string sName = (string)s.SalesName;
+                    int sLeads = (int)s.LeadCount;
+                    int sConv = (int)s.Converted;
+                    double sRate = sLeads > 0 ? Math.Round((double)sConv / sLeads * 100, 0) : 0;
+                    int maxL = (int)topSales.First().LeadCount;
+                    double barW = maxL > 0 ? Math.Round((double)sLeads / maxL * 100, 0) : 0;
+                    string medal = rank == 1 ? "🥇" : rank == 2 ? "🥈" : "🥉";
+                    string barCol = rank == 1 ? "#f59e0b" : rank == 2 ? "#94a3b8" : "#cd7c2f";
+
+                    <div class="col-12 col-md-4">
+                        <div style="border:1px solid var(--bs-border-color,#e2e8f0);border-radius:10px;padding:12px 14px;">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                                <span style="font-size:1.1rem;">@medal</span>
+                                <span style="font-weight:700;font-size:.88rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@sName</span>
+                                <span style="font-size:1.05rem;font-weight:800;color:#3b82f6;">@sLeads</span>
+                            </div>
+                            <div style="background:#e2e8f0;border-radius:99px;height:5px;overflow:hidden;margin-bottom:6px;">
+                                <div style="width:@barW%;background:@barCol;height:100%;border-radius:99px;"></div>
+                            </div>
+                            <div style="font-size:.72rem;color:var(--text-muted);display:flex;justify-content:space-between;">
+                                <span>@sLeads ليد مسند</span>
+                                <span>@sConv تحويل (@sRate%)</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Filters (month filter داخل نفس الـ bar) ─────────────────────────────── *@
 <div class="card mb-4">
     <div class="card-body">
         <form method="get" action="/Admin/Leads" class="row g-2 align-items-end">
-            <div class="col-md-4">
+
+            <div class="col-md-3">
                 <label class="form-label form-label-sm">بحث</label>
-                <input name="q" value="@q" class="form-control form-control-sm" placeholder="اسم، هاتف، بريد..." />
+                <input name="q" value="@q" class="form-control form-control-sm" placeholder="اسم، هاتف..." />
             </div>
+
             <div class="col-md-2">
                 <label class="form-label form-label-sm">الحالة</label>
                 <select name="status" class="form-select form-select-sm">
@@ -51,7 +147,8 @@
                     }
                 </select>
             </div>
-            <div class="col-md-3">
+
+            <div class="col-md-2">
                 <label class="form-label form-label-sm">الحملة</label>
                 <select name="campaignId" class="form-select form-select-sm">
                     <option value="">كل الحملات</option>
@@ -68,10 +165,69 @@
                     }
                 </select>
             </div>
+
             <div class="col-md-2">
+                <label class="form-label form-label-sm">التيلي سيلز</label>
+                <select name="teleSalesId" class="form-select form-select-sm">
+                    <option value="">الكل</option>
+                    @if (teleSalesList != null)
+                    {
+                        @foreach (var ts in teleSalesList)
+                        {
+                            if ((Guid?)ts.Id == teleSalesId)
+                            {
+                                <option value="@ts.Id" selected>@ts.FullName</option>
+                            }
+                            else
+                            {
+                                <option value="@ts.Id">@ts.FullName</option>
+                            }
+                        }
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-1">
+                <label class="form-label form-label-sm">الشهر</label>
+                <select name="month" class="form-select form-select-sm">
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        var ml = new DateTime(selYear, m, 1).ToString("MMMM", new System.Globalization.CultureInfo("ar-EG"));
+                        if (m == selMonth)
+                        {
+                            <option value="@m" selected>@ml</option>
+                        }
+                        else
+                        {
+                            <option value="@m">@ml</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-1">
+                <label class="form-label form-label-sm">السنة</label>
+                <select name="year" class="form-select form-select-sm">
+                    @for (int y = DateTime.UtcNow.Year; y >= DateTime.UtcNow.Year - 3; y--)
+                    {
+                        if (y == selYear)
+                        {
+                            <option value="@y" selected>@y</option>
+                        }
+                        else
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-1">
                 <button type="submit" class="btn btn-primary btn-sm w-100">بحث</button>
             </div>
-            @if (!string.IsNullOrWhiteSpace(q) || status.HasValue || campId.HasValue)
+
+            @if (!string.IsNullOrWhiteSpace(q) || status.HasValue || campId.HasValue || teleSalesId.HasValue
+            || selMonth != DateTime.UtcNow.Month || selYear != DateTime.UtcNow.Year)
             {
                 <div class="col-md-1">
                     <a href="/Admin/Leads" class="btn btn-ghost btn-sm w-100">مسح</a>
@@ -81,6 +237,7 @@
     </div>
 </div>
 
+@* ── Leads Table ──────────────────────────────────────────────────────────── *@
 <div class="card">
     <div class="card-body p-0">
         @if (!Model.Any())
@@ -115,9 +272,7 @@
                             string colorBorder = color + "40";
 
                             <tr>
-                                <td>
-                                    <div style="font-weight:600;">@lead.FullName</div>
-                                </td>
+                                <td><div style="font-weight:600;">@lead.FullName</div></td>
                                 <td style="font-family:monospace;font-size:.83rem;">@lead.Phone</td>
                                 <td style="font-size:.8rem;color:var(--text-muted);">@(lead.Campaign?.Name ?? "—")</td>
                                 <td style="font-size:.8rem;">@(lead.AssignedSales?.FullName ?? "—")</td>
@@ -127,9 +282,7 @@
                                         @label
                                     </span>
                                 </td>
-                                <td style="font-size:.78rem;color:var(--text-muted);">
-                                    @lead.CreatedAt.ToString("dd/MM/yyyy")
-                                </td>
+                                <td style="font-size:.78rem;color:var(--text-muted);">@lead.CreatedAt.ToString("dd/MM/yyyy")</td>
                             </tr>
                         }
                     </tbody>
@@ -145,7 +298,7 @@
                             @if (page > 1)
                             {
                                 <li class="page-item">
-                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&page=@(page - 1)">
+                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&teleSalesId=@teleSalesId&month=@selMonth&year=@selYear&page=@(page-1)">
                                         <i class="bi bi-chevron-right"></i>
                                     </a>
                                 </li>
@@ -153,13 +306,13 @@
                             @for (int p = Math.Max(1, page - 2); p <= Math.Min(totalPages, page + 2); p++)
                             {
                                 <li class="page-item @(p == page ? "active" : "")">
-                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&page=@p">@p</a>
+                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&teleSalesId=@teleSalesId&month=@selMonth&year=@selYear&page=@p">@p</a>
                                 </li>
                             }
                             @if (page < totalPages)
                             {
                                 <li class="page-item">
-                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&page=@(page + 1)">
+                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&teleSalesId=@teleSalesId&month=@selMonth&year=@selYear&page=@(page+1)">
                                         <i class="bi bi-chevron-left"></i>
                                     </a>
                                 </li>
