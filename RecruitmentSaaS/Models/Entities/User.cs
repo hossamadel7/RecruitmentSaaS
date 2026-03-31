@@ -25,6 +25,10 @@ public partial class User
 
     public decimal BaseSalary { get; set; }
 
+    public Guid? ManagerId { get; set; }
+
+    [ForeignKey("BranchId")]
+    [InverseProperty("Users")]
     public virtual Branch Branch { get; set; } = null!;
 
     public virtual ICollection<Campaign> Campaigns { get; set; } = new List<Campaign>();
@@ -55,6 +59,10 @@ public partial class User
 
     public virtual ICollection<FollowUpReminder> FollowUpReminderCreatedBies { get; set; } = new List<FollowUpReminder>();
 
+    [InverseProperty("Manager")]
+    public virtual ICollection<User> InverseManager { get; set; } = new List<User>();
+
+    [InverseProperty("CreatedBy")]
     public virtual ICollection<LeadActivity> LeadActivities { get; set; } = new List<LeadActivity>();
 
     public virtual ICollection<Lead> LeadAssignedOfficeSales { get; set; } = new List<Lead>();
@@ -71,6 +79,11 @@ public partial class User
 
     public virtual ICollection<LeadVisit> LeadVisitReceptionUsers { get; set; } = new List<LeadVisit>();
 
+    [ForeignKey("ManagerId")]
+    [InverseProperty("InverseManager")]
+    public virtual User? Manager { get; set; }
+
+    [InverseProperty("User")]
     public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 
     public virtual ICollection<PassportDownloadLog> PassportDownloadLogs { get; set; } = new List<PassportDownloadLog>();
