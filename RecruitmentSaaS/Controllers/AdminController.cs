@@ -104,9 +104,9 @@ namespace RecruitmentSaaS.Controllers
             var monthLeadsTotal = leadsThisMonth.Sum(x => x.Count);
             var monthCandidatesTotal = candidatesByStage.Sum(x => x.Count);
 
-            // ── Today's office sales appointments (from LeadVisits) ──────────
+            // ── Today's visits & appointments (LeadVisits with VisitDateTime today) ──
             var todayStart = DateTime.UtcNow.Date;
-            var todayEnd = todayStart.AddDays(1);
+            var todayEnd   = todayStart.AddDays(1);
 
             var todayAppointments = await _context.LeadVisits
                 .Include(v => v.Lead)
@@ -140,7 +140,9 @@ namespace RecruitmentSaaS.Controllers
         // ── GET /Admin/Users ────────────────────────────────────────────────
         public async Task<IActionResult> Users(string? q, int? role)
         {
-            var query = _context.Users.AsQueryable();
+            var query = _context.Users
+                .Include(u => u.Manager)
+                .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(q))
                 query = query.Where(u => u.FullName.Contains(q) || u.Email.Contains(q));
@@ -150,8 +152,15 @@ namespace RecruitmentSaaS.Controllers
 
             var users = await query.OrderBy(u => u.Role).ThenBy(u => u.FullName).ToListAsync();
 
-            ViewBag.Q = q;
-            ViewBag.Role = role;
+            var managers = await _context.Users
+                .Where(u => u.Role == 7 && u.IsActive)
+                .OrderBy(u => u.FullName)
+                .Select(u => new { u.Id, u.FullName })
+                .ToListAsync();
+
+            ViewBag.Q        = q;
+            ViewBag.Role     = role;
+            ViewBag.Managers = managers;
 
             return View(users);
         }
@@ -159,7 +168,7 @@ namespace RecruitmentSaaS.Controllers
         // ── POST /Admin/CreateUser ──────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateUser(string fullName, string email, string password, int role, Guid? branchId)
+        public async Task<IActionResult> CreateUser(string fullName, string email, string password, int role, Guid? branchId, Guid? managerId)
         {
             if (await _context.Users.AnyAsync(u => u.Email == email))
             {
@@ -176,13 +185,39 @@ namespace RecruitmentSaaS.Controllers
                 Role = (byte)role,
                 BranchId = branchId ?? Guid.Parse("00000000-0000-0000-0000-000000000020"),
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                // If TeleSales (Role 3) assign to a manager
+                ManagerId = (role == 3 && managerId.HasValue) ? managerId : null
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
             TempData["Success"] = $"تم إنشاء المستخدم {fullName} بنجاح";
+            return RedirectToAction("Users");
+        }
+
+        // ── POST /Admin/AssignManager ───────────────────────────────────────
+        // Assign/unassign a TeleSales user to a manager
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AssignManager(Guid userId, Guid? managerId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null || user.Role != 3)
+            {
+                TempData["Error"] = "المستخدم غير موجود أو ليس تيلي سيلز";
+                return RedirectToAction("Users");
+            }
+
+            user.ManagerId = managerId;
+            await _context.SaveChangesAsync();
+
+            var managerName = managerId.HasValue
+                ? (await _context.Users.FindAsync(managerId.Value))?.FullName ?? "—"
+                : "بدون مدير";
+
+            TempData["Success"] = $"تم تعيين {user.FullName} تحت إشراف {managerName}";
             return RedirectToAction("Users");
         }
 
@@ -238,10 +273,10 @@ namespace RecruitmentSaaS.Controllers
 
             var now = DateTime.UtcNow;
             var selMonth = month ?? now.Month;
-            var selYear = year ?? now.Year;
+            var selYear  = year  ?? now.Year;
 
             var monthStart = new DateTime(selYear, selMonth, 1, 0, 0, 0, DateTimeKind.Utc);
-            var monthEnd = monthStart.AddMonths(1);
+            var monthEnd   = monthStart.AddMonths(1);
 
             // ── Stats queries (scoped to selected month) ─────────────────────
 
@@ -273,7 +308,7 @@ namespace RecruitmentSaaS.Controllers
                 .GroupBy(l => new { l.AssignedSalesId, l.AssignedSales!.FullName })
                 .Select(g => new
                 {
-                    SalesId = g.Key.AssignedSalesId,
+                    SalesId   = g.Key.AssignedSalesId,
                     SalesName = g.Key.FullName,
                     LeadCount = g.Count(),
                     Converted = g.Count(l => l.IsConverted)
@@ -334,25 +369,25 @@ namespace RecruitmentSaaS.Controllers
                 : 0;
 
             // ── ViewBag ──────────────────────────────────────────────────────
-            ViewBag.Q = q;
-            ViewBag.Status = status;
-            ViewBag.CampaignId = campaignId;
-            ViewBag.TeleSalesId = teleSalesId;
+            ViewBag.Q            = q;
+            ViewBag.Status       = status;
+            ViewBag.CampaignId   = campaignId;
+            ViewBag.TeleSalesId  = teleSalesId;
             ViewBag.SelectedMonth = selMonth;
-            ViewBag.SelectedYear = selYear;
-            ViewBag.Page = page;
-            ViewBag.Total = total;
-            ViewBag.TotalPages = (int)Math.Ceiling(total / (double)pageSize);
-            ViewBag.Campaigns = campaigns;
+            ViewBag.SelectedYear  = selYear;
+            ViewBag.Page         = page;
+            ViewBag.Total        = total;
+            ViewBag.TotalPages   = (int)Math.Ceiling(total / (double)pageSize);
+            ViewBag.Campaigns    = campaigns;
             ViewBag.TeleSalesList = teleSalesList;
 
             // Stats
-            ViewBag.NewLeadsThisMonth = newLeadsThisMonth;
-            ViewBag.ConvertedThisMonth = convertedThisMonth;
-            ViewBag.ConversionRate = convRate;
-            ViewBag.LeadsByStatus = leadsByStatus;
-            ViewBag.TopSales = topSales;
-            ViewBag.MonthLabel = new DateTime(selYear, selMonth, 1).ToString("MMMM yyyy", new System.Globalization.CultureInfo("ar-EG"));
+            ViewBag.NewLeadsThisMonth    = newLeadsThisMonth;
+            ViewBag.ConvertedThisMonth   = convertedThisMonth;
+            ViewBag.ConversionRate       = convRate;
+            ViewBag.LeadsByStatus        = leadsByStatus;
+            ViewBag.TopSales             = topSales;
+            ViewBag.MonthLabel           = new DateTime(selYear, selMonth, 1).ToString("MMMM yyyy", new System.Globalization.CultureInfo("ar-EG"));
 
             return View(leads);
         }
@@ -363,12 +398,12 @@ namespace RecruitmentSaaS.Controllers
         {
             const int pageSize = 25;
 
-            var now = DateTime.UtcNow;
+            var now      = DateTime.UtcNow;
             var selMonth = month ?? now.Month;
-            var selYear = year ?? now.Year;
+            var selYear  = year  ?? now.Year;
 
             var monthStart = new DateTime(selYear, selMonth, 1, 0, 0, 0, DateTimeKind.Utc);
-            var monthEnd = monthStart.AddMonths(1);
+            var monthEnd   = monthStart.AddMonths(1);
 
             // ── Stats (scoped to selected month) ────────────────────────────
 
@@ -410,9 +445,9 @@ namespace RecruitmentSaaS.Controllers
                 .GroupBy(c => new { c.AssignedSalesId, c.AssignedSales.FullName })
                 .Select(g => new
                 {
-                    SalesName = g.Key.FullName,
-                    CandCount = g.Count(),
-                    Completed = g.Count(c => c.IsCompleted == true)
+                    SalesName  = g.Key.FullName,
+                    CandCount  = g.Count(),
+                    Completed  = g.Count(c => c.IsCompleted == true)
                 })
                 .OrderByDescending(g => g.CandCount)
                 .Take(3)
@@ -439,7 +474,7 @@ namespace RecruitmentSaaS.Controllers
 
             query = query.OrderByDescending(c => c.CreatedAt);
 
-            var total = await query.CountAsync();
+            var total      = await query.CountAsync();
             var candidates = await query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -454,22 +489,22 @@ namespace RecruitmentSaaS.Controllers
                 .ToListAsync();
 
             // ── ViewBag ──────────────────────────────────────────────────────
-            ViewBag.Q = q;
-            ViewBag.StageId = stageId;
-            ViewBag.SelectedMonth = selMonth;
-            ViewBag.SelectedYear = selYear;
-            ViewBag.Page = page;
-            ViewBag.Total = total;
-            ViewBag.TotalPages = (int)Math.Ceiling(total / (double)pageSize);
-            ViewBag.Stages = stages;
+            ViewBag.Q              = q;
+            ViewBag.StageId        = stageId;
+            ViewBag.SelectedMonth  = selMonth;
+            ViewBag.SelectedYear   = selYear;
+            ViewBag.Page           = page;
+            ViewBag.Total          = total;
+            ViewBag.TotalPages     = (int)Math.Ceiling(total / (double)pageSize);
+            ViewBag.Stages         = stages;
 
             // Stats
-            ViewBag.NewThisMonth = newThisMonth;
-            ViewBag.CompletedThisMonth = completedThisMonth;
-            ViewBag.CollectedThisMonth = collectedThisMonth;
-            ViewBag.ByStage = byStage;
-            ViewBag.TopSales = topSales;
-            ViewBag.MonthLabel = new DateTime(selYear, selMonth, 1)
+            ViewBag.NewThisMonth        = newThisMonth;
+            ViewBag.CompletedThisMonth  = completedThisMonth;
+            ViewBag.CollectedThisMonth  = collectedThisMonth;
+            ViewBag.ByStage             = byStage;
+            ViewBag.TopSales            = topSales;
+            ViewBag.MonthLabel          = new DateTime(selYear, selMonth, 1)
                                             .ToString("MMMM yyyy", new System.Globalization.CultureInfo("ar-EG"));
 
             return View(candidates);
@@ -2061,7 +2096,7 @@ namespace RecruitmentSaaS.Controllers
             return RedirectToAction("Salaries", new { month, year });
         }
 
-
+     
 
         public async Task<IActionResult> DownloadPassportsZip(Guid? packageId, Guid? id, bool newOnly = false)
         {

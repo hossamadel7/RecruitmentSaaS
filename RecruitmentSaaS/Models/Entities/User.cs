@@ -38,6 +38,8 @@ public partial class User
     [Column(TypeName = "decimal(18, 2)")]
     public decimal BaseSalary { get; set; }
 
+    public Guid? ManagerId { get; set; }
+
     [ForeignKey("BranchId")]
     [InverseProperty("Users")]
     public virtual Branch Branch { get; set; } = null!;
@@ -84,6 +86,9 @@ public partial class User
     [InverseProperty("CreatedBy")]
     public virtual ICollection<FollowUpReminder> FollowUpReminderCreatedBies { get; set; } = new List<FollowUpReminder>();
 
+    [InverseProperty("Manager")]
+    public virtual ICollection<User> InverseManager { get; set; } = new List<User>();
+
     [InverseProperty("CreatedBy")]
     public virtual ICollection<LeadActivity> LeadActivities { get; set; } = new List<LeadActivity>();
 
@@ -107,6 +112,10 @@ public partial class User
 
     [InverseProperty("ReceptionUser")]
     public virtual ICollection<LeadVisit> LeadVisitReceptionUsers { get; set; } = new List<LeadVisit>();
+
+    [ForeignKey("ManagerId")]
+    [InverseProperty("InverseManager")]
+    public virtual User? Manager { get; set; }
 
     [InverseProperty("User")]
     public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();

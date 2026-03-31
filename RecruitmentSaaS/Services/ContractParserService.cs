@@ -28,7 +28,7 @@ namespace RecruitmentSaaS.Services
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         private static readonly Regex _passportRegex = new(
-            @"\b([A-Z]{1,2}\d{7,9})\b",
+            @"\b([A-Z][A-Z0-9]{4,9})\b",
             RegexOptions.Compiled);
 
         private static readonly Regex _employerRegex = new(
