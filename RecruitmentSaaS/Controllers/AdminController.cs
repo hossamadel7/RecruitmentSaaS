@@ -46,7 +46,7 @@ namespace RecruitmentSaaS.Controllers
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         // ── GET /Admin/Index ────────────────────────────────────────────────
-        public async Task<IActionResult> Index(int? month, int? year)
+        public async Task<IActionResult> Index(int? month, int? year, string? visitDate)
         {
             var now = DateTime.UtcNow;
             var selMonth = month ?? now.Month;
@@ -104,16 +104,22 @@ namespace RecruitmentSaaS.Controllers
             var monthLeadsTotal = leadsThisMonth.Sum(x => x.Count);
             var monthCandidatesTotal = candidatesByStage.Sum(x => x.Count);
 
-            // ── Today's visits & appointments (LeadVisits with VisitDateTime today) ──
-            var todayStart = DateTime.UtcNow.Date;
-            var todayEnd   = todayStart.AddDays(1);
+            // ── Visits filter by date ─────────────────────────────────────────
+            DateTime visitDateParsed;
+            if (!string.IsNullOrEmpty(visitDate) && DateTime.TryParse(visitDate, out var parsedVd))
+                visitDateParsed = parsedVd.Date;
+            else
+                visitDateParsed = DateTime.UtcNow.Date;
+
+            var visitDateUtc = visitDateParsed.ToUniversalTime();
+            var visitDateEndUtc = visitDateUtc.AddDays(1);
 
             var todayAppointments = await _context.LeadVisits
                 .Include(v => v.Lead)
                     .ThenInclude(l => l.Campaign)
                 .Include(v => v.AssignedSalesUser)
                 .Include(v => v.ReceptionUser)
-                .Where(v => v.VisitDateTime >= todayStart && v.VisitDateTime < todayEnd)
+                .Where(v => v.VisitDateTime >= visitDateUtc && v.VisitDateTime < visitDateEndUtc)
                 .OrderBy(v => v.VisitDateTime)
                 .ToListAsync();
 
@@ -134,6 +140,7 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.MonthLeadsTotal = monthLeadsTotal;
             ViewBag.MonthCandidatesTotal = monthCandidatesTotal;
             ViewBag.TodayAppointments = todayAppointments;
+            ViewBag.VisitDate = visitDateParsed.ToString("yyyy-MM-dd");
 
             return View();
         }

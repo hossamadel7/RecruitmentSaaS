@@ -19,18 +19,27 @@
     var nextStage = packageStages.Where(s => s.StageOrder > currentStageOrder).OrderBy(s => s.StageOrder).FirstOrDefault();
     var nextMinPay = currentMinPay;
 
-    var docRequired = currentStage?.StageType?.RequiredAction == 1
+    // RequiredAction: 1=document, 4=passport, 5=date entry (no doc), 2=data, 3=confirm
+    var docRequired = (currentStage?.StageType?.RequiredAction == 1
                          || currentStage?.StageType?.RequiredAction == 4
-                         || (currentStage?.StageName?.Contains("جواز") == true);
+                         || (currentStage?.StageName?.Contains("جواز") == true))
+                         && currentStage?.StageType?.RequiredAction != 5;
     var requiredDocType = currentStage?.StageType?.DocumentTypeRequired;
     var docUploaded = stageCompletions.Any(sc => sc.PackageStageId == (currentStage?.Id ?? Guid.Empty))
                          || (requiredDocType.HasValue && documents.Any(d => d.DocumentType == requiredDocType.Value))
                          || (!requiredDocType.HasValue && docRequired && documents.Any());
     var docBlocked = docRequired && !docUploaded && !Model.IsCompleted && nextStage != null;
 
-    var canMove = !Model.IsCompleted && nextStage != null && !docBlocked
+    // RequiredAction 5 = date entry — blocked until flight date is entered
+    var dateEntryRequired = currentStage?.StageType?.RequiredAction == 5;
+    var dateEntered = stageCompletions.Any(sc =>
+                                sc.PackageStageId == (currentStage?.Id ?? Guid.Empty)
+                             && sc.CompletionType == 6);
+    var dateBlocked = dateEntryRequired && !dateEntered && !Model.IsCompleted && nextStage != null;
+
+    var canMove = !Model.IsCompleted && nextStage != null && !docBlocked && !dateBlocked
                          && (currentMinPay == null || Model.TotalPaidEGP >= currentMinPay);
-    var blocked = !Model.IsCompleted && nextStage != null && !docBlocked
+    var blocked = !Model.IsCompleted && nextStage != null && !docBlocked && !dateBlocked
                          && currentMinPay.HasValue && Model.TotalPaidEGP < currentMinPay;
 }
 
@@ -253,6 +262,34 @@
                 }
             </div>
         </div>
+
+        <!-- Reminder -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="header-icon" style="background:#FFFBEB;color:#D97706"><i class="bi bi-alarm-fill"></i></div>
+                تعيين تذكير
+            </div>
+            <div class="card-body">
+                <form asp-action="SetReminder" asp-controller="Sales" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="candidateId" value="@Model.Id" />
+                    <div class="mb-2">
+                        <label class="form-label">تاريخ التذكير</label>
+                        <input type="date" name="reminderDate" class="form-control form-control-sm"
+                               min="@DateTime.Now.ToString("yyyy-MM-dd")" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">ملاحظة</label>
+                        <input type="text" name="notes" class="form-control form-control-sm"
+                               placeholder="موضوع التذكير..." />
+                    </div>
+                    <button type="submit" class="btn btn-sm w-100"
+                            style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;font-weight:600">
+                        <i class="bi bi-alarm"></i> تعيين تذكير
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- ── Right Column ──────────────────────────────────────────────────── -->
@@ -457,6 +494,18 @@
                     </button>
                 </div>
             }
+            @if (dateBlocked)
+            {
+                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius);padding:14px 20px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+                    <div>
+                        <div style="font-weight:700;font-size:13px;color:#059669">
+                            <i class="bi bi-airplane-fill me-2"></i>
+                            يجب إدخال تاريخ الطيران قبل الانتقال للمرحلة التالية
+                        </div>
+                        <div style="font-size:11px;color:#059669;margin-top:2px">أدخل تاريخ ووقت رحلة الطيران أدناه</div>
+                    </div>
+                </div>
+            }
 
             @foreach (var ps in packageStages.OrderBy(s => s.StageOrder))
             {
@@ -472,9 +521,11 @@
                 };
                 var stageCode2 = ps.StageType?.StageCode ?? "";
                 var actionType2 = ps.StageType?.RequiredAction ?? 0;
-                var isPassportStage = stageCode2 == "PASSPORT_SUBMIT"
+                // RequiredAction 5 = date entry (no document) — exclude from passport/doc stages
+                var isPassportStage = (stageCode2 == "PASSPORT_SUBMIT"
                 || ps.StageName.Contains("جواز")
-                || actionType2 == 1 || actionType2 == 4;
+                || actionType2 == 1 || actionType2 == 4)
+                && actionType2 != 5;
                 var stageHistory = history.Where(h => h.ToStageOrder == ps.StageOrder)
                 .OrderByDescending(h => h.CreatedAt).ToList();
                 string dotBg = isCompleted ? "#16a34a" : isCurrent ? "var(--primary)" : "#e2e8f0";
@@ -560,6 +611,67 @@
                                 <div style="font-size:11px;color:var(--text-muted)">
                                     يجب إدخال البيانات قبل الانتقال للمرحلة التالية
                                 </div>
+                            </div>
+                        }
+                        @if (isCurrent && !actionDone && actionType2 == 5 && ps.StageType != null)
+                        {
+                            // FLIGHT_BOOKING — date entry, no document
+                            <div style="padding:14px 20px;background:#f0fdf4;border-bottom:1px solid #bbf7d0">
+                                <div style="font-weight:700;font-size:13px;color:#059669;margin-bottom:10px">
+                                    <i class="bi bi-airplane-fill me-2"></i>@(ps.StageType.ActionLabel ?? "أدخل تاريخ الطيران")
+                                </div>
+                                <form method="post" action="/Sales/SaveFlightDate" class="d-flex align-items-end gap-2 flex-wrap">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="candidateId" value="@Model.Id" />
+                                    <div>
+                                        <label style="font-size:12px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:4px">
+                                            تاريخ ووقت الرحلة <span style="color:var(--danger)">*</span>
+                                        </label>
+                                        <input type="datetime-local" name="flightDate"
+                                               class="form-control form-control-sm"
+                                               style="width:220px"
+                                               min="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")"
+                                               required />
+                                    </div>
+                                    <button type="submit"
+                                            style="background:#059669;color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
+                                        <i class="bi bi-save me-1"></i> حفظ تاريخ الطيران
+                                    </button>
+                                </form>
+                                <div style="font-size:11px;color:var(--text-muted);margin-top:8px">
+                                    <i class="bi bi-bell-fill me-1" style="color:var(--accent)"></i>
+                                    سيتم إرسال تذكير تلقائي للمبيعات يوم قبل الرحلة
+                                </div>
+                            </div>
+                        }
+                        @if (isCurrent && actionDone && actionType2 == 5)
+                        {
+                            // Show saved flight date
+                            <div style="padding:10px 20px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;font-size:12px;color:#059669;font-weight:600;display:flex;align-items:center;justify-content:space-between">
+                                <span>
+                                    <i class="bi bi-airplane-fill me-1"></i>
+                                    @{
+                                        var flightCompletion = stageCompletions.FirstOrDefault(sc => sc.PackageStageId == ps.Id && sc.CompletionType == 6);
+                                    }
+                                    @(flightCompletion?.Notes ?? "تم تحديد تاريخ الطيران ✅")
+                                </span>
+                                <button onclick="document.getElementById('editFlightDate_@ps.Id').style.display='block'"
+                                        style="background:none;border:1px solid #059669;border-radius:6px;padding:3px 10px;font-size:11px;color:#059669;cursor:pointer;font-family:inherit">
+                                    <i class="bi bi-pencil me-1"></i> تعديل
+                                </button>
+                            </div>
+                            <div id="editFlightDate_@ps.Id" style="display:none;padding:12px 20px;background:#f0fdf4;border-bottom:1px solid #bbf7d0">
+                                <form method="post" action="/Sales/SaveFlightDate" class="d-flex align-items-end gap-2">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="candidateId" value="@Model.Id" />
+                                    <input type="datetime-local" name="flightDate"
+                                           class="form-control form-control-sm"
+                                           style="width:220px" required />
+                                    <button type="submit"
+                                            style="background:#059669;color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+                                        حفظ
+                                    </button>
+                                </form>
                             </div>
                         }
                         @if (isCurrent && !actionDone && actionType2 == 3 && ps.StageType != null)

@@ -36,10 +36,10 @@ namespace RecruitmentSaaS.Controllers
         {
             var userId = CurrentUserId;
             var now = DateTime.UtcNow;
-            var today = DateOnly.FromDateTime(now);
 
             var waitingLeads = await _context.Leads
-                .Where(l => l.AssignedOfficeSalesId == userId && l.Status == 6)
+                .Where(l => l.AssignedOfficeSalesId == userId
+                    && l.Status == 6)
                 .OrderBy(l => l.UpdatedAt)
                 .Select(l => new LeadListItemDto
                 {
@@ -51,27 +51,6 @@ namespace RecruitmentSaaS.Controllers
                     IsConverted = l.IsConverted,
                     CreatedAt = l.CreatedAt,
                     LastContactedAt = l.LastContactedAt
-                })
-                .ToListAsync();
-
-            // ── التذكيرات المتعلقة بالمرشحين لهذا الـ Sales ──────────────────
-            var todayReminders = await _context.FollowUpReminders
-                .Include(r => r.Candidate)
-                .Where(r => r.AssignedToId == userId
-                         && r.CandidateId != null
-                         && r.Status == 1
-                         && r.ReminderDate <= today)
-                .OrderBy(r => r.ReminderDate)
-                .Select(r => new FollowUpReminderDto
-                {
-                    Id = r.Id,
-                    LeadId = r.LeadId,
-                    CandidateId = r.CandidateId,
-                    LeadName = r.Candidate != null ? r.Candidate.FullName : "—",
-                    LeadPhone = r.Candidate != null ? r.Candidate.Phone : "—",
-                    ReminderDate = r.ReminderDate,
-                    Status = r.Status,
-                    Notes = r.Notes
                 })
                 .ToListAsync();
 
@@ -92,81 +71,12 @@ namespace RecruitmentSaaS.Controllers
                         && c.CompletedAt.Value.Month == now.Month
                         && c.CompletedAt.Value.Year == now.Year),
 
-                TodayReminders = todayReminders,
+                TodayReminders = new List<FollowUpReminderDto>(),
                 RecentLeads = waitingLeads
             };
 
             return View(dto);
         }
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DismissCandidateReminder(Guid reminderId, Guid candidateId)
-        {
-            var reminder = await _context.FollowUpReminders.FindAsync(reminderId);
-            if (reminder != null)
-            {
-                reminder.Status = 3; // Dismissed
-                reminder.DismissedAt = DateTime.UtcNow;
-                reminder.DismissedById = CurrentUserId;
-                reminder.UpdatedAt = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
-            }
-
-            TempData["Success"] = "تم تجاهل التذكير";
-
-            // لو جاي من الـ Dashboard يرجع للـ Index، لو جاي من ملف المرشح يرجع ليه
-            if (candidateId == Guid.Empty)
-                return RedirectToAction("Index");
-
-            return RedirectToAction("CandidateDetail", new { id = candidateId });
-        }
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SetCandidateReminder(
-            Guid candidateId, DateOnly reminderDate, string? notes)
-        {
-            var userId = CurrentUserId;
-
-            var candidate = await _context.Candidates
-                .FirstOrDefaultAsync(c => c.Id == candidateId && c.AssignedSalesId == userId);
-
-            if (candidate == null)
-            {
-                TempData["Error"] = "المرشح غير موجود";
-                return RedirectToAction("Candidates");
-            }
-
-            // نحتاج LeadId — نجيبه من الـ Lead المرتبط
-            var lead = await _context.Leads
-                .FirstOrDefaultAsync(l => l.ConvertedCandidateId == candidateId);
-
-            // لو مفيش lead مرتبط — نستخدم Guid.Empty (LeadId nullable في المنطق بس مش في الـ schema)
-            // عشان الـ FK مش nullable نضيف default lead id أو نستخدم lead فعلي
-            if (lead == null)
-            {
-                TempData["Error"] = "لا يمكن إضافة تذكير — لا يوجد عميل مرتبط بهذا المرشح";
-                return RedirectToAction("CandidateDetail", new { id = candidateId });
-            }
-
-            _context.FollowUpReminders.Add(new FollowUpReminder
-            {
-                Id = Guid.NewGuid(),
-                LeadId = lead.Id,
-                CandidateId = candidateId,
-                AssignedToId = userId,
-                CreatedById = userId,
-                ReminderDate = reminderDate,
-                Notes = notes,
-                Status = 1,
-                CreatedAt = DateTime.UtcNow
-            });
-
-            await _context.SaveChangesAsync();
-
-            TempData["Success"] = $"تم إضافة تذكير بتاريخ {reminderDate:dd/MM/yyyy} لـ {candidate.FullName}";
-            return RedirectToAction("CandidateDetail", new { id = candidateId });
-        }
-
 
         // ── GET /Sales/LeadDetail/{id} ────────────────────────────────────────
         public async Task<IActionResult> LeadDetail(Guid id)
@@ -1001,6 +911,163 @@ namespace RecruitmentSaaS.Controllers
             TempData["Success"] = replaceExisting
                 ? $"تم استبدال {docTypeName} بنجاح ✅ — مرحلة: {stageName}"
                 : $"تم رفع {docTypeName} بنجاح ✅ — مرحلة: {stageName}";
+            return RedirectToAction("CandidateDetail", new { id = candidateId });
+        }
+
+        // ── POST /Sales/SaveFlightDate ───────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveFlightDate(Guid candidateId, DateTime flightDate)
+        {
+            var userId = CurrentUserId;
+
+            var candidate = await _context.Candidates
+                .Include(c => c.CurrentPackageStage)
+                .FirstOrDefaultAsync(c => c.Id == candidateId && c.AssignedSalesId == userId);
+
+            if (candidate == null)
+            {
+                TempData["Error"] = "المرشح غير موجود";
+                return RedirectToAction("Candidates");
+            }
+
+            // Save flight date
+            candidate.FlightDate = flightDate;
+            candidate.UpdatedAt = DateTime.UtcNow;
+
+            // ── StageActionCompletion ─────────────────────────────────────────
+            if (candidate.CurrentPackageStageId.HasValue)
+            {
+                var alreadyDone = await _context.StageActionCompletions
+                    .AnyAsync(s => s.CandidateId == candidateId
+                                && s.PackageStageId == candidate.CurrentPackageStageId.Value
+                                && s.CompletionType == 6); // 6 = DateEntered
+
+                if (!alreadyDone)
+                {
+                    _context.StageActionCompletions.Add(new StageActionCompletion
+                    {
+                        Id = Guid.NewGuid(),
+                        CandidateId = candidateId,
+                        PackageStageId = candidate.CurrentPackageStageId.Value,
+                        CompletedAt = DateTime.UtcNow,
+                        CompletedById = userId,
+                        CompletionType = 6, // DateEntered
+                        Notes = $"تاريخ الطيران: {flightDate:dd/MM/yyyy HH:mm}"
+                    });
+                }
+                else
+                {
+                    // Update existing completion note
+                    var existing = await _context.StageActionCompletions
+                        .FirstOrDefaultAsync(s => s.CandidateId == candidateId
+                                                && s.PackageStageId == candidate.CurrentPackageStageId.Value
+                                                && s.CompletionType == 6);
+                    if (existing != null)
+                        existing.Notes = $"تاريخ الطيران: {flightDate:dd/MM/yyyy HH:mm}";
+                }
+            }
+
+            // ── Reminder: day before flight ───────────────────────────────────
+            var reminderDate = DateOnly.FromDateTime(flightDate.AddDays(-1));
+
+            // Get linked lead
+            var linkedLeadId = await _context.Leads
+                .Where(l => l.ConvertedCandidateId == candidateId)
+                .Select(l => (Guid?)l.Id)
+                .FirstOrDefaultAsync();
+
+            // Remove old flight reminder if exists
+            if (linkedLeadId.HasValue)
+            {
+                var oldReminders = await _context.FollowUpReminders
+                    .Where(r => r.LeadId == linkedLeadId.Value
+                             && r.AssignedToId == userId
+                             && r.Notes != null
+                             && r.Notes.Contains("طيران")
+                             && r.Status == 1)
+                    .ToListAsync();
+                _context.FollowUpReminders.RemoveRange(oldReminders);
+
+                // Add new reminder
+                _context.FollowUpReminders.Add(new FollowUpReminder
+                {
+                    Id = Guid.NewGuid(),
+                    LeadId = linkedLeadId.Value,
+                    AssignedToId = userId,
+                    CreatedById = userId,
+                    ReminderDate = reminderDate,
+                    Notes = $"تذكير: رحلة {candidate.FullName} غداً الساعة {flightDate:HH:mm}",
+                    Status = 1,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            // Immediate notification
+            await _notifications.SendAsync(
+                userId: userId,
+                title: $"✈️ تم تحديد موعد الطيران: {candidate.FullName}",
+                message: $"الرحلة بتاريخ {flightDate:dd/MM/yyyy HH:mm} · ستصلك تذكرة يوم {reminderDate:dd/MM/yyyy}",
+                link: $"/Sales/CandidateDetail/{candidateId}",
+                type: RecruitmentSaaS.Services.NotificationType.General
+            );
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"تم حفظ تاريخ الطيران ✅ — {flightDate:dd/MM/yyyy HH:mm}";
+            return RedirectToAction("CandidateDetail", new { id = candidateId });
+        }
+
+        // ── POST /Sales/SetReminder ───────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SetReminder(Guid candidateId, DateOnly reminderDate, string? notes)
+        {
+            var userId = CurrentUserId;
+
+            var candidate = await _context.Candidates
+                .FirstOrDefaultAsync(c => c.Id == candidateId && c.AssignedSalesId == userId);
+
+            if (candidate == null)
+            {
+                TempData["Error"] = "المرشح غير موجود";
+                return RedirectToAction("Candidates");
+            }
+
+            // Get linked lead for the reminder
+            var leadId = await _context.Leads
+                .Where(l => l.ConvertedCandidateId == candidateId)
+                .Select(l => (Guid?)l.Id)
+                .FirstOrDefaultAsync();
+
+            if (leadId.HasValue)
+            {
+                _context.FollowUpReminders.Add(new FollowUpReminder
+                {
+                    Id = Guid.NewGuid(),
+                    LeadId = leadId.Value,
+                    AssignedToId = userId,
+                    CreatedById = userId,
+                    ReminderDate = reminderDate,
+                    Notes = notes,
+                    Status = 1,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Notification confirming reminder was set
+            await _notifications.SendAsync(
+                userId: userId,
+                title: $"🔔 تذكير مضاف: {candidate.FullName}",
+                message: $"ستصلك تذكرة بتاريخ {reminderDate:dd/MM/yyyy}" +
+                         (string.IsNullOrEmpty(notes) ? "" : $" · {notes}"),
+                link: $"/Sales/CandidateDetail/{candidateId}",
+                type: RecruitmentSaaS.Services.NotificationType.General
+            );
+
+            TempData["Success"] = "تم تعيين التذكير بنجاح";
             return RedirectToAction("CandidateDetail", new { id = candidateId });
         }
 

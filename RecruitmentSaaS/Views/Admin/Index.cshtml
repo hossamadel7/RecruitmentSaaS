@@ -16,42 +16,41 @@
     int selYear = ViewBag.SelectedYear ?? DateTime.Now.Year;
     int monthLeadsTotal = ViewBag.MonthLeadsTotal ?? 0;
     int monthCandidatesTotal = ViewBag.MonthCandidatesTotal ?? 0;
+    string visitDate = ViewBag.VisitDate ?? DateTime.Now.ToString("yyyy-MM-dd");
 
     var recentLeads = (IEnumerable<Lead>)ViewBag.RecentLeads;
     var leadsByStatus = (IEnumerable<dynamic>)ViewBag.LeadsByStatus;
     var candidatesByStage = (IEnumerable<dynamic>)ViewBag.CandidatesByStage;
     var todayAppointments = ViewBag.TodayAppointments as IEnumerable<LeadVisit> ?? Enumerable.Empty<LeadVisit>();
 
-    // Funnel statuses — ordered forward + خسارة + تحويل
     var funnelLabels = new Dictionary<int, string>
     {
-        {1,"عميل جديد"}, {2,"تم التواصل"}, {4,"مهتم"},
-        {5,"موعد مجدول"}, {8,"خسارة"}, {7,"تحويل"}
+        {1,"عميل جديد"},{2,"تم التواصل"},{4,"مهتم"},
+        {5,"موعد مجدول"},{8,"خسارة"},{7,"تحويل"}
     };
     var funnelColors = new Dictionary<int, string>
     {
-        {1,"#3b82f6"}, {2,"#8b5cf6"}, {4,"#0ea5e9"},
-        {5,"#22c55e"}, {8,"#dc2626"}, {7,"#6366f1"}
+        {1,"#3b82f6"},{2,"#8b5cf6"},{4,"#0ea5e9"},
+        {5,"#22c55e"},{8,"#dc2626"},{7,"#6366f1"}
     };
 
-    // All statuses for recent leads table
     string[] allStatusLabels = { "", "عميل جديد", "تم التواصل", "استجاب", "مهتم", "موعد مجدول", "زار المكتب", "تحويل", "خسارة" };
     string[] allStatusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626" };
 
     var monthName = new System.Globalization.CultureInfo("ar-EG").DateTimeFormat.GetMonthName(selMonth);
+    var visitDateParsed = DateTime.TryParse(visitDate, out var vd) ? vd : DateTime.Now;
+    var visitDateDisplay = visitDateParsed.ToString("dd/MM/yyyy");
+    bool isToday = visitDateParsed.Date == DateTime.Now.Date;
 }
 
-<div class="page-header">
-    <div class="d-flex align-items-center gap-3">
-        <div>
-            <h1 class="page-header-title">لوحة التحكم</h1>
-            <div class="page-header-sub">نظرة عامة على النظام</div>
-        </div>
+@* ── Page Header ── *@
+<div class="page-header" style="flex-wrap:wrap;gap:12px">
+    <div>
+        <h1 class="page-header-title">لوحة التحكم</h1>
+        <div class="page-header-sub">نظرة عامة على النظام — @DateTime.Now.ToString("dd/MM/yyyy")</div>
     </div>
-
-    <!-- Month / Year selector -->
-    <form method="get" action="/Admin/Index" class="d-flex align-items-center gap-2">
-        <select name="month" class="form-select form-select-sm" style="width:130px">
+    <form method="get" action="/Admin/Index" class="d-flex align-items-center gap-2 flex-wrap">
+        <select name="month" class="form-select form-select-sm" style="width:120px" onchange="this.form.submit()">
             @for (int m = 1; m <= 12; m++)
             {
                 var mName = new System.Globalization.CultureInfo("ar-EG").DateTimeFormat.GetMonthName(m);
@@ -65,7 +64,7 @@
                 }
             }
         </select>
-        <select name="year" class="form-select form-select-sm" style="width:90px">
+        <select name="year" class="form-select form-select-sm" style="width:85px" onchange="this.form.submit()">
             @for (int y = DateTime.Now.Year; y >= DateTime.Now.Year - 3; y--)
             {
                 if (y == selYear)
@@ -78,85 +77,78 @@
                 }
             }
         </select>
-        <button type="submit" class="btn btn-sm btn-primary">
-            <i class="bi bi-funnel-fill"></i> عرض
-        </button>
         @if (selMonth != DateTime.Now.Month || selYear != DateTime.Now.Year)
         {
-            <a href="/Admin/Index" class="btn btn-sm" style="border:1px solid var(--border)">
-                <i class="bi bi-arrow-clockwise"></i> الشهر الحالي
+            <a href="/Admin/Index" class="btn btn-sm" style="border:1px solid var(--border);white-space:nowrap">
+                <i class="bi bi-arrow-clockwise"></i> الحالي
             </a>
         }
     </form>
 </div>
 
-@* ── Pending alerts ── *@
-@if (pendingRefunds > 0 || pendingCommissions > 0 || pendingPayments > 0 || pendingApprovals > 0)
+@* ── Pending Alerts ── *@
+@if (pendingApprovals + pendingRefunds + pendingCommissions + pendingPayments > 0)
 {
-    <div class="d-flex gap-3 mb-4 flex-wrap">
+    <div class="d-flex gap-2 mb-4 flex-wrap">
         @if (pendingApprovals > 0)
         {
-            <a href="/Admin/StageApprovals"
-               style="background:#f5f3ff;border:1.5px solid #e9d5ff;color:#7c3aed;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
-                <i class="bi bi-shield-lock-fill"></i>
-                <span>@pendingApprovals طلب موافقة في انتظارك</span>
-                <span style="background:#7c3aed;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
+            <a href="/Admin/StageApprovals" class="text-decoration-none"
+               style="background:#f5f3ff;border:1.5px solid #e9d5ff;color:#7c3aed;padding:8px 14px;border-radius:10px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px">
+                <i class="bi bi-shield-lock-fill"></i> @pendingApprovals طلب موافقة
+                <span style="background:#7c3aed;color:#fff;border-radius:99px;padding:1px 7px;font-size:10px">جديد</span>
             </a>
         }
         @if (pendingRefunds > 0)
         {
-            <a href="/Admin/Refunds"
-               style="background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
-                <i class="bi bi-arrow-counterclockwise"></i>
-                <span>@pendingRefunds طلب استرداد في انتظار موافقتك</span>
-                <span style="background:#dc2626;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
+            <a href="/Admin/Refunds" class="text-decoration-none"
+               style="background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626;padding:8px 14px;border-radius:10px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px">
+                <i class="bi bi-arrow-counterclockwise"></i> @pendingRefunds استرداد
+                <span style="background:#dc2626;color:#fff;border-radius:99px;padding:1px 7px;font-size:10px">جديد</span>
             </a>
         }
         @if (pendingCommissions > 0)
         {
-            <a href="/Admin/Commissions"
-               style="background:#fffbeb;border:1.5px solid #fde68a;color:#b45309;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
-                <i class="bi bi-cash-stack"></i>
-                <span>@pendingCommissions عمولة في انتظار اعتمادك</span>
-                <span style="background:#b45309;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
+            <a href="/Admin/Commissions" class="text-decoration-none"
+               style="background:#fffbeb;border:1.5px solid #fde68a;color:#b45309;padding:8px 14px;border-radius:10px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px">
+                <i class="bi bi-cash-stack"></i> @pendingCommissions عمولة
+                <span style="background:#b45309;color:#fff;border-radius:99px;padding:1px 7px;font-size:10px">جديد</span>
             </a>
         }
         @if (pendingPayments > 0)
         {
-            <a href="/Admin/Candidates"
-               style="background:#eff6ff;border:1.5px solid #bfdbfe;color:#2563eb;padding:10px 18px;border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px;">
-                <i class="bi bi-cash-coin"></i>
-                <span>@pendingPayments دفعة في انتظار اعتماد المحاسب</span>
-                <span style="background:#2563eb;color:#fff;border-radius:99px;padding:2px 8px;font-size:.72rem;">جديد</span>
+            <a href="/Admin/Candidates" class="text-decoration-none"
+               style="background:#eff6ff;border:1.5px solid #bfdbfe;color:#2563eb;padding:8px 14px;border-radius:10px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px">
+                <i class="bi bi-cash-coin"></i> @pendingPayments دفعة معلقة
+                <span style="background:#2563eb;color:#fff;border-radius:99px;padding:1px 7px;font-size:10px">جديد</span>
             </a>
         }
     </div>
 }
 
-@* ── KPI cards ── *@
-<div class="row g-3 mb-4">
-    <div class="col-md-3 col-6">
+@* ── KPI Row ── *@
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
         <div class="stat-card blue">
             <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
             <div class="stat-value">@totalLeads.ToString("N0")</div>
             <div class="stat-label">إجمالي العملاء</div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col-6 col-md-3">
         <div class="stat-card green">
             <div class="stat-icon"><i class="bi bi-person-check-fill"></i></div>
             <div class="stat-value">@totalCandidates.ToString("N0")</div>
             <div class="stat-label">إجمالي المرشحين</div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col-6 col-md-3">
         <div class="stat-card amber">
             <div class="stat-icon"><i class="bi bi-cash-coin"></i></div>
             <div class="stat-value">@totalCollected.ToString("N0")</div>
-            <div class="stat-label">إجمالي المحصّل (ج.م)</div>
+            <div class="stat-label">المحصّل (ج.م)</div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col-6 col-md-3">
         <div class="stat-card blue">
             <div class="stat-icon"><i class="bi bi-megaphone-fill"></i></div>
             <div class="stat-value">@activeCampaigns</div>
@@ -165,78 +157,95 @@
     </div>
 </div>
 
-@* ── Pending action cards ── *@
+@* ── Pending Action Row ── *@
 <div class="row g-3 mb-4">
-    <div class="col-md-3 col-6">
+    <div class="col-6 col-md-3">
         <a href="/Admin/StageApprovals" class="text-decoration-none">
-            <div class="stat-card" style="border-right:3px solid #7c3aed;">
-                <div class="stat-icon" style="background:#f5f3ff;color:#7c3aed;"><i class="bi bi-shield-lock-fill"></i></div>
-                <div class="stat-value" style="color:#7c3aed;">@pendingApprovals</div>
-                <div class="stat-label">طلبات موافقة معلقة</div>
+            <div class="stat-card" style="border-right:3px solid #7c3aed">
+                <div class="stat-icon" style="background:#f5f3ff;color:#7c3aed"><i class="bi bi-shield-lock-fill"></i></div>
+                <div class="stat-value" style="color:#7c3aed">@pendingApprovals</div>
+                <div class="stat-label">موافقات معلقة</div>
             </div>
         </a>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col-6 col-md-3">
         <a href="/Admin/Refunds" class="text-decoration-none">
-            <div class="stat-card" style="border-right:3px solid #dc2626;">
-                <div class="stat-icon" style="background:#fef2f2;color:#dc2626;"><i class="bi bi-arrow-counterclockwise"></i></div>
-                <div class="stat-value" style="color:#dc2626;">@pendingRefunds</div>
+            <div class="stat-card" style="border-right:3px solid #dc2626">
+                <div class="stat-icon" style="background:#fef2f2;color:#dc2626"><i class="bi bi-arrow-counterclockwise"></i></div>
+                <div class="stat-value" style="color:#dc2626">@pendingRefunds</div>
                 <div class="stat-label">استردادات معلقة</div>
             </div>
         </a>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col-6 col-md-3">
         <a href="/Admin/Commissions" class="text-decoration-none">
-            <div class="stat-card" style="border-right:3px solid #b45309;">
-                <div class="stat-icon" style="background:#fffbeb;color:#b45309;"><i class="bi bi-cash-stack"></i></div>
-                <div class="stat-value" style="color:#b45309;">@pendingCommissions</div>
-                <div class="stat-label">عمولات تحتاج اعتماد</div>
+            <div class="stat-card" style="border-right:3px solid #b45309">
+                <div class="stat-icon" style="background:#fffbeb;color:#b45309"><i class="bi bi-cash-stack"></i></div>
+                <div class="stat-value" style="color:#b45309">@pendingCommissions</div>
+                <div class="stat-label">عمولات للاعتماد</div>
             </div>
         </a>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col-6 col-md-3">
         <a href="/Admin/Users" class="text-decoration-none">
-            <div class="stat-card" style="border-right:3px solid #2563eb;">
-                <div class="stat-icon" style="background:#eff6ff;color:#2563eb;"><i class="bi bi-person-badge-fill"></i></div>
-                <div class="stat-value" style="color:#2563eb;">@totalUsers</div>
-                <div class="stat-label">مستخدمي النظام</div>
+            <div class="stat-card" style="border-right:3px solid #2563eb">
+                <div class="stat-icon" style="background:#eff6ff;color:#2563eb"><i class="bi bi-person-badge-fill"></i></div>
+                <div class="stat-value" style="color:#2563eb">@totalUsers</div>
+                <div class="stat-label">مستخدمو النظام</div>
             </div>
         </a>
     </div>
 </div>
 
-@* ── Month label ── *@
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-    <div style="width:4px;height:24px;background:var(--primary);border-radius:2px"></div>
-    <span style="font-size:15px;font-weight:700;color:var(--text-primary)">إحصائيات @monthName @selYear</span>
-    <span style="font-size:12px;color:var(--text-muted)">(@monthLeadsTotal عميل · @monthCandidatesTotal مرشح)</span>
-</div>
-
-@* ── Today's Office Sales Appointments ── *@
+@* ── Visits Card with Date Filter ── *@
 <div class="card mb-4">
-    <div class="card-header">
-        <span class="card-title">
-            📅 زيارات اليوم — الاستقبال
-            @if (todayAppointments.Any())
+    <div class="card-header" style="flex-wrap:wrap;gap:8px">
+        <div class="header-icon" style="background:#EFF6FF;color:#2563EB"><i class="bi bi-calendar-check-fill"></i></div>
+        <span style="font-weight:700;font-size:14px">
+            زيارات الاستقبال —
+            @if (isToday)
             {
-                <span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;font-size:.7rem;padding:2px 10px;border-radius:99px;font-weight:700;margin-right:8px;">
-                    @todayAppointments.Count() موعد
-                </span>
+                <span style="color:var(--primary)">اليوم</span>
+            }
+            else
+            {
+                <span style="color:#059669">@visitDateDisplay</span>
             }
         </span>
-        <a href="/Admin/Leads?status=5" class="btn btn-ghost btn-sm">عرض كل المواعيد</a>
+        @if (todayAppointments.Any())
+        {
+            <span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;font-size:11px;padding:2px 10px;border-radius:99px;font-weight:700">
+                @todayAppointments.Count() زيارة
+            </span>
+        }
+
+        @* Date filter form *@
+        <form method="get" action="/Admin/Index" class="ms-auto d-flex align-items-center gap-2">
+            <input type="hidden" name="month" value="@selMonth" />
+            <input type="hidden" name="year" value="@selYear" />
+            <input type="date" name="visitDate" value="@visitDate"
+                   class="form-control form-control-sm" style="width:160px"
+                   onchange="this.form.submit()" />
+            @if (!isToday)
+            {
+                <a href="/Admin/Index?month=@selMonth&year=@selYear"
+                   class="btn btn-sm" style="border:1px solid var(--border);white-space:nowrap">
+                    <i class="bi bi-calendar-day"></i> اليوم
+                </a>
+            }
+        </form>
     </div>
     <div class="card-body p-0">
         @if (!todayAppointments.Any())
         {
-            <div class="empty-state" style="padding:32px;">
-                <div class="empty-state-icon">📅</div>
-                <div class="empty-state-title">لا توجد زيارات اليوم</div>
+            <div class="empty-state" style="padding:32px">
+                <i class="bi bi-calendar-x" style="font-size:32px;opacity:.3;display:block;margin-bottom:8px"></i>
+                <p style="font-size:13px;color:var(--text-muted)">لا توجد زيارات في @visitDateDisplay</p>
             </div>
         }
         else
         {
-            <table class="table table-hover mb-0">
+            <table class="table mb-0">
                 <thead>
                     <tr>
                         <th>العميل</th>
@@ -250,18 +259,17 @@
                 <tbody>
                     @foreach (var visit in todayAppointments)
                     {
-                        var visitTime = visit.VisitDateTime.ToLocalTime();
                         <tr>
-                            <td style="font-weight:600;">@(visit.Lead?.FullName ?? "—")</td>
-                            <td style="font-family:monospace;font-size:.83rem;">@(visit.Lead?.Phone ?? "—")</td>
+                            <td style="font-weight:600">@(visit.Lead?.FullName ?? "—")</td>
+                            <td style="font-family:monospace;font-size:13px">@(visit.Lead?.Phone ?? "—")</td>
                             <td>
-                                <span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;font-size:.75rem;padding:3px 10px;border-radius:99px;font-weight:700;">
-                                    @visitTime.ToString("hh:mm tt")
+                                <span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;font-size:11px;padding:3px 10px;border-radius:99px;font-weight:700">
+                                    @visit.VisitDateTime.ToLocalTime().ToString("hh:mm tt")
                                 </span>
                             </td>
-                            <td style="font-size:.83rem;font-weight:600;">@(visit.AssignedSalesUser?.FullName ?? "—")</td>
-                            <td style="font-size:.82rem;color:var(--text-muted);">@(visit.ReceptionUser?.FullName ?? "—")</td>
-                            <td style="font-size:.8rem;color:var(--text-muted);">@(visit.Lead?.Campaign?.Name ?? "—")</td>
+                            <td style="font-size:13px;font-weight:600">@(visit.AssignedSalesUser?.FullName ?? "—")</td>
+                            <td style="font-size:12px;color:var(--text-muted)">@(visit.ReceptionUser?.FullName ?? "—")</td>
+                            <td style="font-size:12px;color:var(--text-muted)">@(visit.Lead?.Campaign?.Name ?? "—")</td>
                         </tr>
                     }
                 </tbody>
@@ -270,9 +278,15 @@
     </div>
 </div>
 
-@* ── Charts row ── *@
+@* ── Month Stats Label ── *@
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+    <div style="width:4px;height:24px;background:var(--primary);border-radius:2px"></div>
+    <span style="font-size:15px;font-weight:700;color:var(--text-primary)">إحصائيات @monthName @selYear</span>
+    <span style="font-size:12px;color:var(--text-muted)">(@monthLeadsTotal عميل · @monthCandidatesTotal مرشح)</span>
+</div>
+
+@* ── Charts Row ── *@
 <div class="row g-3 mb-4">
-    @* Leads by status *@
     <div class="col-md-6">
         <div class="card h-100">
             <div class="card-header">
@@ -287,16 +301,16 @@
                     {
                         int s = (int)item.Status;
                         int count = (int)item.Count;
-                        string label = funnelLabels.GetValueOrDefault(s, $"حالة {s}");
-                        string color = funnelColors.GetValueOrDefault(s, "#64748b");
-                        double pct = monthLeadsTotal > 0 ? (count * 100.0 / monthLeadsTotal) : 0;
+                        string lbl = funnelLabels.GetValueOrDefault(s, $"حالة {s}");
+                        string col = funnelColors.GetValueOrDefault(s, "#64748b");
+                        double pct = monthLeadsTotal > 0 ? count * 100.0 / monthLeadsTotal : 0;
                         <div class="mb-3">
                             <div class="d-flex justify-content-between mb-1">
-                                <span style="font-size:13px;font-weight:600;color:@color">@label</span>
-                                <span style="font-size:13px;font-weight:700;color:var(--text-primary)">@count</span>
+                                <span style="font-size:13px;font-weight:600;color:@col">@lbl</span>
+                                <span style="font-size:13px;font-weight:800;color:var(--text-primary)">@count</span>
                             </div>
                             <div style="height:7px;background:#F1F5F9;border-radius:4px;overflow:hidden">
-                                <div style="height:100%;width:@(pct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%;background:@color;border-radius:4px;transition:width .4s"></div>
+                                <div style="height:100%;width:@(pct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%;background:@col;border-radius:4px;transition:width .4s"></div>
                             </div>
                         </div>
                     }
@@ -308,8 +322,6 @@
             </div>
         </div>
     </div>
-
-    @* Candidates by stage *@
     <div class="col-md-6">
         <div class="card h-100">
             <div class="card-header">
@@ -322,13 +334,13 @@
                 {
                     @foreach (var item in candidatesByStage)
                     {
-                        string label = item.Stage?.ToString() ?? "—";
+                        string lbl = item.Stage?.ToString() ?? "—";
                         int count = (int)item.Count;
-                        double pct = monthCandidatesTotal > 0 ? (count * 100.0 / monthCandidatesTotal) : 0;
+                        double pct = monthCandidatesTotal > 0 ? count * 100.0 / monthCandidatesTotal : 0;
                         <div class="mb-3">
                             <div class="d-flex justify-content-between mb-1">
-                                <span style="font-size:13px;font-weight:600;color:var(--primary)">@label</span>
-                                <span style="font-size:13px;font-weight:700;color:var(--text-primary)">@count</span>
+                                <span style="font-size:13px;font-weight:600;color:var(--primary)">@lbl</span>
+                                <span style="font-size:13px;font-weight:800;color:var(--text-primary)">@count</span>
                             </div>
                             <div style="height:7px;background:#F1F5F9;border-radius:4px;overflow:hidden">
                                 <div style="height:100%;width:@(pct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%;background:var(--primary);border-radius:4px;transition:width .4s"></div>
@@ -349,7 +361,7 @@
 <div class="card">
     <div class="card-header">
         <div class="header-icon" style="background:#F5F3FF;color:#7C3AED"><i class="bi bi-clock-history"></i></div>
-        أحدث العملاء المحتملين — @monthName @selYear
+        أحدث العملاء — @monthName @selYear
         <a href="/Admin/Leads" class="btn btn-sm ms-auto" style="border:1px solid var(--border);font-size:11px">عرض الكل</a>
     </div>
     <div class="card-body p-0">
