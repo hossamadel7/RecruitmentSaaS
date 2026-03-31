@@ -1,0 +1,78 @@
+@using RecruitmentSaaS.Models.Entities
+@model IEnumerable<Lead>
+@{
+    ViewData["Title"] = "ليدز الموظف";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var member     = ViewBag.Member as User;
+    string mLabel  = ViewBag.MonthLabel;
+    int selMonth   = ViewBag.SelMonth;
+    int selYear    = ViewBag.SelYear;
+
+    string[] statusLabels = { "", "عميل جديد", "تم التواصل", "مهتم", "يفكر", "وعد بالزيارة", "زيارة", "تحويل", "ملغى" };
+    string[] statusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626" };
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <a href="/TeleSalesManager/Index?month=@selMonth&year=@selYear" class="btn btn-ghost btn-sm" style="margin-left:8px;">
+            <i class="bi bi-arrow-right"></i> رجوع
+        </a>
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);">👤</div>
+        <div>
+            <h1 class="page-title">@(member?.FullName ?? "—")</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">
+                @Model.Count().ToString("N0") ليد · @mLabel
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="empty-state" style="padding:48px;">
+                <div class="empty-state-icon">👥</div>
+                <div class="empty-state-title">لا توجد ليدز هذا الشهر</div>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>الكود</th>
+                            <th>الاسم</th>
+                            <th>الهاتف</th>
+                            <th>الحملة</th>
+                            <th>الحالة</th>
+                            <th>التاريخ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var lead in Model)
+                        {
+                            int s = lead.Status;
+                            string lbl = s >= 1 && s < statusLabels.Length ? statusLabels[s] : $"حالة {s}";
+                            string col = s >= 1 && s < statusColors.Length ? statusColors[s] : "#64748b";
+                            <tr>
+                                <td style="font-family:monospace;font-size:.78rem;color:var(--text-muted);">@(lead.LeadCode ?? "—")</td>
+                                <td style="font-weight:600;">@lead.FullName</td>
+                                <td style="font-family:monospace;font-size:.83rem;">@lead.Phone</td>
+                                <td style="font-size:.8rem;color:var(--text-muted);">@(lead.Campaign?.Name ?? "—")</td>
+                                <td>
+                                    <span style="background:@(col+"20");color:@col;border:1px solid @(col+"40");font-size:.7rem;padding:3px 10px;border-radius:99px;font-weight:700;">
+                                        @lbl
+                                    </span>
+                                </td>
+                                <td style="font-size:.78rem;color:var(--text-muted);">@lead.CreatedAt.ToString("dd/MM/yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
