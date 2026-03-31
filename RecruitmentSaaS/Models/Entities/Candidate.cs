@@ -53,8 +53,11 @@ public partial class Candidate
 
     public Guid? CompanyId { get; set; }
 
+    [Precision(0)]
     public DateTime? FlightDate { get; set; }
 
+    [ForeignKey("AssignedSalesId")]
+    [InverseProperty("CandidateAssignedSales")]
     public virtual User AssignedSales { get; set; } = null!;
 
     public virtual Branch Branch { get; set; } = null!;

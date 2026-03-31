@@ -51,7 +51,7 @@ app.UseRouting();
 
 app.UseAuthentication(); // ← must be before UseAuthorization
 app.UseAuthorization();
-
+app.MapGet("/health", () => Results.Ok("OK"));
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

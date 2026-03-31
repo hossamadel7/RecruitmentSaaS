@@ -1143,6 +1143,8 @@ public partial class RecruitmentCrmContext : DbContext
                 .HasForeignKey(d => d.BranchId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_demorecruitment_Us_Br");
+
+            entity.HasOne(d => d.Manager).WithMany(p => p.InverseManager).HasConstraintName("FK_demorecruitment_Us_Manager");
         });
 
         modelBuilder.Entity<VisaUpload>(entity =>

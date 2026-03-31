@@ -6,9 +6,10 @@
 
     string? q = ViewBag.Q;
     int? role = ViewBag.Role;
+    var managers = ViewBag.Managers as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
 
-    string[] roleNames = { "", "مدير", "استقبال", "تيلي سيلز", "محاسب", "عمليات", "مبيعات مكتبية" };
-    string[] roleColors = { "", "#dc2626", "#0ea5e9", "#8b5cf6", "#16a34a", "#f59e0b", "#6366f1" };
+    string[] roleNames = { "", "مدير", "استقبال", "تيلي سيلز", "محاسب", "عمليات", "مبيعات مكتبية", "مدير تيلي سيلز" };
+    string[] roleColors = { "", "#dc2626", "#0ea5e9", "#8b5cf6", "#16a34a", "#f59e0b", "#6366f1", "#7c3aed" };
 }
 
 <div class="page-header">
@@ -89,6 +90,7 @@
                         <th>المستخدم</th>
                         <th>البريد الإلكتروني</th>
                         <th>الدور</th>
+                        <th>المدير / الفريق</th>
                         <th>الحالة</th>
                         <th>تاريخ الإنشاء</th>
                         <th>إجراءات</th>
@@ -102,6 +104,11 @@
                         string rColor = r >= 1 && r < roleColors.Length ? roleColors[r] : "#64748b";
                         string rColorBg = rColor + "20";
                         string rColorBorder = rColor + "40";
+
+                        // Count team members for managers (Role 7)
+                        int teamCount = u.Role == 7
+                        ? Model.Count(x => x.ManagerId == u.Id)
+                        : 0;
 
                         <tr style="@(!u.IsActive ? "opacity:.5;" : "")">
                             <td>
@@ -120,6 +127,46 @@
                                     @rName
                                 </span>
                             </td>
+
+                            @* Manager / Team column *@
+                            <td style="font-size:.82rem;">
+                                @if (u.Role == 7)
+                                {
+                                    @* Manager row: show team count + manage button *@
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span style="background:#f3e8ff;color:#7c3aed;border:1px solid #e9d5ff;
+                                                     font-size:.7rem;padding:2px 8px;border-radius:99px;font-weight:700;">
+                                            @teamCount موظف
+                                        </span>
+                                        <button class="btn btn-sm"
+                                                style="background:#7c3aed;color:#fff;font-size:.72rem;padding:3px 10px;border-radius:8px;"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#manageTeamModal_@u.Id"
+                                                title="إدارة فريق @u.FullName">
+                                            <i class="bi bi-people-fill"></i> إدارة الفريق
+                                        </button>
+                                    </div>
+                                }
+                                else if (u.Role == 3)
+                                {
+                                    @* TeleSales row: show current manager *@
+                                    @if (u.Manager != null)
+                                    {
+                                        <span style="color:#7c3aed;font-size:.8rem;">
+                                            <i class="bi bi-person-check-fill"></i> @u.Manager.FullName
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:var(--text-muted);font-size:.78rem;">غير مسند لمدير</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-muted);">—</span>
+                                }
+                            </td>
+
                             <td>
                                 @if (u.IsActive)
                                 {
@@ -132,9 +179,7 @@
                                                  font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">معطّل</span>
                                 }
                             </td>
-                            <td style="font-size:.78rem;color:var(--text-muted);">
-                                @u.CreatedAt.ToString("dd/MM/yyyy")
-                            </td>
+                            <td style="font-size:.78rem;color:var(--text-muted);">@u.CreatedAt.ToString("dd/MM/yyyy")</td>
                             <td>
                                 <div class="d-flex gap-1 flex-wrap">
                                     <form method="post" action="/Admin/ToggleUser" class="d-inline">
@@ -153,7 +198,6 @@
                                         <i class="bi bi-key"></i>
                                     </button>
 
-                                    @* ── زر نسخ الرابط الشخصي — للـ TeleSales فقط (Role = 3) ── *@
                                     @if (u.Role == 3)
                                     {
                                         <button class="btn btn-outline-success btn-sm"
@@ -172,25 +216,123 @@
     </div>
 </div>
 
-@* ── Toast notification ─────────────────────────────────────────── *@
+@* ── Toast ──────────────────────────────────────────────────────────────── *@
 <div id="copyToast"
      style="display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
             background:#1B4FD8;color:#fff;padding:12px 28px;border-radius:12px;
-            font-size:13px;font-weight:600;z-index:9999;
-            box-shadow:0 4px 20px rgba(27,79,216,.35);transition:opacity .3s;">
+            font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(27,79,216,.35);">
     ✅ تم نسخ الرابط
 </div>
 
-@* ── CREATE USER MODAL ──────────────────────────────────────────── *@
-<div class="modal fade" id="createUserModal" tabindex="-1"
-     aria-labelledby="createUserModalLabel" aria-hidden="true">
+@* ── MANAGE TEAM MODAL (for Role 7 managers) ────────────────────────────── *@
+@{
+    var telesalesUsers = Model.Where(u => u.Role == 3).OrderBy(u => u.FullName).ToList();
+    var managers7 = Model.Where(u => u.Role == 7).OrderBy(u => u.FullName).ToList();
+}
+
+@* One modal per manager — no JS needed *@
+@foreach (var mgr in managers7)
+{
+    <div class="modal fade" id="manageTeamModal_@mgr.Id" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-people-fill" style="color:#7c3aed;margin-left:8px;"></i>
+                        إدارة فريق: @mgr.FullName
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="padding:20px;">
+                    <p style="font-size:.83rem;color:var(--text-muted);margin-bottom:16px;">
+                        اختر موظفي التيلي سيلز الذين تريد إسنادهم لهذا المدير.
+                    </p>
+                    @if (!telesalesUsers.Any())
+                    {
+                        <div style="text-align:center;color:var(--text-muted);padding:24px;font-size:.85rem;">
+                            لا يوجد موظفو تيلي سيلز في النظام
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var ts in telesalesUsers)
+                        {
+                            bool isInThisTeam = ts.ManagerId == mgr.Id;
+                            <div class="d-flex align-items-center justify-content-between"
+                                 style="padding:10px 14px;border:1px solid var(--bs-border-color,#e2e8f0);border-radius:10px;margin-bottom:8px;">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div style="width:34px;height:34px;border-radius:50%;background:#8b5cf620;color:#8b5cf6;
+                                                display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;">
+                                        @ts.FullName.FirstOrDefault()
+                                    </div>
+                                    <div>
+                                        <div style="font-weight:600;font-size:.88rem;">@ts.FullName</div>
+                                        <div style="font-size:.74rem;color:var(--text-muted);">
+                                            @if (ts.Manager != null)
+                                            {
+                                                <span style="color:#7c3aed;"><i class="bi bi-person-check-fill"></i> @ts.Manager.FullName</span>
+                                            }
+                                            else
+                                            {
+                                                <span>غير مسند</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    @if (!isInThisTeam)
+                                    {
+                                        @* Assign to this manager *@
+                                        <form method="post" action="/Admin/AssignManager">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userId" value="@ts.Id" />
+                                            <input type="hidden" name="managerId" value="@mgr.Id" />
+                                            <button type="submit" class="btn btn-sm"
+                                                    style="background:#7c3aed;color:#fff;border:none;font-size:.75rem;padding:4px 12px;border-radius:8px;">
+                                                <i class="bi bi-plus-circle-fill"></i> إضافة للفريق
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;
+                                                     font-size:.73rem;padding:4px 10px;border-radius:8px;font-weight:600;">
+                                            <i class="bi bi-check-circle-fill"></i> في الفريق
+                                        </span>
+                                    }
+                                    @* Remove from team *@
+                                    @if (isInThisTeam)
+                                    {
+                                        <form method="post" action="/Admin/AssignManager">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userId" value="@ts.Id" />
+                                            <input type="hidden" name="managerId" value="" />
+                                            <button type="submit" class="btn btn-sm"
+                                                    style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-size:.75rem;padding:4px 10px;border-radius:8px;"
+                                                    onclick="return confirm('إزالة @ts.FullName من الفريق؟')">
+                                                <i class="bi bi-x-circle-fill"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إغلاق</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}@* ── CREATE USER MODAL ───────────────────────────────────────────────────── *@<div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="createUserModalLabel">مستخدم جديد</h5>
+                <h5 class="modal-title">مستخدم جديد</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post" action="/Admin/CreateUser">
+            <form method="post" action="/Admin/CreateUser" id="createUserForm">
                 @Html.AntiForgeryToken()
                 <div class="modal-body">
                     <div class="mb-3">
@@ -207,10 +349,21 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">الدور <span class="text-danger">*</span></label>
-                        <select name="role" class="form-select" required>
+                        <select name="role" class="form-select" required id="roleSelect" onchange="toggleManagerField(this.value)">
                             @for (int i = 1; i < roleNames.Length; i++)
                             {
                                 <option value="@i">@roleNames[i]</option>
+                            }
+                        </select>
+                    </div>
+                    @* Show manager dropdown only when Role = TeleSales (3) *@
+                    <div class="mb-3" id="managerFieldWrapper" style="display:none;">
+                        <label class="form-label">تعيين لمدير تيلي سيلز <span style="color:var(--text-muted);font-weight:400;">(اختياري)</span></label>
+                        <select name="managerId" class="form-select" id="managerSelect">
+                            <option value="">— بدون مدير —</option>
+                            @foreach (var mgr in managers)
+                            {
+                                <option value="@mgr.Id">@mgr.FullName</option>
                             }
                         </select>
                     </div>
@@ -224,7 +377,7 @@
     </div>
 </div>
 
-@* ── RESET PASSWORD MODAL ────────────────────────────────────────── *@
+@* ── RESET PASSWORD MODAL ────────────────────────────────────────────────── *@
 <div class="modal fade" id="resetPwdModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -255,17 +408,19 @@
 
 @section Scripts {
     <script>
+        // ── Reset password modal ──────────────────────────────────────────────
         function openResetPwd(userId, userName) {
-            document.getElementById('resetUserId').value        = userId;
+            document.getElementById('resetUserId').value         = userId;
             document.getElementById('resetUserName').textContent = userName;
             new bootstrap.Modal(document.getElementById('resetPwdModal')).show();
         }
 
+        // ── Copy referral link ────────────────────────────────────────────────
         function copyRefLink(userId, userName) {
-            var url = window.location.origin + '/?ref=' + userId;
+            var url   = window.location.origin + '/?ref=' + userId;
+            var toast = document.getElementById('copyToast');
             navigator.clipboard.writeText(url).then(function () {
-                var toast = document.getElementById('copyToast');
-                toast.textContent  = '✅ تم نسخ رابط ' + userName;
+                toast.textContent   = '✅ تم نسخ رابط ' + userName;
                 toast.style.display = 'block';
                 toast.style.opacity = '1';
                 setTimeout(function () {
@@ -273,9 +428,14 @@
                     setTimeout(function () { toast.style.display = 'none'; }, 300);
                 }, 3000);
             }).catch(function () {
-                // Fallback لو clipboard API مش متاح
                 prompt('انسخ الرابط يدوياً:', url);
             });
+        }
+
+        // ── Show/hide manager field in create modal ───────────────────────────
+        function toggleManagerField(roleVal) {
+            var wrapper = document.getElementById('managerFieldWrapper');
+            wrapper.style.display = roleVal === '3' ? 'block' : 'none';
         }
     </script>
 }
