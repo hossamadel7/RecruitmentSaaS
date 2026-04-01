@@ -38,22 +38,19 @@ namespace RecruitmentSaaS.Services
             var result = new VisaExtractedData();
 
             // Passport Number
-            // Passport Number
-            // Pattern 1: "Passport No. : Normal / GAWAZ1" → grab after last /
+            // Patterns: "Passport No. : Normal / A44377960" or "A44377960 / عادي"
             var passportMatch = Regex.Match(text,
-                @"Passport\s+No\.?\s*:\s*\w+\s*/\s*([A-Z][A-Z0-9]{2,9})\b",
+                @"Passport\s+No\.?\s*:\s*(?:Normal\s*/\s*)?([A-Z]\d{7,8})",
                 RegexOptions.IgnoreCase);
             if (passportMatch.Success)
                 result.PassportNumber = passportMatch.Groups[1].Value.Trim().ToUpper();
 
-            // Pattern 2: "Passport No. : GAWAZ1" → direct (no Normal /)
+            // Fallback: look for standalone passport number pattern
             if (string.IsNullOrEmpty(result.PassportNumber))
             {
-                var direct = Regex.Match(text,
-                    @"Passport\s+No\.?\s*:\s*([A-Z][A-Z0-9]{2,9})\b",
-                    RegexOptions.IgnoreCase);
-                if (direct.Success)
-                    result.PassportNumber = direct.Groups[1].Value.Trim().ToUpper();
+                var fallback = Regex.Match(text, @"\b([A-Z]\d{7,8})\b");
+                if (fallback.Success)
+                    result.PassportNumber = fallback.Groups[1].Value.Trim().ToUpper();
             }
 
             // Visa / Entry Permit Number
