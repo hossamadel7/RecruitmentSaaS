@@ -10,7 +10,7 @@ using System.Security.Claims;
 
 namespace RecruitmentSaaS.Controllers
 {
-    [Authorize(Roles = "1")]
+    [Authorize(Roles = "1,5")]
     public class VisaController : Controller
     {
         private readonly RecruitmentCrmContext _context;
@@ -37,12 +37,11 @@ namespace RecruitmentSaaS.Controllers
         public async Task<IActionResult> Index()
         {
             var pending = await _context.VisaUploads
-                .Include(v => v.UploadedBy)
-                .Include(v => v.MatchedCandidate)
-                .Where(v => v.MatchStatus == 0 || v.MatchStatus == 3)
-                .OrderByDescending(v => v.UploadedAt)
-                .ToListAsync();
-
+     .Include(v => v.UploadedBy)
+     .Include(v => v.MatchedCandidate)
+     .Where(v => v.MatchStatus == 0)
+     .OrderByDescending(v => v.UploadedAt)
+     .ToListAsync();
             var matched = await _context.VisaUploads
                 .Include(v => v.UploadedBy)
                 .Include(v => v.MatchedCandidate)
