@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
+using RecruitmentSaaS.Models.Entities;
 using System.Security.Claims;
 
 namespace RecruitmentSaaS.Controllers
@@ -35,11 +36,13 @@ namespace RecruitmentSaaS.Controllers
             // Candidates by stage
             var byStage = await _context.Candidates
                 .Where(c => c.IsCompleted != true && c.CurrentPackageStageId != null)
-                .GroupBy(c => new {
+                .GroupBy(c => new
+                {
                     Name = c.CurrentPackageStage!.StageName,
                     Order = c.CurrentPackageStage!.StageOrder
                 })
-                .Select(g => new {
+                .Select(g => new
+                {
                     Stage = g.Key.Name,
                     Order = g.Key.Order,
                     Count = g.Count()
@@ -47,97 +50,12 @@ namespace RecruitmentSaaS.Controllers
                 .OrderBy(g => g.Order)
                 .ToListAsync();
 
-            // ── المرشحون الجاهزون للسفر (StageOrder = 6) ─────────────────────
-            var readyToTravel = await _context.Candidates
-                .Include(c => c.JobPackage)
-                .Include(c => c.AssignedSales)
-                .Where(c => c.IsCompleted != true
-                         && c.CurrentPackageStage != null
-                         && c.CurrentPackageStage.StageOrder == 6)
-                .OrderBy(c => c.FullName)
-                .Select(c => new {
-                    c.Id,
-                    c.FullName,
-                    c.Phone,
-                    c.TotalPaidEgp,
-                    JobPackageName = c.JobPackage.Name,
-                    DestinationCountry = c.JobPackage.DestinationCountry,
-                    JobTitle = c.JobPackage.JobTitle,
-                    PriceEgp = c.JobPackage.PriceEgp,
-                    AssignedSalesName = c.AssignedSales != null ? c.AssignedSales.FullName : "—"
-                })
-                .ToListAsync();
-
             ViewBag.TotalCandidates = totalCandidates;
             ViewBag.InProgress = inProgress;
             ViewBag.CompletedCount = completedCount;
             ViewBag.ByStage = byStage;
-            ViewBag.ReadyToTravel = readyToTravel;
 
             return View();
-        }
-
-        // ── POST /Operations/ConfirmVisaReceived ──────────────────────────────
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ConfirmVisaReceived(Guid candidateId)
-        {
-            var candidate = await _context.Candidates
-                .Include(c => c.CurrentPackageStage)
-                .FirstOrDefaultAsync(c => c.Id == candidateId);
-
-            if (candidate == null)
-            {
-                TempData["Error"] = "المرشح غير موجود";
-                return RedirectToAction("Index");
-            }
-
-            if (candidate.CurrentPackageStage?.StageOrder != 6)
-            {
-                TempData["Error"] = "المرشح ليس في مرحلة استلام التأشيرة";
-                return RedirectToAction("Index");
-            }
-
-            var successParam = new Microsoft.Data.SqlClient.SqlParameter
-            {
-                ParameterName = "@Success",
-                SqlDbType = System.Data.SqlDbType.Bit,
-                Direction = System.Data.ParameterDirection.Output
-            };
-            var messageParam = new Microsoft.Data.SqlClient.SqlParameter
-            {
-                ParameterName = "@Message",
-                SqlDbType = System.Data.SqlDbType.NVarChar,
-                Size = 500,
-                Direction = System.Data.ParameterDirection.Output
-            };
-            var stageNameParam = new Microsoft.Data.SqlClient.SqlParameter
-            {
-                ParameterName = "@NewStageName",
-                SqlDbType = System.Data.SqlDbType.NVarChar,
-                Size = 200,
-                Direction = System.Data.ParameterDirection.Output
-            };
-
-            await _context.Database.ExecuteSqlRawAsync(
-                "EXEC demorecruitment.sp_MoveToNextStage @CandidateId, @MovedById, @Notes, @IsOverride, @OverrideReason, @Success OUTPUT, @Message OUTPUT, @NewStageName OUTPUT",
-                new Microsoft.Data.SqlClient.SqlParameter("@CandidateId", candidateId),
-                new Microsoft.Data.SqlClient.SqlParameter("@MovedById", CurrentUserId),
-                new Microsoft.Data.SqlClient.SqlParameter("@Notes", "تم استلام التأشيرة — جاهز للسفر"),
-                new Microsoft.Data.SqlClient.SqlParameter("@IsOverride", false),
-                new Microsoft.Data.SqlClient.SqlParameter("@OverrideReason", DBNull.Value),
-                successParam, messageParam, stageNameParam
-            );
-
-            var success = (bool)successParam.Value;
-            var message = messageParam.Value?.ToString() ?? "";
-
-            if (success)
-                TempData["Success"] = "تم تأكيد استلام التأشيرة — انتقل المرشح إلى مرحلة السفر ✅";
-            else
-                TempData["Error"] = message;
-
-            return RedirectToAction("Index");
         }
 
         // ── GET /Operations/Candidates ────────────────────────────────────────
@@ -183,6 +101,7 @@ namespace RecruitmentSaaS.Controllers
             var candidate = await _context.Candidates
                 .Include(c => c.JobPackage)
                     .ThenInclude(p => p.PackageStages.Where(s => s.IsActive == true).OrderBy(s => s.StageOrder))
+                    .ThenInclude(ps => ps.StageType)
                 .Include(c => c.RegisteredBy)
                 .Include(c => c.CurrentPackageStage)
                 .FirstOrDefaultAsync(c => c.Id == id);
@@ -295,6 +214,8 @@ namespace RecruitmentSaaS.Controllers
                 FullName = candidate.FullName,
                 Phone = candidate.Phone,
                 NationalId = candidate.NationalId,
+                PassportNumber = candidate.PassportNumber,
+                PassportExpiry = candidate.PassportExpiry,
                 Age = candidate.Age,
                 City = candidate.City,
                 Notes = candidate.Notes,
@@ -305,10 +226,20 @@ namespace RecruitmentSaaS.Controllers
                 TotalPaidEGP = candidate.TotalPaidEgp,
                 IsProfileComplete = candidate.IsProfileComplete,
                 IsCompleted = candidate.IsCompleted,
-                CreatedAt = candidate.CreatedAt
+                CreatedAt = candidate.CreatedAt,
+                FlightDate = candidate.FlightDate
             };
 
-            return View(dto);
+            // Required by shared Sales_CandidateDetail view
+            ViewBag.StageCompletions = await _context.StageActionCompletions
+                .Where(sc => sc.CandidateId == id)
+                .ToListAsync();
+
+            ViewBag.PendingApproval = await _context.StageApprovalRequests
+                .Include(r => r.ToStage)
+                .FirstOrDefaultAsync(r => r.CandidateId == id && r.Status == 1);
+
+            return View("~/Views/Sales/CandidateDetail.cshtml", dto);
         }
 
         // ── POST /Operations/MoveToNextStage ─────────────────────────────────
@@ -458,6 +389,137 @@ namespace RecruitmentSaaS.Controllers
             return RedirectToAction("CandidateDetail", new { id = candidateId });
         }
 
+        // ── POST /Operations/SaveFlightDate ──────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveFlightDate(Guid candidateId, DateTime flightDate)
+        {
+            var userId = CurrentUserId;
+
+            var candidate = await _context.Candidates
+                .Include(c => c.CurrentPackageStage)
+                .FirstOrDefaultAsync(c => c.Id == candidateId);
+
+            if (candidate == null)
+            {
+                TempData["Error"] = "المرشح غير موجود";
+                return RedirectToAction("Candidates");
+            }
+
+            candidate.FlightDate = flightDate;
+            candidate.UpdatedAt = DateTime.UtcNow;
+
+            if (candidate.CurrentPackageStageId.HasValue)
+            {
+                var alreadyDone = await _context.StageActionCompletions
+                    .AnyAsync(s => s.CandidateId == candidateId
+                                && s.PackageStageId == candidate.CurrentPackageStageId.Value
+                                && s.CompletionType == 6);
+
+                if (!alreadyDone)
+                {
+                    _context.StageActionCompletions.Add(new StageActionCompletion
+                    {
+                        Id = Guid.NewGuid(),
+                        CandidateId = candidateId,
+                        PackageStageId = candidate.CurrentPackageStageId.Value,
+                        CompletedAt = DateTime.UtcNow,
+                        CompletedById = userId,
+                        CompletionType = 6,
+                        Notes = $"تاريخ الطيران: {flightDate:dd/MM/yyyy HH:mm}"
+                    });
+                }
+                else
+                {
+                    var existing = await _context.StageActionCompletions
+                        .FirstOrDefaultAsync(s => s.CandidateId == candidateId
+                                                && s.PackageStageId == candidate.CurrentPackageStageId.Value
+                                                && s.CompletionType == 6);
+                    if (existing != null)
+                        existing.Notes = $"تاريخ الطيران: {flightDate:dd/MM/yyyy HH:mm}";
+                }
+            }
+
+            var reminderDate = DateOnly.FromDateTime(flightDate.AddDays(-1));
+            var linkedLeadId = await _context.Leads
+                .Where(l => l.ConvertedCandidateId == candidateId)
+                .Select(l => (Guid?)l.Id)
+                .FirstOrDefaultAsync();
+
+            if (linkedLeadId.HasValue)
+            {
+                var oldReminders = await _context.FollowUpReminders
+                    .Where(r => r.LeadId == linkedLeadId.Value
+                             && r.Notes != null
+                             && r.Notes.Contains("طيران")
+                             && r.Status == 1)
+                    .ToListAsync();
+                _context.FollowUpReminders.RemoveRange(oldReminders);
+
+                if (candidate.AssignedSalesId != Guid.Empty)
+                {
+                    _context.FollowUpReminders.Add(new FollowUpReminder
+                    {
+                        Id = Guid.NewGuid(),
+                        LeadId = linkedLeadId.Value,
+                        AssignedToId = candidate.AssignedSalesId,
+                        CreatedById = userId,
+                        ReminderDate = reminderDate,
+                        Notes = $"تذكير: رحلة {candidate.FullName} غداً الساعة {flightDate:HH:mm}",
+                        Status = 1,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"تم حفظ تاريخ الطيران ✅ — {flightDate:dd/MM/yyyy HH:mm}";
+            return RedirectToAction("CandidateDetail", new { id = candidateId });
+        }
+
+        // ── POST /Operations/SetReminder ──────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SetReminder(Guid candidateId, DateOnly reminderDate, string? notes)
+        {
+            var userId = CurrentUserId;
+
+            var candidate = await _context.Candidates
+                .FirstOrDefaultAsync(c => c.Id == candidateId);
+
+            if (candidate == null)
+            {
+                TempData["Error"] = "المرشح غير موجود";
+                return RedirectToAction("Candidates");
+            }
+
+            var leadId = await _context.Leads
+                .Where(l => l.ConvertedCandidateId == candidateId)
+                .Select(l => (Guid?)l.Id)
+                .FirstOrDefaultAsync();
+
+            if (leadId.HasValue && candidate.AssignedSalesId != Guid.Empty)
+            {
+                _context.FollowUpReminders.Add(new FollowUpReminder
+                {
+                    Id = Guid.NewGuid(),
+                    LeadId = leadId.Value,
+                    AssignedToId = candidate.AssignedSalesId,
+                    CreatedById = userId,
+                    ReminderDate = reminderDate,
+                    Notes = notes,
+                    Status = 1,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+            }
+
+            TempData["Success"] = "تم تعيين التذكير بنجاح";
+            return RedirectToAction("CandidateDetail", new { id = candidateId });
+        }
+
         // ── GET /Operations/DownloadDocument/{id} ─────────────────────────────
         public async Task<IActionResult> DownloadDocument(Guid id)
         {
@@ -497,7 +559,7 @@ namespace RecruitmentSaaS.Controllers
                 CandidateId = candidateId,
                 AmountEgp = amountEgp,
                 Reason = reason,
-                Status = 1, // Pending admin approval
+                Status = 1,
                 RequestedById = CurrentUserId,
                 RequestedAt = DateTime.UtcNow
             });

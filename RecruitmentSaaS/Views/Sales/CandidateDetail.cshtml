@@ -2,6 +2,21 @@
 @{
     ViewData["Title"] = Model.FullName;
     ViewData["Subtitle"] = "ملف المرشح";
+
+    // Controller name based on role — used in all form actions
+    var ctrlName = User.IsInRole("1") ? "Admin"
+                 : User.IsInRole("5") ? "Operations"
+                 : "Sales";
+
+    // Back link based on role
+    var backUrl = User.IsInRole("1") ? "/Admin/Candidates"
+                : User.IsInRole("5") ? "/Operations/Candidates"
+                : "/Sales/Candidates";
+
+    // Operations can only act on their own stages
+    var isOperations = User.IsInRole("5");
+    var operationsStages = new[] { "VISA_RECEIVED", "ACCOMMODATION", "FLIGHT_BOOKING", "DEPARTURE" };
+
     var payments = ViewBag.Payments as List<RecruitmentSaaS.Models.DTOs.PaymentDto> ?? new();
     var documents = ViewBag.Documents as List<RecruitmentSaaS.Models.DTOs.DocumentDto> ?? new();
     var history = ViewBag.StageHistory as List<RecruitmentSaaS.Models.DTOs.CandidateStageHistoryDto> ?? new();
@@ -37,15 +52,22 @@
                              && sc.CompletionType == 6);
     var dateBlocked = dateEntryRequired && !dateEntered && !Model.IsCompleted && nextStage != null;
 
+    // Operations can only move/act on their assigned stages
+    var currentStageCode = currentStage?.StageType?.StageCode ?? "";
+    var isOperationsStage = operationsStages.Contains(currentStageCode);
+    var operationsBlocked = isOperations && !isOperationsStage;
+
     var canMove = !Model.IsCompleted && nextStage != null && !docBlocked && !dateBlocked
+                         && !operationsBlocked
                          && (currentMinPay == null || Model.TotalPaidEGP >= currentMinPay);
     var blocked = !Model.IsCompleted && nextStage != null && !docBlocked && !dateBlocked
+                         && !operationsBlocked
                          && currentMinPay.HasValue && Model.TotalPaidEGP < currentMinPay;
 }
 
 <div class="page-header">
     <div class="d-flex align-items-center gap-3">
-        <a href="/Sales/Candidates" style="color:var(--text-muted);text-decoration:none;font-size:20px">
+        <a href="@backUrl" style="color:var(--text-muted);text-decoration:none;font-size:20px">
             <i class="bi bi-arrow-right"></i>
         </a>
         <div>
@@ -120,9 +142,10 @@
                                 ("bi-calendar-heart",  "العمر",         Model.Age.HasValue ? $"{Model.Age} سنة" : "—"),
                                 ("bi-geo-alt-fill",    "المدينة",       Model.City ?? "—"),
                                 ("bi-briefcase-fill",  "الباقة",        Model.JobPackageName),
+                                ("bi-airplane-fill",   "تاريخ السفر",   Model.FlightDate.HasValue ? Model.FlightDate.Value.ToString("dd/MM/yyyy HH:mm") : "—"),
                                 ("bi-calendar3",       "تاريخ التسجيل", Model.CreatedAt.ToString("dd/MM/yyyy")),
-                                ("bi-passport-fill",   "رقم الجواز",     Model.PassportNumber ?? "—"),
-                                ("bi-calendar-event",  "انتهاء الجواز",  Model.PassportExpiry.HasValue ? Model.PassportExpiry.Value.ToString("dd/MM/yyyy") : "—"),
+                                ("bi-passport-fill",   "رقم الجواز",    Model.PassportNumber ?? "—"),
+                                ("bi-calendar-event",  "انتهاء الجواز", Model.PassportExpiry.HasValue ? Model.PassportExpiry.Value.ToString("dd/MM/yyyy") : "—"),
                                 };
                 }
                 @foreach (var (icon, label, value) in rows)
@@ -254,7 +277,7 @@
                                 <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@doc.FileName</div>
                                 <div style="font-size:10px;color:var(--text-muted)">@(doc.FileSizeBytes / 1024) KB · @doc.UploadedByName</div>
                             </div>
-                            <a href="@(User.IsInRole("1") ? $"/Admin/DownloadDocument/{doc.Id}" : $"/Sales/DownloadDocument/{doc.Id}")" style="color:var(--text-muted);font-size:15px" title="تحميل">
+                            <a href="/@ctrlName/DownloadDocument/@doc.Id" style="color:var(--text-muted);font-size:15px" title="تحميل">
                                 <i class="bi bi-download"></i>
                             </a>
                         </div>
@@ -270,7 +293,7 @@
                 تعيين تذكير
             </div>
             <div class="card-body">
-                <form asp-action="SetReminder" asp-controller="Sales" method="post">
+                <form asp-action="SetReminder" asp-controller="@ctrlName" method="post">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="candidateId" value="@Model.Id" />
                     <div class="mb-2">
@@ -351,7 +374,7 @@
                                 }
                             </div>
                         }
-                        <form asp-action="AddVisitComment" asp-controller="Sales" method="post"
+                        <form asp-action="AddVisitComment" asp-controller="@ctrlName" method="post"
                               style="display:flex;gap:8px;margin-right:42px">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="candidateId" value="@Model.Id" />
@@ -476,6 +499,21 @@
                 </div>
             }
 
+            @if (operationsBlocked)
+            {
+                <div style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:var(--radius);padding:14px 20px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
+                    <i class="bi bi-lock-fill" style="color:#64748b;font-size:18px"></i>
+                    <div>
+                        <div style="font-weight:700;font-size:13px;color:#475569">
+                            هذه المرحلة من اختصاص فريق المبيعات
+                        </div>
+                        <div style="font-size:11px;color:#94a3b8;margin-top:2px">
+                            مراحلك: استلام التأشيرة · التسكين · حجز تذكرة السفر · السفر
+                        </div>
+                    </div>
+                </div>
+            }
+
             @if (docBlocked)
             {
                 <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--radius);padding:14px 20px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -581,7 +619,11 @@
                         </div>
                     </div>
                     <div style="display:@bodyDisplay">
-                        @if (isCurrent && !actionDone)
+                        @{
+                            var psCode = ps.StageType?.StageCode ?? "";
+                            var canActOnStage = !isOperations || operationsStages.Contains(psCode);
+                        }
+                        @if (isCurrent && !actionDone && canActOnStage)
                         {
                             @if (isPassportStage)
                             {
@@ -602,7 +644,7 @@
                                 </div>
                             }
                         }
-                        @if (isCurrent && !actionDone && actionType2 == 2 && ps.StageType != null)
+                        @if (isCurrent && !actionDone && canActOnStage && actionType2 == 2 && ps.StageType != null)
                         {
                             <div style="padding:14px 20px;background:#eff6ff;border-bottom:1px solid #bfdbfe">
                                 <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:8px">
@@ -613,14 +655,14 @@
                                 </div>
                             </div>
                         }
-                        @if (isCurrent && !actionDone && actionType2 == 5 && ps.StageType != null)
+                        @if (isCurrent && !actionDone && canActOnStage && actionType2 == 5 && ps.StageType != null)
                         {
                             // FLIGHT_BOOKING — date entry, no document
                             <div style="padding:14px 20px;background:#f0fdf4;border-bottom:1px solid #bbf7d0">
                                 <div style="font-weight:700;font-size:13px;color:#059669;margin-bottom:10px">
                                     <i class="bi bi-airplane-fill me-2"></i>@(ps.StageType.ActionLabel ?? "أدخل تاريخ الطيران")
                                 </div>
-                                <form method="post" action="/Sales/SaveFlightDate" class="d-flex align-items-end gap-2 flex-wrap">
+                                <form method="post" action="/@ctrlName/SaveFlightDate" class="d-flex align-items-end gap-2 flex-wrap">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="candidateId" value="@Model.Id" />
                                     <div>
@@ -644,7 +686,7 @@
                                 </div>
                             </div>
                         }
-                        @if (isCurrent && actionDone && actionType2 == 5)
+                        @if (isCurrent && actionDone && canActOnStage && actionType2 == 5)
                         {
                             // Show saved flight date
                             <div style="padding:10px 20px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;font-size:12px;color:#059669;font-weight:600;display:flex;align-items:center;justify-content:space-between">
@@ -661,7 +703,7 @@
                                 </button>
                             </div>
                             <div id="editFlightDate_@ps.Id" style="display:none;padding:12px 20px;background:#f0fdf4;border-bottom:1px solid #bbf7d0">
-                                <form method="post" action="/Sales/SaveFlightDate" class="d-flex align-items-end gap-2">
+                                <form method="post" action="/@ctrlName/SaveFlightDate" class="d-flex align-items-end gap-2">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="candidateId" value="@Model.Id" />
                                     <input type="datetime-local" name="flightDate"
@@ -674,13 +716,13 @@
                                 </form>
                             </div>
                         }
-                        @if (isCurrent && !actionDone && actionType2 == 3 && ps.StageType != null)
+                        @if (isCurrent && !actionDone && canActOnStage && actionType2 == 3 && ps.StageType != null)
                         {
                             <div style="padding:14px 20px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;display:flex;align-items:center;justify-content:space-between">
                                 <div style="font-weight:700;font-size:13px;color:#16a34a">
                                     <i class="bi bi-check-circle me-2"></i>@(ps.StageType.ActionLabel ?? "تأكيد إتمام المرحلة")
                                 </div>
-                                <form method="post" action="/Sales/CompleteStageAction">
+                                <form method="post" action="/@ctrlName/CompleteStageAction">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="candidateId" value="@Model.Id" />
                                     <input type="hidden" name="packageStageId" value="@ps.Id" />
@@ -691,7 +733,7 @@
                                 </form>
                             </div>
                         }
-                        @if (isCurrent && actionDone)
+                        @if (isCurrent && actionDone && canActOnStage)
                         {
                             <div style="padding:10px 20px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;font-size:12px;color:#16a34a;font-weight:600">
                                 <i class="bi bi-check-circle-fill me-1"></i> تم تنفيذ المطلوب لهذه المرحلة ✅
@@ -746,7 +788,7 @@
                 ×
             </button>
         </div>
-        <form method="post" action="/Sales/RequestStageApproval" style="padding:22px">
+        <form method="post" action="/@ctrlName/RequestStageApproval" style="padding:22px">
             @Html.AntiForgeryToken()
             <input type="hidden" name="candidateId" value="@Model.Id" />
             <input type="hidden" name="exceptionType" value="1" />
@@ -804,7 +846,7 @@
                 ×
             </button>
         </div>
-        <form method="post" action="/Sales/RequestStageApproval" style="padding:22px">
+        <form method="post" action="/@ctrlName/RequestStageApproval" style="padding:22px">
             @Html.AntiForgeryToken()
             <input type="hidden" name="candidateId" value="@Model.Id" />
             <input type="hidden" name="fromStageId" value="@(packageStages.FirstOrDefault(s => s.StageOrder == currentStageOrder)?.Id)" />
@@ -853,7 +895,7 @@
                 ×
             </button>
         </div>
-        <form method="post" action="/Sales/MoveToNextStage" style="padding:22px">
+        <form method="post" action="/@ctrlName/MoveToNextStage" style="padding:22px">
             @Html.AntiForgeryToken()
             <input type="hidden" name="candidateId" value="@Model.Id" />
             <div class="mb-3">
@@ -885,7 +927,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form asp-action="EditCandidate" asp-controller="Sales" method="post">
+            <form asp-action="EditCandidate" asp-controller="@ctrlName" method="post">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="candidateId" value="@Model.Id" />
                 <div class="modal-body" style="padding:24px">
@@ -935,7 +977,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form asp-action="AddPayment" asp-controller="Sales" method="post">
+            <form asp-action="AddPayment" asp-controller="@ctrlName" method="post">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="candidateId" value="@Model.Id" />
                 <div class="modal-body" style="padding:24px">
@@ -1015,7 +1057,7 @@
                     يوجد <strong>@existingDoc.FileName</strong> مرفوع بالفعل لمرحلة <strong>@(currentStage?.StageName ?? "")</strong> — سيتم استبداله برفع ملف جديد
                 </div>
             }
-            <form asp-action="UploadDocument" asp-controller="Sales" method="post" enctype="multipart/form-data">
+            <form asp-action="UploadDocument" asp-controller="@ctrlName" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="candidateId" value="@Model.Id" />
                 <input type="hidden" name="replaceExisting" value="true" />
