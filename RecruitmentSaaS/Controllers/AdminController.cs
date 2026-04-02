@@ -1889,8 +1889,25 @@ namespace RecruitmentSaaS.Controllers
                 .Where(sp => sp.SalaryMonth == monthStart)
                 .ToListAsync();
 
-            var dto = users.Select(u => {
+            var dto = users.Select(u =>
+            {
                 var pay = payments.FirstOrDefault(p => p.UserId == u.Id);
+
+                string? paidAgoText = null;
+                if (pay?.Status == 3 && pay.PaidAt.HasValue)
+                {
+                    var days = (DateTime.UtcNow.Date - pay.PaidAt.Value.Date).Days;
+
+                    paidAgoText = days switch
+                    {
+                        <= 0 => "تم صرف الراتب اليوم",
+                        1 => "تم صرف الراتب منذ يوم",
+                        2 => "تم صرف الراتب منذ يومين",
+                        < 11 => $"تم صرف الراتب منذ {days} أيام",
+                        _ => $"تم صرف الراتب منذ {days} يوم"
+                    };
+                }
+
                 return new SalaryUserDto
                 {
                     UserId = u.Id,
@@ -1901,7 +1918,9 @@ namespace RecruitmentSaaS.Controllers
                     Adjustment = pay?.Adjustment ?? 0,
                     AdjustmentNote = pay?.AdjustmentNote,
                     PaymentId = pay?.Id,
-                    Status = pay?.Status ?? 0
+                    Status = pay?.Status ?? 0,
+                    PaidAt = pay?.PaidAt,
+                    PaidAgoText = paidAgoText
                 };
             }).ToList();
 
