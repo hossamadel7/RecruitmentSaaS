@@ -2200,8 +2200,18 @@ html, body {
         height: 36px;
     }
 
-    .nav-staff {
-        display: none;
+    @media (max-width: 768px) {
+        .nav-staff {
+            display: flex;
+            font-size: .68rem;
+            padding: 6px 10px;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+            .nav-staff i {
+                font-size: .8rem;
+            }
     }
 }
 

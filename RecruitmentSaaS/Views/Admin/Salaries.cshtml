@@ -220,9 +220,18 @@
                             <td>
                                 @if (u.Status == 3)
                                 {
-                                    <span style="font-size:12px;color:#059669">
-                                        <i class="bi bi-check-circle-fill me-1"></i>تم الصرف
-                                    </span>
+                                    <div>
+                                        <div style="font-size:12px;color:#059669;font-weight:600">
+                                            <i class="bi bi-check-circle-fill me-1"></i>تم الصرف
+                                        </div>
+
+                                        @if (!string.IsNullOrWhiteSpace(u.PaidAgoText))
+                                        {
+                                            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+                                                @u.PaidAgoText
+                                            </div>
+                                        }
+                                    </div>
                                 }
                                 else
                                 {
