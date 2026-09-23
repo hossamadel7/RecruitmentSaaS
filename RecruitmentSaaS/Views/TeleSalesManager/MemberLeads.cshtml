@@ -49,6 +49,7 @@
                             <th>الحملة</th>
                             <th>الحالة</th>
                             <th>التاريخ</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -68,6 +69,12 @@
                                     </span>
                                 </td>
                                 <td style="font-size:.78rem;color:var(--text-muted);">@lead.CreatedAt.ToString("dd/MM/yyyy")</td>
+                                <td>
+                                    <button type="button" class="btn btn-ghost btn-sm handoff-btn" title="توليد رابط تحويل واتساب"
+                                            data-lead-id="@lead.Id" data-lead-name="@lead.FullName">
+                                        <i class="bi bi-whatsapp" style="color:#16a34a"></i>
+                                    </button>
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -76,3 +83,5 @@
         }
     </div>
 </div>
+
+@await Html.PartialAsync("_WhatsAppHandoffModal")

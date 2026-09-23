@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
+using RecruitmentSaaS.Hubs;
 using RecruitmentSaaS.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,6 +38,12 @@ builder.Services.AddScoped<RecruitmentSaaS.Services.IVisaParserService,
 
 builder.Services.AddHostedService<RecruitmentSaaS.Services.AppointmentReminderService>();
 
+// WhatsApp Shared Inbox
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IWhatsAppCloudApiService, WhatsAppCloudApiService>();
+builder.Services.AddScoped<IWhatsAppWebhookProcessor, WhatsAppWebhookProcessor>();
+builder.Services.AddScoped<IInboxRealtimeNotifier, InboxRealtimeNotifier>();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -52,6 +59,7 @@ app.UseRouting();
 app.UseAuthentication(); // ← must be before UseAuthorization
 app.UseAuthorization();
 app.MapGet("/health", () => Results.Ok("OK"));
+app.MapHub<InboxHub>("/hubs/inbox");
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
