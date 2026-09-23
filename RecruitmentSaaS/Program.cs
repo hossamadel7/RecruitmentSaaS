@@ -43,6 +43,8 @@ builder.Services.AddSignalR();
 builder.Services.AddScoped<IWhatsAppCloudApiService, WhatsAppCloudApiService>();
 builder.Services.AddScoped<IWhatsAppWebhookProcessor, WhatsAppWebhookProcessor>();
 builder.Services.AddScoped<IInboxRealtimeNotifier, InboxRealtimeNotifier>();
+builder.Services.AddScoped<IMetaCredentialStore, MetaCredentialStore>();
+builder.Services.AddScoped<IMetaAuthService, MetaAuthService>();
 
 var app = builder.Build();
 

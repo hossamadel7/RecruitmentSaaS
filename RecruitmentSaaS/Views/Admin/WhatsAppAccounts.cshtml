@@ -1,9 +1,20 @@
 @using RecruitmentSaaS.Models.Entities
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @model IEnumerable<WhatsAppAccount>
 @{
     ViewData["Title"] = "أرقام الواتساب";
     Layout = "~/Views/Shared/_Layout.cshtml";
     var agents = ViewBag.Agents as IEnumerable<User> ?? Enumerable.Empty<User>();
+
+    var metaAppId = Configuration["WhatsApp:AppId"] ?? "";
+    var metaConfigId = Configuration["WhatsApp:EmbeddedSignupConfigId"] ?? "";
+    var metaApiVersion = Configuration["WhatsApp:ApiVersion"] ?? "v21.0";
+}
+
+@{
+    var whatsappConnected = Context.Request.Query["whatsappConnected"].ToString();
+    var whatsappError = Context.Request.Query["whatsappError"].ToString();
+    var connectDisabled = string.IsNullOrEmpty(metaAppId) || string.IsNullOrEmpty(metaConfigId);
 }
 
 <div class="page-header">
@@ -14,10 +25,37 @@
             <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@Model.Count() رقم متصل بالنظام</p>
         </div>
     </div>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createAccountModal">
-        <i class="bi bi-plus-lg me-1"></i> إضافة رقم واتساب
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#createAccountModal">
+            <i class="bi bi-plus-lg me-1"></i> إضافة يدوياً (Cloud API)
+        </button>
+        @if (connectDisabled)
+        {
+            <button class="btn btn-primary" disabled>
+                <i class="bi bi-whatsapp me-1"></i> Connect WhatsApp
+            </button>
+        }
+        else
+        {
+            <a class="btn btn-primary" href="/api/whatsapp/connect/start">
+                <i class="bi bi-whatsapp me-1"></i> Connect WhatsApp
+            </a>
+        }
+    </div>
 </div>
+
+@if (connectDisabled)
+{
+    <div class="alert alert-warning mb-4">⚠️ WhatsApp:AppId أو WhatsApp:EmbeddedSignupConfigId غير مُعدّة في الإعدادات — زر Connect WhatsApp معطّل حتى يتم ضبطها.</div>
+}
+@if (!string.IsNullOrEmpty(whatsappConnected))
+{
+    <div class="alert alert-success mb-4">✅ @whatsappConnected</div>
+}
+@if (!string.IsNullOrEmpty(whatsappError))
+{
+    <div class="alert alert-danger mb-4">❌ @whatsappError</div>
+}
 
 @if (TempData["Success"] != null)
 {
@@ -46,6 +84,8 @@
                         <th>الرقم الظاهر</th>
                         <th class="d-none-mobile">Phone Number ID</th>
                         <th class="d-none-mobile">WABA ID</th>
+                        <th>وضع الاتصال</th>
+                        <th>الويب هوك</th>
                         <th>المندوب الافتراضي</th>
                         <th>الحالة</th>
                         <th></th>
@@ -55,10 +95,34 @@
                     @foreach (var a in Model)
                     {
                         <tr>
-                            <td style="font-weight:600;">@a.Name</td>
+                            <td style="font-weight:600;">@a.Name @(!string.IsNullOrWhiteSpace(a.VerifiedName) ? $"({a.VerifiedName})" : "")</td>
                             <td dir="ltr" style="font-size:.82rem;">@a.DisplayPhoneNumber</td>
                             <td class="d-none-mobile" style="font-size:.78rem;color:var(--text-muted);" dir="ltr">@a.PhoneNumberId</td>
                             <td class="d-none-mobile" style="font-size:.78rem;color:var(--text-muted);" dir="ltr">@a.WabaId</td>
+                            <td>
+                                @if (a.ConnectionMode == (byte)WhatsAppConnectionMode.Coexistence)
+                                {
+                                    <span style="background:#eef2ff;color:#1B4FD8;border:1px solid #c7d2fe;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">WhatsApp Business App + Cloud API</span>
+                                }
+                                else
+                                {
+                                    <span style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">Cloud API فقط</span>
+                                }
+                            </td>
+                            <td>
+                                @if (a.WebhookSubscriptionStatus == (byte)WebhookSubscriptionStatus.Subscribed)
+                                {
+                                    <span style="color:#16a34a;font-size:.78rem;font-weight:600;"><i class="bi bi-check-circle-fill"></i> مشترك</span>
+                                }
+                                else if (a.WebhookSubscriptionStatus == (byte)WebhookSubscriptionStatus.Failed)
+                                {
+                                    <span style="color:#dc2626;font-size:.78rem;font-weight:600;"><i class="bi bi-exclamation-circle-fill"></i> فشل</span>
+                                }
+                                else
+                                {
+                                    <span style="color:#d97706;font-size:.78rem;font-weight:600;"><i class="bi bi-hourglass-split"></i> قيد الانتظار</span>
+                                }
+                            </td>
                             <td style="font-size:.82rem;">@(a.AssignedSalesAgent?.FullName ?? "—")</td>
                             <td>
                                 @if (a.IsActive)
@@ -188,3 +252,4 @@
         </div>
     </div>
 }
+

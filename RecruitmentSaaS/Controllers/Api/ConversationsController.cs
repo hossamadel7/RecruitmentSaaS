@@ -223,6 +223,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 WhatsAppAccountId = conversation.WhatsAppAccountId,
                 Direction = (byte)MessageDirection.Outgoing,
                 MessageType = (byte)WhatsAppMessageType.Text,
+                MessageSource = (byte)MessageSource.CloudApi,
                 TextBody = dto.Text,
                 SenderUserId = CurrentUserId,
                 Status = (byte)MessageStatus.Queued,

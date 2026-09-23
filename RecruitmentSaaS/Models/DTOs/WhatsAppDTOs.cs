@@ -11,8 +11,14 @@ namespace RecruitmentSaaS.Models.DTOs
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string DisplayPhoneNumber { get; set; } = string.Empty;
+        public string? PhoneNumberId { get; set; }
+        public string? WabaId { get; set; }
+        public byte ConnectionMode { get; set; }
+        public byte WebhookSubscriptionStatus { get; set; }
+        public string? VerifiedName { get; set; }
         public bool IsActive { get; set; }
         public int UnreadCount { get; set; }
+        public DateTime? LastMessageAt { get; set; }
         public Guid? AssignedSalesAgentId { get; set; }
         public string? AssignedSalesAgentName { get; set; }
     }

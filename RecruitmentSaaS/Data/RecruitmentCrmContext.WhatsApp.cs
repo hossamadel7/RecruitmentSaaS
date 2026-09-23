@@ -21,6 +21,8 @@ public partial class RecruitmentCrmContext
 
     public virtual DbSet<ConversationFollowUp> ConversationFollowUps { get; set; } = null!;
 
+    public virtual DbSet<MetaSystemCredential> MetaSystemCredentials { get; set; } = null!;
+
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<WhatsAppAccount>(entity =>
@@ -38,6 +40,9 @@ public partial class RecruitmentCrmContext
             entity.Property(e => e.DisplayPhoneNumber).HasMaxLength(30);
             entity.Property(e => e.PhoneNumberId).HasMaxLength(50);
             entity.Property(e => e.WabaId).HasMaxLength(50);
+            entity.Property(e => e.ConnectionMode).HasDefaultValue((byte)WhatsAppConnectionMode.CloudApi);
+            entity.Property(e => e.WebhookSubscriptionStatus).HasDefaultValue((byte)Models.Entities.WebhookSubscriptionStatus.Pending);
+            entity.Property(e => e.VerifiedName).HasMaxLength(200);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
@@ -129,6 +134,7 @@ public partial class RecruitmentCrmContext
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
             entity.Property(e => e.WhatsAppMessageId).HasMaxLength(100);
             entity.Property(e => e.MessageType).HasDefaultValue((byte)WhatsAppMessageType.Text);
+            entity.Property(e => e.MessageSource).HasDefaultValue((byte)Models.Entities.MessageSource.CloudApi);
             entity.Property(e => e.TextBody).HasMaxLength(4000);
             entity.Property(e => e.MediaId).HasMaxLength(200);
             entity.Property(e => e.MediaUrl).HasMaxLength(1000);
@@ -257,6 +263,19 @@ public partial class RecruitmentCrmContext
                 .HasForeignKey(d => d.CompletedById)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("FK_demorecruitment_WA_FU_CompletedBy");
+        });
+
+        modelBuilder.Entity<MetaSystemCredential>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_demorecruitment_Meta_Cred");
+
+            entity.ToTable("MetaSystemCredentials", "demorecruitment");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.AccessToken).HasMaxLength(2000);
+            entity.Property(e => e.ObtainedAt).HasPrecision(0);
+            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.UpdatedAt).HasPrecision(0);
         });
     }
 }

@@ -2340,6 +2340,8 @@ namespace RecruitmentSaaS.Controllers
                 DisplayPhoneNumber = displayPhoneNumber.Trim(),
                 PhoneNumberId = phoneNumberId.Trim(),
                 WabaId = wabaId.Trim(),
+                ConnectionMode = (byte)WhatsAppConnectionMode.CloudApi,
+                WebhookSubscriptionStatus = (byte)WebhookSubscriptionStatus.Pending,
                 AssignedSalesAgentId = assignedSalesAgentId,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow

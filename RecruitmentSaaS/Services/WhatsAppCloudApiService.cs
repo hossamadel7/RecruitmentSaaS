@@ -36,26 +36,28 @@ namespace RecruitmentSaaS.Services
     public class WhatsAppCloudApiService : IWhatsAppCloudApiService
     {
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IMetaCredentialStore _credentialStore;
         private readonly ILogger<WhatsAppCloudApiService> _logger;
         private readonly string _apiVersion;
-        private readonly string _accessToken;
 
         public WhatsAppCloudApiService(
             IHttpClientFactory httpClientFactory,
+            IMetaCredentialStore credentialStore,
             IConfiguration config,
             ILogger<WhatsAppCloudApiService> logger)
         {
             _httpClientFactory = httpClientFactory;
+            _credentialStore = credentialStore;
             _logger = logger;
             _apiVersion = config["WhatsApp:ApiVersion"] ?? "v21.0";
-            _accessToken = config["WhatsApp:AccessToken"] ?? string.Empty;
         }
 
         public async Task<WhatsAppSendResult> SendTextMessageAsync(string phoneNumberId, string toWaId, string text, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(_accessToken))
+            var accessToken = await _credentialStore.GetCurrentAccessTokenAsync(ct);
+            if (string.IsNullOrWhiteSpace(accessToken))
             {
-                _logger.LogError("WhatsApp:AccessToken is not configured.");
+                _logger.LogError("No WhatsApp access token available (neither Embedded Signup nor WhatsApp:AccessToken configured).");
                 return new WhatsAppSendResult { Success = false, ErrorMessage = "WhatsApp access token is not configured." };
             }
 
@@ -74,7 +76,7 @@ namespace RecruitmentSaaS.Services
             {
                 Content = new StringContent(payload.ToString(Formatting.None), Encoding.UTF8, "application/json")
             };
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
             var http = _httpClientFactory.CreateClient();
 
@@ -107,11 +109,12 @@ namespace RecruitmentSaaS.Services
 
         public async Task<string?> ResolveMediaUrlAsync(string mediaId, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(_accessToken)) return null;
+            var accessToken = await _credentialStore.GetCurrentAccessTokenAsync(ct);
+            if (string.IsNullOrWhiteSpace(accessToken)) return null;
 
             var http = _httpClientFactory.CreateClient();
             using var request = new HttpRequestMessage(HttpMethod.Get, $"https://graph.facebook.com/{_apiVersion}/{mediaId}");
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
             try
             {

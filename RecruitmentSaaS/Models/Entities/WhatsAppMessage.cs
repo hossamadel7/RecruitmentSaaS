@@ -33,6 +33,14 @@ public enum MessageStatus : byte
     Failed = 6
 }
 
+public enum MessageSource : byte
+{
+    CloudApi = 1,
+    WhatsAppBusinessApp = 2,
+    Customer = 3,
+    System = 4
+}
+
 public partial class WhatsAppMessage
 {
     public Guid Id { get; set; }
@@ -47,6 +55,9 @@ public partial class WhatsAppMessage
     public byte Direction { get; set; }
 
     public byte MessageType { get; set; }
+
+    /// <summary>Where this message actually originated — our inbox, the salesperson's WhatsApp Business app, the customer, or a system action.</summary>
+    public byte MessageSource { get; set; }
 
     public string? TextBody { get; set; }
 
