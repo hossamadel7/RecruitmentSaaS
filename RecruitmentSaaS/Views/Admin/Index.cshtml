@@ -86,6 +86,24 @@
     </form>
 </div>
 
+@* ── WhatsApp Today ── *@
+<div class="card mb-4">
+    <div class="card-header">
+        <span class="header-icon" style="background:#dcfce7"><i class="bi bi-whatsapp" style="color:#16a34a"></i></span>
+        واتساب — اليوم
+        <a href="/Inbox/Index" class="btn btn-ghost btn-sm ms-auto">فتح صندوق الوارد</a>
+    </div>
+    <div class="card-body">
+        <div id="wa-dashboard-loading" style="display:flex;gap:12px;flex-wrap:wrap">
+            <div class="skeleton-line" style="width:110px;height:60px;border-radius:10px"></div>
+            <div class="skeleton-line" style="width:110px;height:60px;border-radius:10px"></div>
+            <div class="skeleton-line" style="width:110px;height:60px;border-radius:10px"></div>
+            <div class="skeleton-line" style="width:110px;height:60px;border-radius:10px"></div>
+        </div>
+        <div id="wa-dashboard-body" class="row g-3" style="display:none"></div>
+    </div>
+</div>
+
 @* ── Pending Alerts ── *@
 @if (pendingApprovals + pendingRefunds + pendingCommissions + pendingPayments > 0)
 {
@@ -407,3 +425,55 @@
         }
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        (async function () {
+            try {
+                var res = await fetch('/api/whatsapp/dashboard');
+                if (!res.ok) return;
+                var data = await res.json();
+
+                function statTile(label, value, color) {
+                    return '<div class="col-6 col-md-3">' +
+                        '<div class="stat-card ' + color + '" style="padding:14px">' +
+                        '<div class="stat-value" style="font-size:22px">' + value + '</div>' +
+                        '<div class="stat-label">' + label + '</div>' +
+                        '</div></div>';
+                }
+
+                var html = '' +
+                    statTile('رسائل واردة اليوم', data.today.incomingMessages, 'blue') +
+                    statTile('رسائل صادرة اليوم', data.today.outgoingMessages, 'green') +
+                    statTile('محادثات جديدة', data.today.newConversations, 'blue') +
+                    statTile('غير مقروءة', data.today.unreadConversations, 'red') +
+                    statTile('محادثات مفتوحة', data.today.openConversations, 'amber') +
+                    statTile('مؤهل', data.today.qualifiedCount, 'blue') +
+                    statTile('تم الفوز', data.today.wonCount, 'green') +
+                    statTile('خسارة', data.today.lostCount, 'red') +
+                    statTile('متابعات مستحقة اليوم', data.today.followUpsDueToday, 'amber') +
+                    statTile('روابط تحويل مُولّدة اليوم', data.today.handoffsGenerated, 'blue') +
+                    statTile('تحويلات ناجحة اليوم', data.today.handoffsConnected, 'green') +
+                    (data.avgFirstResponseMinutes != null
+                        ? statTile('متوسط أول رد (دقيقة)', Math.round(data.avgFirstResponseMinutes), 'blue')
+                        : '');
+
+                if (data.perAccount && data.perAccount.length) {
+                    html += '<div class="col-12"><table class="table table-sm mt-2"><thead><tr>' +
+                        '<th>الرقم</th><th>المندوب</th><th>رسائل واردة اليوم</th><th>مفتوحة</th><th>غير مقروءة</th><th>فوز</th>' +
+                        '</tr></thead><tbody>' +
+                        data.perAccount.map(function (a) {
+                            return '<tr><td style="font-weight:600">' + a.name + '</td><td>' + (a.assignedAgentName || '—') + '</td>' +
+                                '<td>' + a.incomingMessagesToday + '</td><td>' + a.openConversations + '</td>' +
+                                '<td>' + a.unreadConversations + '</td><td>' + a.wonCount + '</td></tr>';
+                        }).join('') + '</tbody></table></div>';
+                }
+
+                document.getElementById('wa-dashboard-loading').style.display = 'none';
+                var body = document.getElementById('wa-dashboard-body');
+                body.innerHTML = html;
+                body.style.display = 'flex';
+            } catch (e) { /* dashboard is a nice-to-have; fail quietly */ }
+        })();
+    </script>
+}

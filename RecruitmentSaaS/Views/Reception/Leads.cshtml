@@ -66,6 +66,10 @@
                                    style="font-size:12px;font-weight:600;color:var(--primary);text-decoration:none;padding:5px 12px;border:1px solid var(--primary);border-radius:6px">
                                     <i class="bi bi-eye"></i>
                                 </a>
+                                <button type="button" class="btn btn-ghost btn-sm handoff-btn" title="توليد رابط تحويل واتساب"
+                                        data-lead-id="@lead.Id" data-lead-name="@lead.FullName">
+                                    <i class="bi bi-whatsapp" style="color:#16a34a"></i>
+                                </button>
                             </td>
                         </tr>
                     }
@@ -91,3 +95,5 @@
         }
     }
 </div>
+
+@await Html.PartialAsync("_WhatsAppHandoffModal")

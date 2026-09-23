@@ -1,0 +1,103 @@
+@{
+    Layout = "_Layout";
+    var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    var currentUserName = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+    var currentRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/inbox.css" />
+}
+
+<div class="inbox-app" id="inbox-app">
+    <div class="inbox-columns" id="inbox-columns">
+
+        <!-- ══════════ SCREEN 1 (mobile) / COLUMN 1 (desktop) — Accounts + Conversations ══════════ -->
+        <aside class="inbox-col inbox-col-list" id="col-list">
+            <div class="inbox-account-tabs" id="account-tabs">
+                <div class="skeleton-line" style="width:60px;height:26px;border-radius:20px"></div>
+                <div class="skeleton-line" style="width:80px;height:26px;border-radius:20px"></div>
+                <div class="skeleton-line" style="width:80px;height:26px;border-radius:20px"></div>
+            </div>
+
+            <div class="inbox-toolbar">
+                <div class="inbox-search-box">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="conv-search" placeholder="بحث بالاسم أو الهاتف أو كود العميل..." />
+                </div>
+                <div class="inbox-filter-row" id="filter-row">
+                    <button class="inbox-filter-chip active" data-filter="all">الكل</button>
+                    <button class="inbox-filter-chip" data-filter="unread">غير مقروء</button>
+                    <button class="inbox-filter-chip" data-filter="me">مخصص لي</button>
+                    <button class="inbox-filter-chip" data-filter="unassigned">غير مخصص</button>
+                    <button class="inbox-filter-chip" data-filter="open">مفتوح</button>
+                    <button class="inbox-filter-chip" data-filter="followup">متابعة</button>
+                    <button class="inbox-filter-chip" data-filter="closed">مغلق</button>
+                </div>
+            </div>
+
+            <div class="conversation-list" id="conversation-list">
+                <div class="skeleton-row"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:60%"></div><div class="skeleton-line" style="width:85%"></div></div></div>
+                <div class="skeleton-row"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:50%"></div><div class="skeleton-line" style="width:70%"></div></div></div>
+                <div class="skeleton-row"><div class="skeleton-circle"></div><div style="flex:1"><div class="skeleton-line" style="width:65%"></div><div class="skeleton-line" style="width:40%"></div></div></div>
+            </div>
+        </aside>
+
+        <!-- ══════════ SCREEN 2 (mobile) / COLUMN 2 (desktop) — Chat ══════════ -->
+        <section class="inbox-col inbox-col-chat" id="col-chat">
+            <div class="inbox-empty-state" id="chat-empty-state">
+                <i class="bi bi-whatsapp"></i>
+                <div>اختر محادثة لعرضها هنا</div>
+            </div>
+
+            <div id="chat-active" style="display:none;flex-direction:column;flex:1;min-height:0">
+                <div class="chat-header" id="chat-header" onclick="Inbox.showScreen('customer')">
+                    <button class="mobile-back-btn" onclick="event.stopPropagation();Inbox.showScreen('list')"><i class="bi bi-chevron-right"></i></button>
+                    <div class="conv-avatar" id="chat-avatar">؟</div>
+                    <div style="flex:1;min-width:0">
+                        <div class="chat-header-name" id="chat-header-name">—</div>
+                        <div class="chat-header-sub" id="chat-header-sub">—</div>
+                    </div>
+                    <span class="conv-account-pill" id="chat-header-account">—</span>
+                </div>
+
+                <div class="chat-messages" id="chat-messages"></div>
+
+                <div class="chat-composer">
+                    <textarea id="composer-input" rows="1" placeholder="اكتب رسالة... (Enter للإرسال، Shift+Enter لسطر جديد)"></textarea>
+                    <button class="composer-send-btn" id="composer-send-btn" title="إرسال">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ══════════ SCREEN 3 (mobile) / COLUMN 3 (desktop) — Customer / Lead panel ══════════ -->
+        <aside class="inbox-col inbox-col-customer" id="col-customer">
+            <div class="chat-header">
+                <button class="mobile-back-btn" onclick="Inbox.showScreen('chat')"><i class="bi bi-chevron-right"></i></button>
+                <div style="font-weight:700;font-size:13.5px">بيانات العميل</div>
+            </div>
+            <div class="customer-panel-body" id="customer-panel-body">
+                <div class="inbox-empty-state"><i class="bi bi-person-lines-fill"></i><div>اختر محادثة أولاً</div></div>
+            </div>
+        </aside>
+
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+    <script>
+        window.__INBOX_USER__ = {
+            id: @Html.Raw(Json.Serialize(currentUserId)),
+            name: @Html.Raw(Json.Serialize(currentUserName)),
+            role: @Html.Raw(Json.Serialize(currentRole)),
+            isOrgWide: @Html.Raw((currentRole == "1" || currentRole == "7") ? "true" : "false"),
+            canAssign: @Html.Raw((currentRole == "1" || currentRole == "7") ? "true" : "false")
+        };
+        // Let the inbox use the full page body instead of the default padded layout.
+        document.querySelector('.page-body')?.classList.add('inbox-page-body');
+    </script>
+    <script src="~/js/inbox.js"></script>
+}

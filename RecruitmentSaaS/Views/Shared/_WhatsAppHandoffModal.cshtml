@@ -1,0 +1,107 @@
+@* Shared "Generate WhatsApp Handoff" modal. Include once per page, then add buttons anywhere
+   with class="handoff-btn" data-lead-id="..." data-lead-name="..." — no extra wiring needed. *@
+<div class="modal fade" id="handoffModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تحويل واتساب <span id="handoffLeadName" style="color:var(--text-muted);font-weight:400;font-size:.85rem"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="handoffStep1">
+                    <label class="form-label">اختر رقم الواتساب</label>
+                    <select id="handoffAccountSelect" class="form-select mb-3"></select>
+                    <button type="button" class="btn btn-primary w-100" onclick="WhatsAppHandoff.generate()">
+                        <i class="bi bi-link-45deg me-1"></i> توليد الرابط
+                    </button>
+                </div>
+                <div id="handoffStep2" style="display:none">
+                    <div class="alert alert-success" style="font-size:.85rem">
+                        تم توليد الرابط — انسخه وأرسله للعميل عبر Messenger. سيتم ربط المحادثة تلقائياً بمجرد وصول رسالة العميل عبر واتساب.
+                    </div>
+                    <label class="form-label">كود المرجع</label>
+                    <input id="handoffRefCode" class="form-control mb-3" dir="ltr" readonly />
+                    <label class="form-label">رابط واتساب</label>
+                    <div class="input-group mb-2">
+                        <input id="handoffUrl" class="form-control" dir="ltr" readonly />
+                        <button class="btn btn-outline-secondary" type="button" onclick="WhatsAppHandoff.copy()">نسخ</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var WhatsAppHandoff = (function () {
+        var currentLeadId = null;
+        var modal = null;
+
+        async function open(leadId, leadName) {
+            currentLeadId = leadId;
+            document.getElementById('handoffLeadName').textContent = leadName ? '— ' + leadName : '';
+            document.getElementById('handoffStep1').style.display = 'block';
+            document.getElementById('handoffStep2').style.display = 'none';
+
+            var select = document.getElementById('handoffAccountSelect');
+            select.innerHTML = '<option>...تحميل</option>';
+
+            if (!modal) modal = new bootstrap.Modal(document.getElementById('handoffModal'));
+            modal.show();
+
+            try {
+                var res = await fetch('/api/whatsapp/accounts');
+                var accounts = await res.json();
+                select.innerHTML = accounts.filter(function (a) { return a.isActive; })
+                    .map(function (a) { return '<option value="' + a.id + '">' + a.name + (a.assignedSalesAgentName ? ' — ' + a.assignedSalesAgentName : '') + '</option>'; })
+                    .join('');
+                if (!accounts.length) select.innerHTML = '<option value="">لا توجد أرقام واتساب مفعّلة</option>';
+            } catch (e) {
+                select.innerHTML = '<option value="">تعذر تحميل الأرقام</option>';
+            }
+        }
+
+        async function generate() {
+            var accountId = document.getElementById('handoffAccountSelect').value;
+            if (!accountId) { alert('اختر رقم واتساب أولاً'); return; }
+
+            try {
+                var res = await fetch('/api/leads/' + currentLeadId + '/handoff', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ leadId: currentLeadId, whatsAppAccountId: accountId })
+                });
+                if (!res.ok) {
+                    var err = await res.json().catch(function () { return {}; });
+                    alert('تعذر توليد الرابط' + (err.error ? ': ' + err.error : ''));
+                    return;
+                }
+                var handoff = await res.json();
+                document.getElementById('handoffRefCode').value = handoff.referenceCode;
+                document.getElementById('handoffUrl').value = handoff.generatedWhatsAppUrl;
+                document.getElementById('handoffStep1').style.display = 'none';
+                document.getElementById('handoffStep2').style.display = 'block';
+            } catch (e) {
+                alert('تعذر توليد الرابط');
+            }
+        }
+
+        function copy() {
+            var input = document.getElementById('handoffUrl');
+            input.select();
+            navigator.clipboard?.writeText(input.value);
+        }
+
+        return { open: open, generate: generate, copy: copy };
+    })();
+
+    // Event delegation — works regardless of when/where .handoff-btn elements are added to the page.
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.handoff-btn');
+        if (!btn) return;
+        WhatsAppHandoff.open(btn.dataset.leadId, btn.dataset.leadName);
+    });
+</script>

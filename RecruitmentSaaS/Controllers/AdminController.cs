@@ -2296,6 +2296,114 @@ namespace RecruitmentSaaS.Controllers
 
             return File(memoryStream.ToArray(), "application/zip", zipName);
         }
+
+        // ── GET /Admin/WhatsAppAccounts ──────────────────────────────────────
+        public async Task<IActionResult> WhatsAppAccounts()
+        {
+            var accounts = await _context.WhatsAppAccounts
+                .Include(a => a.AssignedSalesAgent)
+                .OrderBy(a => a.Name)
+                .ToListAsync();
+
+            ViewBag.Agents = await _context.Users
+                .Where(u => u.IsActive && (u.Role == 6 || u.Role == 3))
+                .OrderBy(u => u.FullName)
+                .ToListAsync();
+
+            return View(accounts);
+        }
+
+        // ── POST /Admin/CreateWhatsAppAccount ────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateWhatsAppAccount(
+            string name, string displayPhoneNumber, string phoneNumberId, string wabaId, Guid? assignedSalesAgentId)
+        {
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(displayPhoneNumber) ||
+                string.IsNullOrWhiteSpace(phoneNumberId) || string.IsNullOrWhiteSpace(wabaId))
+            {
+                TempData["Error"] = "كل الحقول مطلوبة";
+                return RedirectToAction("WhatsAppAccounts");
+            }
+
+            var exists = await _context.WhatsAppAccounts.AnyAsync(a => a.PhoneNumberId == phoneNumberId);
+            if (exists)
+            {
+                TempData["Error"] = "يوجد رقم واتساب مسجل بنفس Phone Number ID بالفعل";
+                return RedirectToAction("WhatsAppAccounts");
+            }
+
+            _context.WhatsAppAccounts.Add(new WhatsAppAccount
+            {
+                Id = Guid.NewGuid(),
+                Name = name.Trim(),
+                DisplayPhoneNumber = displayPhoneNumber.Trim(),
+                PhoneNumberId = phoneNumberId.Trim(),
+                WabaId = wabaId.Trim(),
+                AssignedSalesAgentId = assignedSalesAgentId,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"تم إضافة رقم واتساب \"{name}\" بنجاح";
+            return RedirectToAction("WhatsAppAccounts");
+        }
+
+        // ── POST /Admin/EditWhatsAppAccount ──────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditWhatsAppAccount(
+            Guid accountId, string name, string displayPhoneNumber, string phoneNumberId, string wabaId, Guid? assignedSalesAgentId)
+        {
+            var account = await _context.WhatsAppAccounts.FindAsync(accountId);
+            if (account == null)
+            {
+                TempData["Error"] = "رقم الواتساب غير موجود";
+                return RedirectToAction("WhatsAppAccounts");
+            }
+
+            var duplicatePhoneNumberId = await _context.WhatsAppAccounts
+                .AnyAsync(a => a.Id != accountId && a.PhoneNumberId == phoneNumberId);
+            if (duplicatePhoneNumberId)
+            {
+                TempData["Error"] = "يوجد رقم واتساب آخر بنفس Phone Number ID";
+                return RedirectToAction("WhatsAppAccounts");
+            }
+
+            account.Name = name.Trim();
+            account.DisplayPhoneNumber = displayPhoneNumber.Trim();
+            account.PhoneNumberId = phoneNumberId.Trim();
+            account.WabaId = wabaId.Trim();
+            account.AssignedSalesAgentId = assignedSalesAgentId;
+            account.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "تم تحديث بيانات رقم الواتساب";
+            return RedirectToAction("WhatsAppAccounts");
+        }
+
+        // ── POST /Admin/ToggleWhatsAppAccount ────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleWhatsAppAccount(Guid accountId)
+        {
+            var account = await _context.WhatsAppAccounts.FindAsync(accountId);
+            if (account == null)
+            {
+                TempData["Error"] = "رقم الواتساب غير موجود";
+                return RedirectToAction("WhatsAppAccounts");
+            }
+
+            account.IsActive = !account.IsActive;
+            account.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = account.IsActive ? "تم تفعيل الرقم" : "تم إيقاف الرقم";
+            return RedirectToAction("WhatsAppAccounts");
+        }
     }
 
     public class CommissionTierDto

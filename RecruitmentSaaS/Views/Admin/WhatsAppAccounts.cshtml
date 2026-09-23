@@ -1,0 +1,190 @@
+@using RecruitmentSaaS.Models.Entities
+@model IEnumerable<WhatsAppAccount>
+@{
+    ViewData["Title"] = "أرقام الواتساب";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var agents = ViewBag.Agents as IEnumerable<User> ?? Enumerable.Empty<User>();
+}
+
+<div class="page-header">
+    <div class="page-header-left">
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);"><i class="bi bi-whatsapp" style="color:#16a34a"></i></div>
+        <div>
+            <h1 class="page-title">أرقام الواتساب</h1>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@Model.Count() رقم متصل بالنظام</p>
+        </div>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createAccountModal">
+        <i class="bi bi-plus-lg me-1"></i> إضافة رقم واتساب
+    </button>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success mb-4" data-auto-dismiss="4000">✅ @TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger mb-4" data-auto-dismiss="4000">❌ @TempData["Error"]</div>
+}
+
+<div class="card">
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="empty-state" style="padding:48px;">
+                <div class="empty-state-icon"><i class="bi bi-whatsapp"></i></div>
+                <div class="empty-state-title">لا توجد أرقام واتساب مسجلة بعد</div>
+            </div>
+        }
+        else
+        {
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th>الرقم الظاهر</th>
+                        <th class="d-none-mobile">Phone Number ID</th>
+                        <th class="d-none-mobile">WABA ID</th>
+                        <th>المندوب الافتراضي</th>
+                        <th>الحالة</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in Model)
+                    {
+                        <tr>
+                            <td style="font-weight:600;">@a.Name</td>
+                            <td dir="ltr" style="font-size:.82rem;">@a.DisplayPhoneNumber</td>
+                            <td class="d-none-mobile" style="font-size:.78rem;color:var(--text-muted);" dir="ltr">@a.PhoneNumberId</td>
+                            <td class="d-none-mobile" style="font-size:.78rem;color:var(--text-muted);" dir="ltr">@a.WabaId</td>
+                            <td style="font-size:.82rem;">@(a.AssignedSalesAgent?.FullName ?? "—")</td>
+                            <td>
+                                @if (a.IsActive)
+                                {
+                                    <span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">نشط</span>
+                                }
+                                else
+                                {
+                                    <span style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">متوقف</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <button class="btn btn-ghost btn-sm" data-bs-toggle="modal" data-bs-target="#editAccountModal_@a.Id">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <form method="post" action="/Admin/ToggleWhatsAppAccount" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="accountId" value="@a.Id" />
+                                    <button type="submit" class="btn btn-ghost btn-sm" title="@(a.IsActive ? "إيقاف" : "تفعيل")">
+                                        <i class="bi @(a.IsActive ? "bi-toggle-on" : "bi-toggle-off")"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@* ── CREATE MODAL ───────────────────────────────────────────────────── *@
+<div class="modal fade" id="createAccountModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">رقم واتساب جديد</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="/Admin/CreateWhatsAppAccount">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">اسم الرقم <span class="text-danger">*</span></label>
+                        <input name="name" class="form-control" required placeholder="مثال: Sales #1" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">الرقم الظاهر (بصيغة دولية) <span class="text-danger">*</span></label>
+                        <input name="displayPhoneNumber" class="form-control" dir="ltr" required placeholder="+2010XXXXXXXX" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Meta Phone Number ID <span class="text-danger">*</span></label>
+                        <input name="phoneNumberId" class="form-control" dir="ltr" required placeholder="1234567890" />
+                        <div class="form-text">من WhatsApp Manager → Phone numbers. هذا هو المعرّف المستخدم لتوجيه الرسائل الواردة لهذا الرقم.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">WABA ID <span class="text-danger">*</span></label>
+                        <input name="wabaId" class="form-control" dir="ltr" required placeholder="1234567890" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">المندوب الافتراضي <span style="color:var(--text-muted);font-weight:400;">(اختياري)</span></label>
+                        <select name="assignedSalesAgentId" class="form-select">
+                            <option value="">— بدون تعيين —</option>
+                            @foreach (var agent in agents)
+                            {
+                                <option value="@agent.Id">@agent.FullName</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">إضافة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* ── EDIT MODALS (one per account) ─────────────────────────────────── *@
+@foreach (var a in Model)
+{
+    <div class="modal fade" id="editAccountModal_@a.Id" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">تعديل @a.Name</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="/Admin/EditWhatsAppAccount">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="accountId" value="@a.Id" />
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">اسم الرقم</label>
+                            <input name="name" class="form-control" required value="@a.Name" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">الرقم الظاهر</label>
+                            <input name="displayPhoneNumber" class="form-control" dir="ltr" required value="@a.DisplayPhoneNumber" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Meta Phone Number ID</label>
+                            <input name="phoneNumberId" class="form-control" dir="ltr" required value="@a.PhoneNumberId" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">WABA ID</label>
+                            <input name="wabaId" class="form-control" dir="ltr" required value="@a.WabaId" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">المندوب الافتراضي</label>
+                            <select name="assignedSalesAgentId" class="form-select">
+                                <option value="">— بدون تعيين —</option>
+                                @foreach (var agent in agents)
+                                {
+                                    <option value="@agent.Id" selected="@(agent.Id == a.AssignedSalesAgentId ? "selected" : null)">@agent.FullName</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">حفظ</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
