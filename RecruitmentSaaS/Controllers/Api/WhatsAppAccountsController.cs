@@ -30,10 +30,11 @@ namespace RecruitmentSaaS.Controllers.Api
         public async Task<IActionResult> List()
         {
             var isOrgWide = WhatsAppAuthorization.IsOrgWide(CurrentRole);
+            var isAdmin = WhatsAppAuthorization.IsAdmin(CurrentRole);
             var userId = CurrentUserId;
 
             var accountsQuery = _context.WhatsAppAccounts.AsNoTracking();
-            if (!WhatsAppAuthorization.IsAdmin(CurrentRole))
+            if (!isAdmin)
                 accountsQuery = accountsQuery.Where(a => a.IsActive);
 
             var accounts = await accountsQuery
@@ -43,9 +44,17 @@ namespace RecruitmentSaaS.Controllers.Api
                     Id = a.Id,
                     Name = a.Name,
                     DisplayPhoneNumber = a.DisplayPhoneNumber,
+                    PhoneNumberId = isAdmin ? a.PhoneNumberId : null,
+                    WabaId = isAdmin ? a.WabaId : null,
+                    ConnectionMode = a.ConnectionMode,
+                    WebhookSubscriptionStatus = a.WebhookSubscriptionStatus,
+                    VerifiedName = a.VerifiedName,
                     IsActive = a.IsActive,
                     AssignedSalesAgentId = a.AssignedSalesAgentId,
                     AssignedSalesAgentName = a.AssignedSalesAgent != null ? a.AssignedSalesAgent.FullName : null,
+                    LastMessageAt = _context.WhatsAppConversations
+                        .Where(c => c.WhatsAppAccountId == a.Id)
+                        .Max(c => (DateTime?)c.LastMessageAt),
                     UnreadCount = _context.WhatsAppConversations.Count(c =>
                         c.WhatsAppAccountId == a.Id &&
                         c.UnreadCount > 0 &&

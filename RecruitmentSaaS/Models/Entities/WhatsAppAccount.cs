@@ -3,6 +3,19 @@ using System.Collections.Generic;
 
 namespace RecruitmentSaaS.Models.Entities;
 
+public enum WhatsAppConnectionMode : byte
+{
+    CloudApi = 1,
+    Coexistence = 2
+}
+
+public enum WebhookSubscriptionStatus : byte
+{
+    Pending = 1,
+    Subscribed = 2,
+    Failed = 3
+}
+
 public partial class WhatsAppAccount
 {
     public Guid Id { get; set; }
@@ -15,6 +28,13 @@ public partial class WhatsAppAccount
     public string PhoneNumberId { get; set; } = null!;
 
     public string WabaId { get; set; } = null!;
+
+    public byte ConnectionMode { get; set; }
+
+    public byte WebhookSubscriptionStatus { get; set; }
+
+    /// <summary>Business name Meta has verified for this number, when available.</summary>
+    public string? VerifiedName { get; set; }
 
     public Guid? AssignedSalesAgentId { get; set; }
 
