@@ -1,0 +1,28 @@
+@model bool
+@{
+    var en = Model;
+    var logoPath = "/uploads/images/logo fahd.png";
+    var q = en ? "?lang=en" : "";
+}
+<footer class="footer">
+    <a href="/" class="footer-brand">
+        <div class="nav-logo" style="width:34px;height:34px">
+            <img src="@logoPath" alt="Al Fahd Al Arabi" style="padding:4px;object-fit:contain;width:100%;height:100%" />
+        </div>
+        <span class="footer-brand-name">@(en ? "Al Fahd Al Arabi International Recruitment" : "الفهد العربي للتوظيف الدولي")</span>
+    </a>
+    <div class="footer-links">
+        <a href="/">@(en ? "Home" : "الرئيسية")</a>
+        <a href="/Home/Privacy@(q)">@(en ? "Privacy Policy" : "سياسة الخصوصية")</a>
+        <a href="/Home/Terms@(q)">@(en ? "Terms & Conditions" : "الشروط والأحكام")</a>
+    </div>
+    <span class="footer-copy">
+        <span lang="ar" dir="rtl">الاسم القانوني: الفهد العربي لإلحاق العمالة المصرية للعمل بالخارج — ترخيص رقم ٤٩٢</span>
+        <br />
+        <span lang="ar" dir="rtl">١٠٣ مكرر الهرم، الجيزة، جمهورية مصر العربية</span>
+        <br />
+        <span lang="en" dir="ltr">103 bis El Haram, Giza, Egypt</span>
+        <br />
+        © @DateTime.Now.Year @(en ? "All rights reserved" : "جميع الحقوق محفوظة")
+    </span>
+</footer>

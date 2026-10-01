@@ -1,0 +1,220 @@
+@{
+    Layout = null;
+    var logoPath = "/uploads/images/logo fahd.png";
+    var en = string.Equals(Context.Request.Query["lang"], "en", StringComparison.OrdinalIgnoreCase);
+    ViewData["Title"] = en ? "Terms & Conditions — Al Fahd Al Arabi" : "الشروط والأحكام — الفهد العربي";
+    const string LegalNameAr = "الفهد العربي لإلحاق العمالة المصرية للعمل بالخارج";
+}
+<!DOCTYPE html>
+<html lang="@(en ? "en" : "ar")" dir="@(en ? "ltr" : "rtl")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <meta name="description" content="@(en ? $"Terms and Conditions of {LegalNameAr} (Al Fahd Al Arabi)" : $"الشروط والأحكام الخاصة بشركة {LegalNameAr}")" />
+    <link rel="alternate" hreflang="ar" href="/Home/Terms" />
+    <link rel="alternate" hreflang="en" href="/Home/Terms?lang=en" />
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/@(en ? "bootstrap.min.css" : "bootstrap.rtl.min.css")" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="~/css/home.css" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="~/favicon.png" />
+    <partial name="_LegalStyles" />
+</head>
+<body class="legal-page">
+
+    <div class="legal-nav">
+        <nav class="navbar scrolled">
+            <a href="/" class="nav-brand">
+                <div class="nav-logo">
+                    <img src="@logoPath" alt="Al Fahd Al Arabi" style="padding:5px;object-fit:contain;width:100%;height:100%" />
+                </div>
+                <div class="nav-name">
+                    @(en ? "Al Fahd Al Arabi" : "الفهد العربي")
+                    <small>@(en ? "International Recruitment · License No. 492" : "للتوظيف الدولي · ترخيص رقم ٤٩٢")</small>
+                </div>
+            </a>
+            <div class="nav-right">
+                <a href="@(en ? "/Home/Terms" : "/Home/Terms?lang=en")" class="nav-staff lang-switch">
+                    <i class="bi bi-translate"></i> @(en ? "العربية" : "English")
+                </a>
+                <a href="/" class="nav-staff">
+                    <i class="bi @(en ? "bi-arrow-left" : "bi-arrow-right")"></i> @(en ? "Home" : "الرئيسية")
+                </a>
+            </div>
+        </nav>
+    </div>
+
+    <section class="legal-hero">
+        <h1>@(en ? "Terms & Conditions" : "الشروط والأحكام")</h1>
+        <p>
+            @(en ? "Legal name:" : "الاسم القانوني:") <span lang="ar" dir="rtl">@LegalNameAr</span>
+            — @(en ? "Ministry of Manpower License No. 492" : "ترخيص وزارة القوى العاملة رقم ٤٩٢")
+        </p>
+    </section>
+
+    <div class="legal-body">
+        @if (en)
+        {
+            <p class="legal-updated">Last updated: 30/09/2026</p>
+
+            <h2>1. Introduction and acceptance</h2>
+            <p>
+                This website is operated by <span lang="ar" dir="rtl">"@LegalNameAr"</span> (Al Fahd Al Arabi for the Placement of Egyptian Workers Abroad),
+                a limited liability company licensed by the Egyptian Ministry of Manpower under License No. 492, with its head office at
+                103 bis El Haram, Giza, Egypt.
+                By using this website or registering for our services, you agree to be bound by these Terms and Conditions.
+            </p>
+
+            <h2>2. Nature of the service</h2>
+            <p>
+                The Company provides services for placing Egyptian workers in employment opportunities with employers abroad, including: initial registration,
+                matching applicants with available opportunities, and administrative follow-up of contract, travel and visa procedures in coordination with the competent official authorities.
+                All job opportunities shown on the website are indicative and subject to actual availability and the approval of the employer abroad.
+            </p>
+
+            <h2>3. Registration and accuracy of information</h2>
+            <ul>
+                <li>The information submitted through the registration form (name, phone number, employment details) must be accurate and up to date.</li>
+                <li>The Company may contact you by phone, WhatsApp or any other contact method you provided in order to follow up on your application.</li>
+                <li>The Company reserves the right to reject or suspend any registration found to contain inaccurate information or that does not meet the requirements of the requested position.</li>
+            </ul>
+
+            <h2>4. Applicant obligations</h2>
+            <ul>
+                <li>Provide valid and accurate documents (passport, qualifications, certificates) when requested.</li>
+                <li>Attend scheduled appointments for medical examinations, interviews and travel.</li>
+                <li>Disclose any travel or employment restrictions that may affect the completion of the procedures.</li>
+                <li>Comply with the terms of the employment contract signed with the employer abroad after the placement procedures are completed.</li>
+            </ul>
+
+            <h2>5. Fees and charges</h2>
+            <p>
+                Any fees or administrative costs related to placement procedures (such as medical examinations or issuing official documents) are explained to the applicant
+                in writing before being collected, and no amount is collected without the applicant's knowledge and consent. These charges are subject to the regulations of the
+                Egyptian Ministry of Manpower governing licensed agencies for the placement of workers abroad.
+            </p>
+
+            <h2>6. Cancellation</h2>
+            <p>
+                Applicants may withdraw their registration at any time before signing an employment contract by contacting the branch where they registered.
+                Cancellation and refund terms for any amounts paid are set out in a separate receipt or written agreement handed to the applicant upon payment.
+            </p>
+
+            <h2>7. Limitation of liability</h2>
+            <p>
+                The Company makes every effort to match applicants with suitable job opportunities; however, the final hiring decision rests with the employer abroad.
+                The Company is not responsible for any delay or rejection resulting from decisions of external parties (employers, embassies, the Passports Authority) beyond its control.
+            </p>
+
+            <h2>8. Intellectual property</h2>
+            <p>All content on this website (text, logo, design) is owned by Al Fahd Al Arabi and may not be copied or republished without prior written permission.</p>
+
+            <h2>9. Communication via WhatsApp</h2>
+            <p>
+                When you contact us via WhatsApp Business, you agree to receive messages related to the status of your application and available job opportunities.
+                You can ask us to stop these messages at any time by replying directly to the message.
+            </p>
+
+            <h2>10. Governing law</h2>
+            <p>
+                These terms are governed by and construed in accordance with the laws of the Arab Republic of Egypt, and the courts of Giza Governorate shall have jurisdiction
+                over any dispute arising from them, without prejudice to any other mandatory jurisdiction imposed by the laws regulating agencies for the placement of workers abroad.
+            </p>
+
+            <h2>11. Changes to these terms</h2>
+            <p>The Company reserves the right to amend these terms at any time. Amendments take effect from the date they are published on this page.</p>
+
+            <h2>12. Contact us</h2>
+            <p>
+                <strong lang="ar" dir="rtl">@LegalNameAr</strong><br />
+                103 bis El Haram, Giza, Egypt<br />
+                Via the <a href="/#register" style="color:var(--gold)">registration form on our website</a> or by visiting one of our branches.
+            </p>
+        }
+        else
+        {
+            <p class="legal-updated">آخر تحديث: 30/09/2026</p>
+
+            <h2>١. مقدمة وقبول الشروط</h2>
+            <p>
+                يُشغَّل هذا الموقع الإلكتروني من قِبل شركة "@LegalNameAr"، شركة ذات مسئولية محدودة مرخصة
+                من وزارة القوى العاملة المصرية بموجب الترخيص رقم ٤٩٢، ومقرها الرئيسي ١٠٣ مكرر الهرم، الجيزة، جمهورية مصر العربية. باستخدامك لهذا الموقع أو تسجيلك لطلب خدماتنا، فإنك توافق على الالتزام
+                بهذه الشروط والأحكام.
+            </p>
+
+            <h2>٢. طبيعة الخدمة</h2>
+            <p>
+                تقدّم الشركة خدمات إلحاق العمالة المصرية بفرص عمل لدى جهات توظيف بالخارج، وتشمل: التسجيل الأولي، مطابقة المتقدمين
+                بفرص العمل المتاحة، المتابعة الإدارية لإجراءات العقد والسفر والتأشيرة بالتنسيق مع الجهات الرسمية المختصة.
+                جميع فرص العمل المعروضة على الموقع استرشادية وتخضع لتوفرها الفعلي وموافقة جهة العمل بالخارج.
+            </p>
+
+            <h2>٣. التسجيل وصحة البيانات</h2>
+            <ul>
+                <li>يجب أن تكون البيانات المقدَّمة عبر نموذج التسجيل (الاسم، رقم الهاتف، البيانات الوظيفية) صحيحة ومحدّثة.</li>
+                <li>تحتفظ الشركة بحق التواصل معك هاتفياً أو عبر واتساب أو أي وسيلة تواصل أخرى قدّمتها لمتابعة طلبك.</li>
+                <li>تحتفظ الشركة بحق رفض أو إيقاف أي طلب تسجيل يتضح عدم صحة بياناته أو عدم استيفائه لشروط الوظيفة المطلوبة.</li>
+            </ul>
+
+            <h2>٤. التزامات المتقدّم للتوظيف</h2>
+            <ul>
+                <li>تقديم مستندات صحيحة وسارية (جواز السفر، المؤهلات، الشهادات) عند طلبها.</li>
+                <li>الالتزام بالمواعيد المحدّدة لإجراءات الفحص الطبي والمقابلات والسفر.</li>
+                <li>الإفصاح عن أي موانع سفر أو عمل قد تؤثر على استكمال الإجراءات.</li>
+                <li>الالتزام بشروط عقد العمل الموقّع مع جهة العمل بالخارج بعد إتمام إجراءات الإلحاق.</li>
+            </ul>
+
+            <h2>٥. المصروفات والرسوم</h2>
+            <p>
+                أي رسوم أو مصروفات إدارية مرتبطة بإجراءات الإلحاق (كالفحص الطبي أو استخراج المستندات الرسمية) يتم توضيحها
+                للمتقدم كتابةً قبل تحصيلها، ولا يتم تحصيل أي مبلغ دون علم المتقدم وموافقته. تخضع هذه المصروفات لضوابط وزارة
+                القوى العاملة المصرية المنظِّمة لعمل مكاتب إلحاق العمالة بالخارج.
+            </p>
+
+            <h2>٦. الإلغاء</h2>
+            <p>
+                يحق للمتقدم طلب سحب تسجيله في أي وقت قبل توقيع عقد العمل، وذلك بالتواصل مع الفرع المسجَّل به. تُحدَّد أحكام
+                الإلغاء والاسترداد المتعلقة بأي مبالغ مدفوعة بموجب إيصال أو اتفاق مكتوب مستقل يُسلَّم للمتقدم عند سداد أي مبلغ.
+            </p>
+
+            <h2>٧. حدود المسؤولية</h2>
+            <p>
+                تبذل الشركة جهدها لمطابقة المتقدمين بفرص عمل مناسبة، إلا أن القرار النهائي بالتعاقد يعود لجهة العمل بالخارج،
+                ولا تتحمل الشركة مسؤولية أي تأخير أو رفض ناتج عن قرارات جهات خارجية (جهة العمل، السفارات، مصلحة الجوازات)
+                خارج عن إرادتها.
+            </p>
+
+            <h2>٨. الملكية الفكرية</h2>
+            <p>
+                جميع محتويات هذا الموقع (النصوص، الشعار، التصميم) مملوكة لشركة الفهد العربي، ولا يجوز نسخها أو إعادة نشرها
+                دون إذن كتابي مسبق.
+            </p>
+
+            <h2>٩. التواصل عبر واتساب</h2>
+            <p>
+                عند تواصلك معنا عبر واتساب للأعمال، فإنك توافق على استقبال رسائل متعلقة بحالة طلبك وفرص العمل المتاحة.
+                يمكنك طلب إيقاف هذه المراسلات في أي وقت بالرد على الرسالة مباشرةً.
+            </p>
+
+            <h2>١٠. القانون الواجب التطبيق</h2>
+            <p>
+                تخضع هذه الشروط وتُفسَّر وفقاً لقوانين جمهورية مصر العربية، وتختص محاكم محافظة الجيزة بالفصل في أي نزاع ينشأ
+                عنها، دون إخلال بأي اختصاص إلزامي آخر تفرضه القوانين المنظِّمة لعمل مكاتب إلحاق العمالة بالخارج.
+            </p>
+
+            <h2>١١. تعديل الشروط</h2>
+            <p>تحتفظ الشركة بحق تعديل هذه الشروط في أي وقت، ويُعمل بالتعديل من تاريخ نشره على هذه الصفحة.</p>
+
+            <h2>١٢. تواصل معنا</h2>
+            <p>
+                <strong>@LegalNameAr</strong><br />
+                ١٠٣ مكرر الهرم، الجيزة<br />
+                من خلال <a href="/#register" style="color:var(--gold)">نموذج التسجيل على الموقع</a> أو زيارة أحد فروعنا.
+            </p>
+        }
+    </div>
+
+    <partial name="_LegalFooter" model="en" />
+</body>
+</html>
