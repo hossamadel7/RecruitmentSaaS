@@ -135,6 +135,12 @@ namespace RecruitmentSaaS.Controllers
         // ── GET /Home/ThankYou ────────────────────────────────────────────
         public IActionResult ThankYou() => View();
 
+        // ── GET /Home/Privacy ────────────────────────────────────────────
+        public IActionResult Privacy() => View();
+
+        // ── GET /Home/Terms ──────────────────────────────────────────────
+        public IActionResult Terms() => View();
+
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error() =>
             View(new RecruitmentSaaS.Models.ErrorViewModel

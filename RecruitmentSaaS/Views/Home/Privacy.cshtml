@@ -1,6 +1,223 @@
-﻿@{
-    ViewData["Title"] = "Privacy Policy";
+@{
+    Layout = null;
+    var logoPath = "/uploads/images/logo fahd.png";
+    var en = string.Equals(Context.Request.Query["lang"], "en", StringComparison.OrdinalIgnoreCase);
+    ViewData["Title"] = en ? "Privacy Policy — Al Fahd Al Arabi" : "سياسة الخصوصية — الفهد العربي";
+    const string LegalNameAr = "الفهد العربي لإلحاق العمالة المصرية للعمل بالخارج";
 }
-<h1>@ViewData["Title"]</h1>
+<!DOCTYPE html>
+<html lang="@(en ? "en" : "ar")" dir="@(en ? "ltr" : "rtl")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <meta name="description" content="@(en ? $"Privacy Policy of {LegalNameAr} (Al Fahd Al Arabi)" : $"سياسة الخصوصية الخاصة بشركة {LegalNameAr}")" />
+    <link rel="alternate" hreflang="ar" href="/Home/Privacy" />
+    <link rel="alternate" hreflang="en" href="/Home/Privacy?lang=en" />
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/@(en ? "bootstrap.min.css" : "bootstrap.rtl.min.css")" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="~/css/home.css" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="~/favicon.png" />
+    <partial name="_LegalStyles" />
+</head>
+<body class="legal-page">
 
-<p>Use this page to detail your site's privacy policy.</p>
+    <div class="legal-nav">
+        <nav class="navbar scrolled">
+            <a href="/" class="nav-brand">
+                <div class="nav-logo">
+                    <img src="@logoPath" alt="Al Fahd Al Arabi" style="padding:5px;object-fit:contain;width:100%;height:100%" />
+                </div>
+                <div class="nav-name">
+                    @(en ? "Al Fahd Al Arabi" : "الفهد العربي")
+                    <small>@(en ? "International Recruitment · License No. 492" : "للتوظيف الدولي · ترخيص رقم ٤٩٢")</small>
+                </div>
+            </a>
+            <div class="nav-right">
+                <a href="@(en ? "/Home/Privacy" : "/Home/Privacy?lang=en")" class="nav-staff lang-switch">
+                    <i class="bi bi-translate"></i> @(en ? "العربية" : "English")
+                </a>
+                <a href="/" class="nav-staff">
+                    <i class="bi @(en ? "bi-arrow-left" : "bi-arrow-right")"></i> @(en ? "Home" : "الرئيسية")
+                </a>
+            </div>
+        </nav>
+    </div>
+
+    <section class="legal-hero">
+        <h1>@(en ? "Privacy Policy" : "سياسة الخصوصية")</h1>
+        <p>
+            @(en ? "Legal name:" : "الاسم القانوني:") <span lang="ar" dir="rtl">@LegalNameAr</span>
+            — @(en ? "Ministry of Manpower License No. 492" : "ترخيص وزارة القوى العاملة رقم ٤٩٢")
+        </p>
+    </section>
+
+    <div class="legal-body">
+        @if (en)
+        {
+            <p class="legal-updated">Last updated: 30/09/2026</p>
+
+            <h2>1. Who we are</h2>
+            <p>
+                <span lang="ar" dir="rtl">"@LegalNameAr"</span> (Al Fahd Al Arabi for the Placement of Egyptian Workers Abroad; hereinafter "the Company", "we" or "us")
+                is a limited liability company licensed by the Egyptian Ministry of Manpower to place Egyptian workers in employment abroad under License No. 492.
+                Our head office is located at: 103 bis El Haram, Giza, Arab Republic of Egypt.
+            </p>
+            <p>
+                This policy explains how we collect, use and protect your personal data when you use our website, register as a job seeker,
+                contact us by phone or WhatsApp, or visit one of our branches.
+            </p>
+
+            <h2>2. Data we collect</h2>
+            <ul>
+                <li>Identification data: full name, phone number, national ID number, date of birth, city.</li>
+                <li>Travel and employment data: passport number and expiry date, education, desired job, preferred country of work, previous experience.</li>
+                <li>Documents you upload or hand to us: copies of ID and passport, certificates, employment contracts.</li>
+                <li>Payment data related to administrative fees and recruitment service packages, where applicable.</li>
+                <li>Records of communications via the website, phone, or WhatsApp Business.</li>
+                <li>Basic technical data when browsing the website (such as browser type and IP address) for operation and security purposes.</li>
+            </ul>
+
+            <h2>3. How we use your data</h2>
+            <ul>
+                <li>Matching you with job opportunities available with our partner employers abroad.</li>
+                <li>Contacting you about the status of your application, appointments, and travel and visa procedures.</li>
+                <li>Preparing and following up on employment contracts and official travel documents.</li>
+                <li>Complying with the requirements of Egyptian government authorities (Ministry of Manpower, Passports Authority, embassies) regarding work permits abroad.</li>
+                <li>Improving our services and website, and responding to your inquiries.</li>
+            </ul>
+
+            <h2>4. Sharing data with third parties</h2>
+            <p>We do not sell your data to any third party. We may share your data only in the following cases:</p>
+            <ul>
+                <li>With partner employers abroad, to the extent necessary to complete recruitment and travel procedures.</li>
+                <li>With the competent Egyptian government authorities (Ministry of Manpower, Passports Authority, embassies and consulates) to fulfil a legal obligation.</li>
+                <li>With communication service providers, such as the WhatsApp Business Platform (Meta), when you contact us via WhatsApp — such communications are also subject to WhatsApp/Meta's privacy policy.</li>
+                <li>When required by a court order or an official request from a competent government authority.</li>
+            </ul>
+
+            <h2>5. Data retention</h2>
+            <p>
+                We retain your data for as long as the service is being provided, and for the period required by Egyptian law for retaining employment
+                and contract records after the service ends. It is then deleted or anonymised, unless you request otherwise and the law permits it.
+            </p>
+
+            <h2>6. Your rights</h2>
+            <ul>
+                <li>To access the data we hold about you.</li>
+                <li>To request correction of any inaccurate data.</li>
+                <li>To request deletion of your data, unless a legal obligation prevents it (such as records of active contracts).</li>
+                <li>To object to the use of your data for marketing communications at any time.</li>
+            </ul>
+            <p>To exercise any of these rights, please contact us using the details below.</p>
+
+            <h2>7. Cookies</h2>
+            <p>
+                Our website uses essential cookies required for it to function properly (for example, remembering the referral source when you arrive via a link from one of our consultants).
+                We do not use cookies for third-party advertising.
+            </p>
+
+            <h2>8. Data security</h2>
+            <p>
+                We take reasonable technical and organisational measures to protect your data against unauthorised access, loss or misuse,
+                including restricting access to authorised staff only, according to their job role.
+            </p>
+
+            <h2>9. Changes to this policy</h2>
+            <p>We may update this policy from time to time. Any changes will be published on this page together with the date of the update.</p>
+
+            <h2>10. Contact us</h2>
+            <p>
+                For any inquiry regarding privacy or your personal data:<br />
+                <strong lang="ar" dir="rtl">@LegalNameAr</strong><br />
+                103 bis El Haram, Giza, Egypt<br />
+                Via the <a href="/#register" style="color:var(--gold)">registration form on our website</a> or by visiting one of our branches.
+            </p>
+        }
+        else
+        {
+            <p class="legal-updated">آخر تحديث: 30/09/2026</p>
+
+            <h2>١. من نحن</h2>
+            <p>
+                شركة "@LegalNameAr" (يُشار إليها فيما بعد بـ "الشركة" أو "نحن") شركة ذات مسئولية محدودة،
+                مرخصة من وزارة القوى العاملة المصرية لمزاولة عمليات إلحاق العمالة المصرية بالعمل بالخارج بموجب الترخيص رقم ٤٩٢،
+                ومقرها الرئيسي: ١٠٣ مكرر الهرم، الجيزة، جمهورية مصر العربية.
+            </p>
+            <p>
+                توضح هذه السياسة كيفية جمعنا واستخدامنا وحمايتنا لبياناتك الشخصية عند استخدامك لموقعنا الإلكتروني، أو تسجيلك كباحث عن عمل،
+                أو تواصلك معنا عبر الهاتف أو واتساب أو زيارتك لأحد فروعنا.
+            </p>
+
+            <h2>٢. البيانات التي نجمعها</h2>
+            <ul>
+                <li>بيانات التعريف: الاسم الكامل، رقم الهاتف، الرقم القومي، تاريخ الميلاد، المدينة.</li>
+                <li>بيانات السفر والتوظيف: رقم جواز السفر وتاريخ انتهائه، المؤهل الدراسي، الوظيفة المطلوبة، الدولة المفضّلة للعمل، الخبرات السابقة.</li>
+                <li>المستندات التي ترفعها أو تسلّمها لنا: صور الهوية وجواز السفر، الشهادات، عقود العمل.</li>
+                <li>بيانات الدفع الخاصة بالمصروفات الإدارية والباقات المتعلقة بخدمات التوظيف، عند وجودها.</li>
+                <li>سجلّ المراسلات عبر الموقع، الهاتف، أو تطبيق واتساب للأعمال.</li>
+                <li>بيانات تقنية أساسية عند تصفح الموقع (مثل نوع المتصفح وعنوان IP) لأغراض تشغيل الموقع وأمانه.</li>
+            </ul>
+
+            <h2>٣. كيف نستخدم بياناتك</h2>
+            <ul>
+                <li>مطابقتك بفرص العمل المتاحة لدى شركاتنا الشريكة في الخارج.</li>
+                <li>التواصل معك بخصوص حالة طلبك، والمواعيد، وإجراءات السفر والتأشيرة.</li>
+                <li>إعداد ومتابعة عقود العمل والمستندات الرسمية اللازمة للسفر.</li>
+                <li>الالتزام بمتطلبات الجهات الحكومية المصرية (وزارة القوى العاملة، الجوازات، السفارات) المتعلقة بتصاريح العمل بالخارج.</li>
+                <li>تحسين خدماتنا وموقعنا الإلكتروني، والرد على استفساراتك.</li>
+            </ul>
+
+            <h2>٤. مشاركة البيانات مع أطراف أخرى</h2>
+            <p>لا نبيع بياناتك لأي طرف ثالث. قد نشارك بياناتك فقط في الحالات التالية:</p>
+            <ul>
+                <li>مع جهات العمل/الشركات الشريكة بالخارج، بالقدر اللازم لإتمام إجراءات التوظيف والسفر.</li>
+                <li>مع الجهات الحكومية المصرية المختصة (وزارة القوى العاملة، مصلحة الجوازات، السفارات والقنصليات) تنفيذاً لالتزام قانوني.</li>
+                <li>مع مزوّدي خدمات التواصل، مثل منصة واتساب لإدارة الأعمال (Meta) عند تواصلك معنا عبر واتساب — وتخضع هذه المراسلات أيضاً لسياسة خصوصية واتساب/Meta.</li>
+                <li>عند الالتزام بأمر قضائي أو طلب رسمي من جهة حكومية مختصة.</li>
+            </ul>
+
+            <h2>٥. مدة الاحتفاظ بالبيانات</h2>
+            <p>
+                نحتفظ ببياناتك طوال فترة تقديم الخدمة، وللمدة التي يتطلبها القانون المصري للاحتفاظ بسجلات التوظيف والعقود بعد انتهاء الخدمة،
+                ثم يتم حذفها أو إخفاء هويتها بعد ذلك، إلا إذا طلبت خلاف ذلك وسمح القانون بتنفيذه.
+            </p>
+
+            <h2>٦. حقوقك</h2>
+            <ul>
+                <li>الاطلاع على البيانات التي نحتفظ بها عنك.</li>
+                <li>طلب تصحيح أي بيانات غير دقيقة.</li>
+                <li>طلب حذف بياناتك، ما لم يوجد التزام قانوني يمنع ذلك (مثل سجلات العقود السارية).</li>
+                <li>الاعتراض على استخدام بياناتك في التواصل التسويقي في أي وقت.</li>
+            </ul>
+            <p>لممارسة أي من هذه الحقوق، يُرجى التواصل معنا عبر بيانات الاتصال الموضحة أدناه.</p>
+
+            <h2>٧. ملفات تعريف الارتباط (Cookies)</h2>
+            <p>
+                يستخدم موقعنا ملفات تعريف ارتباط أساسية لتشغيل الموقع بشكل صحيح (مثل حفظ مصدر التسجيل عند وجود رابط إحالة من أحد مستشارينا).
+                لا نستخدم ملفات تعريف ارتباط لأغراض إعلانية خارجية.
+            </p>
+
+            <h2>٨. أمان البيانات</h2>
+            <p>
+                نتخذ إجراءات تقنية وتنظيمية معقولة لحماية بياناتك من الوصول غير المصرح به أو الفقد أو سوء الاستخدام،
+                بما في ذلك تقييد الوصول للبيانات على الموظفين المخوَّلين فقط حسب طبيعة عملهم.
+            </p>
+
+            <h2>٩. تعديلات على هذه السياسة</h2>
+            <p>قد نقوم بتحديث هذه السياسة من وقت لآخر، وسيتم نشر أي تعديلات على هذه الصفحة مع تاريخ التحديث.</p>
+
+            <h2>١٠. تواصل معنا</h2>
+            <p>
+                لأي استفسار يتعلق بالخصوصية أو بياناتك الشخصية:<br />
+                <strong>@LegalNameAr</strong><br />
+                ١٠٣ مكرر الهرم، الجيزة<br />
+                من خلال <a href="/#register" style="color:var(--gold)">نموذج التسجيل على الموقع</a> أو زيارة أحد فروعنا.
+            </p>
+        }
+    </div>
+
+    <partial name="_LegalFooter" model="en" />
+</body>
+</html>
