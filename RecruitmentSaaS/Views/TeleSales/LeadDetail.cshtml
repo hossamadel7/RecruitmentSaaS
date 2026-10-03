@@ -60,6 +60,7 @@
                         ("bi-telephone-fill", "الهاتف",           Model.Phone),
                         ("bi-briefcase-fill", "الوظيفة المطلوبة", Model.InterestedJobTitle ?? "—"),
                         ("bi-geo-alt-fill",   "الدولة المطلوبة",  Model.InterestedCountry ?? "—"),
+                        ("bi-person-vcard",  "السن",             Model.Age?.ToString() ?? "—"),
                         ("bi-person-fill",    "مسجل بواسطة",      Model.RegisteredByName ?? "—"),
                         ("bi-megaphone-fill", "الحملة",           Model.CampaignName ?? "—"),
                         ("bi-calendar3",      "تاريخ الإضافة",    Model.CreatedAt.ToString("dd/MM/yyyy")),

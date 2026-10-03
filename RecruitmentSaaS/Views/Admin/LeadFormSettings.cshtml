@@ -1,0 +1,136 @@
+@using RecruitmentSaaS.Controllers
+@model RecruitmentSaaS.Models.Entities.LeadFormSetting
+@{
+    ViewData["Title"] = "إعدادات نموذج التسجيل";
+    ViewData["Subtitle"] = "تحويل المتقدمين الأكبر سناً مباشرةً لمحادثة واتساب مع المبيعات";
+    var teamForms = ViewBag.TeamForms as List<RecruitmentSaaS.Models.Entities.TeamLeadForm> ?? new();
+    var baseUrl = ViewBag.BaseUrl as string;
+}
+
+<div style="padding:24px;max-width:1000px">
+
+    @* Success/Error alerts are rendered by _Layout *@
+    <div class="card">
+        <div class="card-body p-4">
+            <div style="font-size:12.5px;color:#64748B;line-height:1.8;margin-bottom:20px">
+                لما المتقدم يختار سن يساوي أو أكبر من السن المحدد هنا ويبعت النموذج، هتتفتح له محادثة واتساب
+                مع رقم المبيعات تلقائياً. لو رقم الواتساب فاضي، التحويل بيتوقف وكل المتقدمين يشوفوا صفحة الشكر العادية.
+            </div>
+
+            <form asp-action="LeadFormSettings" method="post">
+                @Html.AntiForgeryToken()
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" style="font-size:13px">السن اللي يبدأ منه التحويل لواتساب</label>
+                    <select name="seniorAgeThreshold" class="form-select" style="max-width:200px">
+                        @for (var a = HomeController.MinAge; a <= HomeController.MaxAge; a++)
+                        {
+                            <option value="@a" selected="@(a == Model.SeniorAgeThreshold)">@a سنة أو أكثر</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" style="font-size:13px">رقم واتساب المبيعات</label>
+                    <input type="tel" name="salesWhatsAppNumber" class="form-control" dir="ltr" style="max-width:280px"
+                           value="@Model.SalesWhatsAppNumber" placeholder="201012345678" maxlength="30" />
+                    <div class="form-text">بالصيغة الدولية بكود الدولة وبدون + أو مسافات (مصر: 20 ثم الرقم بدون الصفر الأول).</div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold" style="font-size:13px">الرسالة الجاهزة (اختياري)</label>
+                    <textarea name="salesWhatsAppMessage" class="form-control" rows="3" maxlength="1000"
+                              placeholder="@HomeController.DefaultSalesWhatsAppMessage">@Model.SalesWhatsAppMessage</textarea>
+                    <div class="form-text">
+                        تقدر تستخدم <code>{name}</code> و <code>{age}</code> و <code>{job}</code> وهتتبدل ببيانات المتقدم. لو سبتها فاضية هتتبعت الرسالة الافتراضية.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1"></i> حفظ
+                </button>
+                <a href="/register" target="_blank" class="btn btn-outline-secondary ms-2">
+                    <i class="bi bi-box-arrow-up-left me-1"></i> فتح صفحة التسجيل
+                </a>
+            </form>
+        </div>
+    </div>
+
+    @* ── Per-team forms ── *@
+    <div class="card mt-4">
+        <div class="card-body p-4">
+            <div style="font-weight:700;font-size:15px;margin-bottom:4px">فورم لكل فريق</div>
+            <div style="font-size:12.5px;color:#64748B;line-height:1.8;margin-bottom:16px">
+                كل مدير تيلي سيلز ليه رابط تسجيل خاص بفريقه. السن المحدد فوق بيتطبق على كل الفرق:
+                <br />• <strong>أقل من السن:</strong> الليد بيتسجل ويظهر لمدير الفريق بس (صفحة "ليدز فورم الفريق") — مش في الـ Pool.
+                <br />• <strong>السن أو أكبر:</strong> الليد بيتوزع بالدور على تيلي سيلز الفريق ويتحول لواتساب الفريق.
+                لو رقم الفريق فاضي بيتستخدم رقم المبيعات العام اللي فوق.
+            </div>
+
+            @if (!teamForms.Any())
+            {
+                <div style="font-size:13px;color:#64748B">لا يوجد مديري تيلي سيلز نشطين.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0" style="font-size:13px">
+                        <thead>
+                            <tr>
+                                <th>الفريق (المدير)</th>
+                                <th>رابط الفورم</th>
+                                <th>واتساب الفريق</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var f in teamForms)
+                            {
+                                var formId = "tf-" + f.Id.ToString("N");
+                                var url = $"{baseUrl}/register/{f.Slug}";
+                                <tr>
+                                    <td style="font-weight:600;white-space:nowrap">@f.Manager.FullName</td>
+                                    <td>
+                                        <div class="input-group input-group-sm" dir="ltr" style="min-width:260px">
+                                            <span class="input-group-text">/register/</span>
+                                            <input type="text" name="slug" form="@formId" class="form-control" value="@f.Slug"
+                                                   required maxlength="50" pattern="[a-z0-9][a-z0-9\-]{1,48}[a-z0-9]" />
+                                            <button type="button" class="btn btn-outline-secondary copy-url" data-url="@url" title="نسخ الرابط">
+                                                <i class="bi bi-clipboard"></i>
+                                            </button>
+                                            <a href="@url" target="_blank" class="btn btn-outline-secondary" title="فتح">
+                                                <i class="bi bi-box-arrow-up-right"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="tel" name="whatsAppNumber" form="@formId" class="form-control form-control-sm" dir="ltr"
+                                               value="@f.WhatsAppNumber" placeholder="@(Model.SalesWhatsAppNumber ?? "201012345678")" maxlength="30" style="min-width:150px" />
+                                    </td>
+                                    <td>
+                                        <form id="@formId" asp-action="UpdateTeamLeadForm" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@f.Id" />
+                                            <button type="submit" class="btn btn-primary btn-sm">حفظ</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<script>
+    document.querySelectorAll('.copy-url').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            navigator.clipboard.writeText(btn.dataset.url).then(function () {
+                btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+                setTimeout(function () { btn.innerHTML = '<i class="bi bi-clipboard"></i>'; }, 1500);
+            });
+        });
+    });
+</script>

@@ -1609,6 +1609,107 @@ namespace RecruitmentSaaS.Controllers
             return View(tiers);
         }
 
+        // ── GET /Admin/LeadFormSettings ─────────────────────────────────────
+        public async Task<IActionResult> LeadFormSettings()
+        {
+            var settings = await _context.LeadFormSettings.AsNoTracking().FirstOrDefaultAsync()
+                ?? new LeadFormSetting { SeniorAgeThreshold = HomeController.DefaultSeniorAgeThreshold };
+
+            await RecruitmentSaaS.Services.TeamLeadForms.EnsureForManagersAsync(_context);
+            ViewBag.TeamForms = await _context.TeamLeadForms
+                .AsNoTracking()
+                .Include(f => f.Manager)
+                .Where(f => f.Manager.Role == 7 && f.Manager.IsActive)
+                .OrderBy(f => f.Manager.FullName)
+                .ToListAsync();
+            ViewBag.BaseUrl = $"{Request.Scheme}://{Request.Host}";
+
+            return View(settings);
+        }
+
+        // ── POST /Admin/UpdateTeamLeadForm ──────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateTeamLeadForm(Guid id, string slug, string? whatsAppNumber)
+        {
+            var form = await _context.TeamLeadForms.Include(f => f.Manager).FirstOrDefaultAsync(f => f.Id == id);
+            if (form == null) return NotFound();
+
+            slug = (slug ?? "").Trim().ToLowerInvariant();
+            if (!RecruitmentSaaS.Services.TeamLeadForms.IsValidSlug(slug))
+            {
+                TempData["Error"] = "رابط الفريق لازم يكون حروف إنجليزي صغيرة وأرقام و - فقط (من 3 لـ 50 حرف)";
+                return RedirectToAction("LeadFormSettings");
+            }
+            if (await _context.TeamLeadForms.AnyAsync(f => f.Slug == slug && f.Id != id))
+            {
+                TempData["Error"] = "الرابط ده مستخدم لفريق تاني";
+                return RedirectToAction("LeadFormSettings");
+            }
+
+            var number = NormalizeWhatsAppNumber(whatsAppNumber);
+            if (number == null)
+            {
+                TempData["Error"] = "رقم الواتساب غير صحيح — اكتبه بالصيغة الدولية مثل 201012345678";
+                return RedirectToAction("LeadFormSettings");
+            }
+
+            form.Slug = slug;
+            form.WhatsAppNumber = number.Length > 0 ? number : null;
+            form.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"تم حفظ فورم فريق {form.Manager.FullName}";
+            return RedirectToAction("LeadFormSettings");
+        }
+
+        // wa.me needs the number in international format, digits only.
+        // Returns "" for empty input and null when invalid.
+        private static string? NormalizeWhatsAppNumber(string? raw)
+        {
+            var number = new string((raw ?? "").Where(char.IsDigit).ToArray());
+            if (number.StartsWith("00")) number = number[2..];
+            return number.Length is > 0 and < 10 ? null : number;
+        }
+
+        // ── POST /Admin/LeadFormSettings ────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LeadFormSettings(
+            byte seniorAgeThreshold, string? salesWhatsAppNumber, string? salesWhatsAppMessage)
+        {
+            if (seniorAgeThreshold < HomeController.MinAge || seniorAgeThreshold > HomeController.MaxAge)
+            {
+                TempData["Error"] = $"السن يجب أن يكون بين {HomeController.MinAge} و {HomeController.MaxAge}";
+                return RedirectToAction("LeadFormSettings");
+            }
+
+            var number = NormalizeWhatsAppNumber(salesWhatsAppNumber);
+            if (number == null)
+            {
+                TempData["Error"] = "رقم الواتساب غير صحيح — اكتبه بالصيغة الدولية مثل 201012345678";
+                return RedirectToAction("LeadFormSettings");
+            }
+
+            var settings = await _context.LeadFormSettings.FirstOrDefaultAsync();
+            if (settings == null)
+            {
+                settings = new LeadFormSetting { Id = Guid.NewGuid() };
+                _context.LeadFormSettings.Add(settings);
+            }
+
+            settings.SeniorAgeThreshold = seniorAgeThreshold;
+            settings.SalesWhatsAppNumber = number.Length > 0 ? number : null;
+            settings.SalesWhatsAppMessage = string.IsNullOrWhiteSpace(salesWhatsAppMessage) ? null : salesWhatsAppMessage.Trim();
+            settings.UpdatedAt = DateTime.UtcNow;
+            settings.UpdatedById = CurrentUserId;
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "تم حفظ إعدادات نموذج التسجيل";
+            return RedirectToAction("LeadFormSettings");
+        }
+
         // POST /Admin/UpdateCommissionSettings
         [HttpPost]
         [ValidateAntiForgeryToken]

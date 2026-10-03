@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
+using RecruitmentSaaS.Services;
 using System.Security.Claims;
 
 namespace RecruitmentSaaS.Controllers
@@ -196,6 +197,76 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.MonthLabel = curStart.ToString("MMMM yyyy", new System.Globalization.CultureInfo("ar-EG"));
 
             return View(leads);
+        }
+
+        // ── GET /TeleSalesManager/TeamFormLeads ──────────────────────────────
+        // Leads from my team's registration form that are under the age threshold —
+        // they stay here (not in the TeleSales Pool) until I assign them.
+        public async Task<IActionResult> TeamFormLeads()
+        {
+            await TeamLeadForms.EnsureForManagersAsync(_context, new[] { CurrentUserId });
+
+            var form = await _context.TeamLeadForms.AsNoTracking()
+                .FirstOrDefaultAsync(f => f.ManagerId == CurrentUserId);
+
+            var leads = await _context.Leads
+                .AsNoTracking()
+                .Where(l => l.TeamManagerId == CurrentUserId
+                         && l.AssignedSalesId == null
+                         && l.IsConverted == false)
+                .OrderByDescending(l => l.CreatedAt)
+                .ToListAsync();
+
+            ViewBag.FormUrl = form == null ? null : $"{Request.Scheme}://{Request.Host}/register/{form.Slug}";
+            ViewBag.MyTeam = await _context.Users
+                .Where(u => u.ManagerId == CurrentUserId && u.Role == 3 && u.IsActive)
+                .OrderBy(u => u.FullName)
+                .ToListAsync();
+
+            return View(leads);
+        }
+
+        // ── POST /TeleSalesManager/AssignTeamLead ────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AssignTeamLead(Guid leadId, Guid salesUserId)
+        {
+            var lead = await _context.Leads
+                .FirstOrDefaultAsync(l => l.Id == leadId
+                                       && l.TeamManagerId == CurrentUserId
+                                       && l.AssignedSalesId == null);
+
+            var member = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == salesUserId
+                                       && u.ManagerId == CurrentUserId
+                                       && u.Role == 3
+                                       && u.IsActive);
+
+            if (lead == null || member == null)
+            {
+                TempData["Error"] = "هذا العميل غير متاح أو الموظف ليس في فريقك";
+                return RedirectToAction("TeamFormLeads");
+            }
+
+            lead.AssignedSalesId = member.Id;
+            lead.UpdatedAt = DateTime.UtcNow;
+
+            _context.LeadActivities.Add(new Models.Entities.LeadActivity
+            {
+                Id = Guid.NewGuid(),
+                LeadId = lead.Id,
+                ActivityType = 8,
+                Description = $"تم تعيين العميل لـ {member.FullName} بواسطة {CurrentUserName}",
+                CreatedById = CurrentUserId,
+                CreatedByName = CurrentUserName,
+                ActorType = 1,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"تم تعيين {lead.FullName} لـ {member.FullName}";
+            return RedirectToAction("TeamFormLeads");
         }
     }
 }

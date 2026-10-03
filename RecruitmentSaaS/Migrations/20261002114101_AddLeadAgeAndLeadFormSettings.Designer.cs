@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RecruitmentSaaS.Data;
 
@@ -11,9 +12,11 @@ using RecruitmentSaaS.Data;
 namespace RecruitmentSaaS.Migrations
 {
     [DbContext(typeof(RecruitmentCrmContext))]
-    partial class RecruitmentCrmContextModelSnapshot : ModelSnapshot
+    [Migration("20261002114101_AddLeadAgeAndLeadFormSettings")]
+    partial class AddLeadAgeAndLeadFormSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1115,9 +1118,6 @@ namespace RecruitmentSaaS.Migrations
                         .HasColumnType("tinyint")
                         .HasDefaultValue((byte)1);
 
-                    b.Property<Guid?>("TeamManagerId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasPrecision(0)
                         .HasColumnType("datetime2(0)");
@@ -1159,9 +1159,6 @@ namespace RecruitmentSaaS.Migrations
                     b.HasIndex(new[] { "LeadSource" }, "IX_demorecruitment_Ld_Src");
 
                     b.HasIndex(new[] { "Status" }, "IX_demorecruitment_Ld_St");
-
-                    b.HasIndex(new[] { "TeamManagerId" }, "IX_demorecruitment_Ld_TeamMgr")
-                        .HasFilter("([TeamManagerId] IS NOT NULL)");
 
                     b.HasIndex(new[] { "LeadCode" }, "UQ_demorecruitment_Ld_Code")
                         .IsUnique()
@@ -2152,47 +2149,6 @@ namespace RecruitmentSaaS.Migrations
                     b.ToTable("StageTypes", "demorecruitment");
                 });
 
-            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.TeamLeadForm", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
-
-                    b.Property<Guid>("ManagerId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<string>("WhatsAppNumber")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.HasKey("Id")
-                        .HasName("PK_demorecruitment_TLF");
-
-                    b.HasIndex(new[] { "ManagerId" }, "UQ_demorecruitment_TLF_Mgr")
-                        .IsUnique();
-
-                    b.HasIndex(new[] { "Slug" }, "UQ_demorecruitment_TLF_Slug")
-                        .IsUnique();
-
-                    b.ToTable("TeamLeadForms", "demorecruitment");
-                });
-
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3108,11 +3064,6 @@ namespace RecruitmentSaaS.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_demorecruitment_Ld_Rg");
 
-                    b.HasOne("RecruitmentSaaS.Models.Entities.User", "TeamManager")
-                        .WithMany()
-                        .HasForeignKey("TeamManagerId")
-                        .HasConstraintName("FK_demorecruitment_Ld_TeamMgr");
-
                     b.Navigation("AssignedOfficeSales");
 
                     b.Navigation("AssignedSales");
@@ -3124,8 +3075,6 @@ namespace RecruitmentSaaS.Migrations
                     b.Navigation("GoogleSheet");
 
                     b.Navigation("RegisteredBy");
-
-                    b.Navigation("TeamManager");
                 });
 
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.LeadActivity", b =>
@@ -3507,17 +3456,6 @@ namespace RecruitmentSaaS.Migrations
                     b.Navigation("ReviewedBy");
 
                     b.Navigation("ToStage");
-                });
-
-            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.TeamLeadForm", b =>
-                {
-                    b.HasOne("RecruitmentSaaS.Models.Entities.User", "Manager")
-                        .WithMany()
-                        .HasForeignKey("ManagerId")
-                        .IsRequired()
-                        .HasConstraintName("FK_demorecruitment_TLF_Mgr");
-
-                    b.Navigation("Manager");
                 });
 
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.User", b =>

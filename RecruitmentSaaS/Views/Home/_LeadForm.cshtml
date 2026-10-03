@@ -1,0 +1,141 @@
+@using RecruitmentSaaS.Controllers
+@{
+    // Shared registration form — used by the home page and the standalone /register page.
+    var returnTo = ViewData["ReturnTo"] as string ?? "home";
+    var teamSlug = ViewData["TeamSlug"] as string;
+    var formError = TempData["FormError"]?.ToString() ?? "";
+    var logoPath = "/uploads/images/logo fahd.png";
+}
+<div class="form-split reveal-scale">
+
+    <!-- Left: trust panel -->
+    <div class="form-trust-panel">
+        <div class="form-trust-logo">
+            <img src="@logoPath" alt="الفهد العربي" />
+        </div>
+        <div class="form-trust-title">لماذا تثق فينا؟</div>
+        <div class="form-trust-sub">٤ أسباب تجعل الفهد العربي خيارك الأول</div>
+
+        <div class="form-trust-points">
+            <div class="form-trust-point">
+                <div class="form-trust-point-icon"><i class="bi bi-patch-check-fill"></i></div>
+                <div class="form-trust-point-text">
+                    <strong>مرخصة رسمياً</strong>
+                    معتمدون من وزارة القوى العاملة وسفارات الدول المستقبِلة
+                </div>
+            </div>
+            <div class="form-trust-point">
+                <div class="form-trust-point-icon"><i class="bi bi-file-earmark-check-fill"></i></div>
+                <div class="form-trust-point-text">
+                    <strong>عقود شفافة</strong>
+                    كل حقوقك مكتوبة ومضمونة قبل السفر
+                </div>
+            </div>
+            <div class="form-trust-point">
+                <div class="form-trust-point-icon"><i class="bi bi-headset"></i></div>
+                <div class="form-trust-point-text">
+                    <strong>دعم ما بعد السفر</strong>
+                    فريقنا معك حتى بعد وصولك واستقرارك
+                </div>
+            </div>
+            <div class="form-trust-point">
+                <div class="form-trust-point-icon"><i class="bi bi-cash-coin"></i></div>
+                <div class="form-trust-point-text">
+                    <strong>الاستشارة مجانية</strong>
+                    لا رسوم مسبقة — ندفع فقط عند إتمام الإجراءات
+                </div>
+            </div>
+        </div>
+
+        <div class="form-trust-rating">
+            <div class="form-trust-stars">★★★★★</div>
+            <div class="form-trust-score">٤.٩ / ٥</div>
+            <div class="form-trust-count">بناءً على +٢٣٠٠ تقييم موثق</div>
+        </div>
+    </div>
+
+    <!-- Right: form fields -->
+    <div class="form-body">
+        <div class="form-body-header">
+            <h2>
+                <i class="bi bi-clipboard2-check-fill me-2" style="font-size:.95rem;color:#1E3055"></i>
+                نموذج التسجيل
+            </h2>
+            <p>جميع الحقول المُعلّمة بـ * مطلوبة — التسجيل مجاني تماماً</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(formError))
+        {
+            <div class="error-banner">
+                <i class="bi bi-exclamation-circle-fill"></i> @formError
+            </div>
+        }
+
+        <form method="post" action="/Home/SubmitLead" novalidate id="leadForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnTo" value="@returnTo" />
+            @if (!string.IsNullOrEmpty(teamSlug))
+            {
+                <input type="hidden" name="team" value="@teamSlug" />
+            }
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <label class="field-label">الاسم الكامل <span class="field-required">*</span></label>
+                    <input name="FullName" id="fullName" type="text" class="form-control"
+                           required maxlength="200" placeholder="مثال: محمد أحمد" />
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="field-label">رقم الهاتف <span class="field-required">*</span></label>
+                    <input name="Phone" id="phone" type="tel" class="form-control"
+                           required maxlength="30" pattern="[0-9]{10,15}" placeholder="01xxxxxxxxx" />
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="field-label">السن <span class="field-required">*</span></label>
+                    <select name="Age" id="age" class="form-select" required>
+                        <option value="" selected disabled>اختر السن</option>
+                        @for (var a = HomeController.MinAge; a < HomeController.MaxAge; a++)
+                        {
+                            <option value="@a">@a</option>
+                        }
+                        <option value="@HomeController.MaxAge">@HomeController.MaxAge أو أكثر</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="field-label">الوظيفة المطلوبة</label>
+                    <input name="InterestedJobTitle" type="text" class="form-control"
+                           maxlength="200" placeholder="مثال: سائق، فني كهرباء..." />
+                </div>
+                <div class="col-12">
+                    <label class="field-label">ملاحظات</label>
+                    <textarea name="Notes" id="notesField" class="form-control"
+                              placeholder="أي معلومات إضافية تريد إضافتها..."></textarea>
+                </div>
+                <div class="col-12" style="margin-top:4px">
+                    <button type="submit" class="btn-submit" id="submitBtn">
+                        <i class="bi bi-send-fill"></i> أرسل طلبك الآن
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <div class="form-note">
+            <i class="bi bi-lock-fill"></i> بياناتك محمية — الاستشارة الأولى مجانية تماماً
+        </div>
+    </div>
+
+</div><!-- /form-split -->
+
+<script>
+    (function () {
+        /* ── Prevent double submit ── */
+        var leadForm  = document.getElementById('leadForm');
+        var submitBtn = document.getElementById('submitBtn');
+        if (leadForm && submitBtn) {
+            leadForm.addEventListener('submit', function () {
+                if (!leadForm.checkValidity()) return;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>جارٍ الإرسال...';
+            });
+        }
+    })();
+</script>

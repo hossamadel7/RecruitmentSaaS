@@ -6,7 +6,6 @@ using RecruitmentSaaS.Models.DTOs;
 using RecruitmentSaaS.Models.Entities;
 using RecruitmentSaaS.Services;
 using System.Security.Claims;
-using System.Security.Cryptography;
 
 namespace RecruitmentSaaS.Controllers.Api
 {
@@ -47,7 +46,7 @@ namespace RecruitmentSaaS.Controllers.Api
             if (assignedAgentId == null)
                 return BadRequest(new { error = "This account has no default sales agent — pick one explicitly." });
 
-            var referenceCode = await GenerateUniqueReferenceCodeAsync();
+            var referenceCode = await WhatsAppHandoffCodes.GenerateUniqueAsync(_context);
             var waUrl = $"https://wa.me/{account.DisplayPhoneNumber.TrimStart('+')}" +
                         $"?text={Uri.EscapeDataString($"Hello, I'm interested in getting more information. Reference: #{referenceCode}")}";
 
@@ -114,22 +113,6 @@ namespace RecruitmentSaaS.Controllers.Api
                 .ToListAsync();
 
             return Ok(handoffs);
-        }
-
-        private async Task<string> GenerateUniqueReferenceCodeAsync()
-        {
-            const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no O/0/I/1 ambiguity
-
-            for (var attempt = 0; attempt < 10; attempt++)
-            {
-                var suffix = RandomNumberGenerator.GetString(alphabet, 6);
-                var code = $"REF-{suffix}";
-
-                var exists = await _context.WhatsAppHandoffs.AnyAsync(h => h.ReferenceCode == code);
-                if (!exists) return code;
-            }
-
-            throw new InvalidOperationException("Could not generate a unique handoff reference code.");
         }
     }
 }

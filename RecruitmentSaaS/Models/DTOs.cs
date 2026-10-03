@@ -94,6 +94,7 @@ namespace RecruitmentSaaS.Models.DTOs
         public string? Notes { get; set; }
         public string? InterestedJobTitle { get; set; }
         public string? InterestedCountry { get; set; }
+        public byte? Age { get; set; }
         public string? ReferredByName { get; set; }
         public string? ReferredByPhone { get; set; }
         public bool IsConverted { get; set; }

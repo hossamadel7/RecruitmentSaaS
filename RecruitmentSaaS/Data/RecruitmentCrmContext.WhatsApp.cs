@@ -277,5 +277,7 @@ public partial class RecruitmentCrmContext
             entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
         });
+
+        ConfigureLeadForm(modelBuilder);
     }
 }

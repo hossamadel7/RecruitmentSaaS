@@ -124,6 +124,7 @@ namespace RecruitmentSaaS.Controllers
                 Notes = lead.Notes,
                 InterestedJobTitle = lead.InterestedJobTitle,
                 InterestedCountry = lead.InterestedCountry,
+                Age = lead.Age,
                 ReferredByName = lead.ReferredByName,
                 ReferredByPhone = lead.ReferredByPhone,
                 IsConverted = lead.IsConverted,

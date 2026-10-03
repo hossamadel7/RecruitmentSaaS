@@ -114,7 +114,9 @@ namespace RecruitmentSaaS.Controllers
                                 l.AssignedSalesId == userId
                                 ||
                                 // Leads مش معيّنة لحد + sheet rule
+                                // (ليدز فورم الفريق اللي مش معيّنة بتفضل مع مدير الفريق بس)
                                 (l.AssignedSalesId == null
+                                 && l.TeamManagerId == null
                                  && (l.GoogleSheetId == null
                                      || mySheetIds.Contains(l.GoogleSheetId.Value)))
                             ));
@@ -165,6 +167,7 @@ namespace RecruitmentSaaS.Controllers
             var lead = await _context.Leads
                 .FirstOrDefaultAsync(l => l.Id == leadId
                     && l.AssignedSalesId == null
+                    && l.TeamManagerId == null
                     && l.IsConverted == false);
 
             if (lead == null)
@@ -242,7 +245,8 @@ namespace RecruitmentSaaS.Controllers
                 .Include(l => l.Campaign)
                 .Include(l => l.RegisteredBy)
                 .FirstOrDefaultAsync(l => l.Id == id
-                    && (l.AssignedSalesId == userId || l.AssignedSalesId == null));
+                    && (l.AssignedSalesId == userId
+                        || (l.AssignedSalesId == null && l.TeamManagerId == null)));
 
             if (lead == null) return NotFound();
 
@@ -268,6 +272,7 @@ namespace RecruitmentSaaS.Controllers
                 Notes = lead.Notes,
                 InterestedJobTitle = lead.InterestedJobTitle,
                 InterestedCountry = lead.InterestedCountry,
+                Age = lead.Age,
                 ReferredByName = lead.ReferredByName,
                 ReferredByPhone = lead.ReferredByPhone,
                 IsConverted = lead.IsConverted,
