@@ -11,10 +11,12 @@ namespace RecruitmentSaaS.Controllers
     public class TeleSalesManagerController : Controller
     {
         private readonly RecruitmentCrmContext _context;
+        private readonly INotificationService _notifications;
 
-        public TeleSalesManagerController(RecruitmentCrmContext context)
+        public TeleSalesManagerController(RecruitmentCrmContext context, INotificationService notifications)
         {
             _context = context;
+            _notifications = notifications;
         }
 
         private Guid CurrentUserId =>
@@ -200,41 +202,98 @@ namespace RecruitmentSaaS.Controllers
         }
 
         // ── GET /TeleSalesManager/TeamFormLeads ──────────────────────────────
-        // Leads from my team's registration form that are under the age threshold —
-        // they stay here (not in the TeleSales Pool) until I assign them.
-        public async Task<IActionResult> TeamFormLeads()
+        // All of my team's leads: everything assigned to my TeleSales (any source) plus my team
+        // form's leads still waiting for me. member = <userId> | "unassigned"; status; q; page.
+        public async Task<IActionResult> TeamFormLeads(string? member, byte? status, string? q, int page = 1)
         {
+            const int pageSize = 50;
             await TeamLeadForms.EnsureForManagersAsync(_context, new[] { CurrentUserId });
 
             var form = await _context.TeamLeadForms.AsNoTracking()
                 .FirstOrDefaultAsync(f => f.ManagerId == CurrentUserId);
 
-            var leads = await _context.Leads
-                .AsNoTracking()
-                .Where(l => l.TeamManagerId == CurrentUserId
-                         && l.AssignedSalesId == null
-                         && l.IsConverted == false)
+            // Include deactivated members: their leads are still the team's
+            var team = await _context.Users.AsNoTracking()
+                .Where(u => u.ManagerId == CurrentUserId && u.Role == 3)
+                .OrderByDescending(u => u.IsActive).ThenBy(u => u.FullName)
+                .ToListAsync();
+            var teamIds = team.Select(u => u.Id).ToList();
+
+            var scope = TeamLeadsScope(teamIds);
+
+            // Header counters + per-member counts (whole team, before filters)
+            ViewBag.TotalCount = await scope.CountAsync();
+            ViewBag.UnassignedCount = await scope.CountAsync(l => l.AssignedSalesId == null);
+            ViewBag.ConvertedCount = await scope.CountAsync(l => l.IsConverted);
+            ViewBag.MemberCounts = await scope.Where(l => l.AssignedSalesId != null)
+                .GroupBy(l => l.AssignedSalesId!.Value)
+                .Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count);
+
+            var query = scope;
+            if (member == "unassigned")
+                query = query.Where(l => l.AssignedSalesId == null);
+            else if (Guid.TryParse(member, out var memberId))
+                query = query.Where(l => l.AssignedSalesId == memberId);
+
+            if (status.HasValue)
+                query = query.Where(l => l.Status == status.Value);
+
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var term = q.Trim();
+                var phone = PhoneNumbers.Normalize(term);
+                query = query.Where(l => l.FullName.Contains(term)
+                                      || (l.LeadCode != null && l.LeadCode.Contains(term))
+                                      || l.Phone.Contains(term)
+                                      || (phone.Length >= 4 && l.Phone.Contains(phone)));
+            }
+
+            var filteredCount = await query.CountAsync();
+            page = Math.Max(1, page);
+            var leads = await query
+                .Include(l => l.AssignedSales)
                 .OrderByDescending(l => l.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
 
             ViewBag.FormUrl = form == null ? null : $"{Request.Scheme}://{Request.Host}/register/{form.Slug}";
-            ViewBag.MyTeam = await _context.Users
-                .Where(u => u.ManagerId == CurrentUserId && u.Role == 3 && u.IsActive)
-                .OrderBy(u => u.FullName)
-                .ToListAsync();
+            ViewBag.Team = team;
+            ViewBag.MyTeam = team.Where(u => u.IsActive).ToList(); // who can receive leads
+            ViewBag.Member = member;
+            ViewBag.Status = status;
+            ViewBag.Q = q;
+            ViewBag.Page = page;
+            ViewBag.PageCount = (int)Math.Ceiling(filteredCount / (double)pageSize);
+            ViewBag.FilteredCount = filteredCount;
 
             return View(leads);
         }
 
+        // A lead belongs to my team when my team form brought it in, or one of my TeleSales holds it
+        private IQueryable<Models.Entities.Lead> TeamLeadsScope(List<Guid> teamIds) =>
+            _context.Leads.Where(l => l.TeamManagerId == CurrentUserId
+                                   || (l.AssignedSalesId != null && teamIds.Contains(l.AssignedSalesId.Value)));
+
         // ── POST /TeleSalesManager/AssignTeamLead ────────────────────────────
+        // Assign a waiting lead, or move a lead between members of my team. The lead's WhatsApp
+        // chat moves with it so the new person sees the conversation.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AssignTeamLead(Guid leadId, Guid salesUserId)
+        public async Task<IActionResult> AssignTeamLead(Guid leadId, Guid salesUserId, string? returnQuery)
         {
-            var lead = await _context.Leads
-                .FirstOrDefaultAsync(l => l.Id == leadId
-                                       && l.TeamManagerId == CurrentUserId
-                                       && l.AssignedSalesId == null);
+            IActionResult Back() => Redirect("/TeleSalesManager/TeamFormLeads" +
+                (!string.IsNullOrEmpty(returnQuery) && returnQuery.StartsWith('?') ? returnQuery : ""));
+
+            var teamIds = await _context.Users
+                .Where(u => u.ManagerId == CurrentUserId && u.Role == 3)
+                .Select(u => u.Id)
+                .ToListAsync();
+
+            var lead = await TeamLeadsScope(teamIds)
+                .Include(l => l.AssignedSales)
+                .FirstOrDefaultAsync(l => l.Id == leadId);
 
             var member = await _context.Users
                 .FirstOrDefaultAsync(u => u.Id == salesUserId
@@ -245,18 +304,34 @@ namespace RecruitmentSaaS.Controllers
             if (lead == null || member == null)
             {
                 TempData["Error"] = "هذا العميل غير متاح أو الموظف ليس في فريقك";
-                return RedirectToAction("TeamFormLeads");
+                return Back();
             }
+            if (lead.AssignedSalesId == member.Id)
+                return Back();
 
+            var previous = lead.AssignedSales;
             lead.AssignedSalesId = member.Id;
             lead.UpdatedAt = DateTime.UtcNow;
+
+            // The customer's WhatsApp chat follows the lead (unless someone else deliberately holds it)
+            var chats = await _context.WhatsAppConversations
+                .Where(c => c.LeadId == lead.Id
+                         && (c.AssignedSalesAgentId == null || c.AssignedSalesAgentId == previous!.Id))
+                .ToListAsync();
+            foreach (var chat in chats)
+            {
+                chat.AssignedSalesAgentId = member.Id;
+                chat.UpdatedAt = DateTime.UtcNow;
+            }
 
             _context.LeadActivities.Add(new Models.Entities.LeadActivity
             {
                 Id = Guid.NewGuid(),
                 LeadId = lead.Id,
                 ActivityType = 8,
-                Description = $"تم تعيين العميل لـ {member.FullName} بواسطة {CurrentUserName}",
+                Description = previous == null
+                    ? $"تم تعيين العميل لـ {member.FullName} بواسطة {CurrentUserName}"
+                    : $"تم نقل العميل من {previous.FullName} إلى {member.FullName} بواسطة {CurrentUserName}",
                 CreatedById = CurrentUserId,
                 CreatedByName = CurrentUserName,
                 ActorType = 1,
@@ -265,8 +340,18 @@ namespace RecruitmentSaaS.Controllers
 
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = $"تم تعيين {lead.FullName} لـ {member.FullName}";
-            return RedirectToAction("TeamFormLeads");
+            try
+            {
+                await _notifications.SendAsync(member.Id, "عميل جديد من مدير الفريق",
+                    $"{lead.FullName} — {lead.Phone}", link: $"/TeleSales/LeadDetail/{lead.Id}");
+            }
+            catch { /* the assignment is saved; a failed notification must not undo it */ }
+
+            TempData["Success"] = previous == null
+                ? $"تم تعيين {lead.FullName} لـ {member.FullName}"
+                : $"تم نقل {lead.FullName} من {previous.FullName} إلى {member.FullName}"
+                  + (chats.Count > 0 ? " (ومعه محادثة الواتساب)" : "");
+            return Back();
         }
     }
 }

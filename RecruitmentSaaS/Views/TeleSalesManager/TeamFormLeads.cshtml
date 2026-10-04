@@ -1,20 +1,70 @@
 @using RecruitmentSaaS.Models.Entities
 @model IEnumerable<Lead>
 @{
-    ViewData["Title"] = "ليدز فورم الفريق";
+    ViewData["Title"] = "ليدز الفريق";
     Layout = "~/Views/Shared/_Layout.cshtml";
 
     var formUrl = ViewBag.FormUrl as string;
+    var team = ViewBag.Team as List<User> ?? new List<User>();
     var myTeam = ViewBag.MyTeam as List<User> ?? new List<User>();
+    var memberCounts = ViewBag.MemberCounts as Dictionary<Guid, int> ?? new Dictionary<Guid, int>();
+    string? member = ViewBag.Member;
+    byte? status = ViewBag.Status;
+    string? q = ViewBag.Q;
+    int currentPage = ViewBag.Page ?? 1;
+    int pageCount = ViewBag.PageCount ?? 1;
+    int totalCount = ViewBag.TotalCount ?? 0;
+    int unassignedCount = ViewBag.UnassignedCount ?? 0;
+    int convertedCount = ViewBag.ConvertedCount ?? 0;
+    int filteredCount = ViewBag.FilteredCount ?? 0;
+
+    string[] statusLabels = { "", "عميل جديد", "تم التواصل", "مهتم", "يفكر", "وعد بالزيارة", "زيارة", "تحويل", "ملغى" };
+    string[] statusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626" };
+
+    string SourceLabel(Lead l) => l.GoogleSheetId != null ? "Google Sheets"
+        : l.TeamManagerId != null ? "فورم الفريق"
+        : l.LeadSource switch { 1 => "فيسبوك", 2 => "الموقع", 3 => "زيارة الفرع", _ => "—" };
+
+    // Keep the current filters in links and after assigning
+    string Query(string? m = null, byte? st = null, int? p = null, bool keepMember = true, bool keepStatus = true)
+    {
+        var parts = new List<string>();
+        var mm = keepMember ? (m ?? member) : m;
+        var ss = keepStatus ? (st ?? status) : st;
+        if (!string.IsNullOrEmpty(mm)) parts.Add("member=" + Uri.EscapeDataString(mm));
+        if (ss.HasValue) parts.Add("status=" + ss.Value);
+        if (!string.IsNullOrWhiteSpace(q)) parts.Add("q=" + Uri.EscapeDataString(q));
+        if (p.HasValue && p.Value > 1) parts.Add("page=" + p.Value);
+        return parts.Count == 0 ? "" : "?" + string.Join("&", parts);
+    }
+    var currentQuery = Query(p: currentPage);
 }
+
+<style>
+    .tl-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .tl-stat { display: block; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; color: inherit; text-decoration: none; }
+    .tl-stat:hover { border-color: #c7d2fe; }
+    .tl-stat.active { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light); }
+    .tl-stat .n { font-size: 1.4rem; font-weight: 800; line-height: 1.2; }
+    .tl-stat .l { font-size: .78rem; color: var(--text-muted); }
+    .tl-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+    .tl-filters > div { min-width: 160px; flex: 1; }
+    .tl-filters label { font-size: .75rem; color: var(--text-muted); margin-bottom: 3px; display: block; }
+    .tl-assigned { font-size: .8rem; font-weight: 600; }
+    .tl-waiting { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; font-size: .72rem; padding: 2px 9px; border-radius: 99px; font-weight: 700; white-space: nowrap; }
+    .tl-assign { display: flex; gap: 4px; }
+    .tl-assign select { min-width: 130px; }
+    .tl-src { font-size: .72rem; color: var(--text-muted); white-space: nowrap; }
+    tr.tl-row-waiting { background: #fffbeb; }
+</style>
 
 <div class="page-header">
     <div class="page-header-left">
-        <div class="page-header-icon" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);">📝</div>
+        <div class="page-header-icon" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);">📋</div>
         <div>
-            <h1 class="page-title">ليدز فورم الفريق</h1>
+            <h1 class="page-title">ليدز الفريق</h1>
             <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">
-                @Model.Count().ToString("N0") ليد أقل من السن المحدد — ظاهرين ليك بس لحد ما تعيّنهم
+                كل العملاء المعيّنين لفريقك، والعملاء اللي في انتظار تعيينك
             </p>
         </div>
     </div>
@@ -23,19 +73,66 @@
 @if (!string.IsNullOrEmpty(formUrl))
 {
     <div class="card mb-3">
-        <div class="card-body d-flex align-items-center gap-2 flex-wrap">
+        <div class="card-body d-flex align-items-center gap-2 flex-wrap" style="padding:10px 14px">
             <span style="font-weight:700;font-size:.85rem">رابط فورم فريقك:</span>
             <input type="text" readonly class="form-control form-control-sm" id="teamFormUrl" dir="ltr"
-                   value="@formUrl" style="max-width:380px" onclick="this.select()" />
-            <button type="button" class="btn btn-primary btn-sm" id="copyFormUrl">
-                <i class="bi bi-clipboard"></i> نسخ
-            </button>
-            <span style="font-size:.75rem;color:var(--text-muted)">
-                اللي سنهم من السن المحدد أو أكبر بيتوزعوا بالدور على فريقك ويتحولوا لواتساب الفريق.
-            </span>
+                   value="@formUrl" style="max-width:340px" onclick="this.select()" />
+            <button type="button" class="btn btn-primary btn-sm" id="copyFormUrl"><i class="bi bi-clipboard"></i> نسخ</button>
         </div>
     </div>
 }
+
+<div class="tl-stats">
+    <a class="tl-stat @(string.IsNullOrEmpty(member) && !status.HasValue ? "active" : "")" href="/TeleSalesManager/TeamFormLeads">
+        <div class="n">@totalCount</div><div class="l">كل ليدز الفريق</div>
+    </a>
+    <a class="tl-stat @(member == "unassigned" ? "active" : "")" href="/TeleSalesManager/TeamFormLeads?member=unassigned">
+        <div class="n" style="color:#c2410c">@unassignedCount</div><div class="l">في انتظار تعيينك</div>
+    </a>
+    <a class="tl-stat @(status == 7 ? "active" : "")" href="/TeleSalesManager/TeamFormLeads?status=7">
+        <div class="n" style="color:#6366f1">@convertedCount</div><div class="l">تم تحويلهم</div>
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body" style="padding:12px 14px">
+        <form method="get" action="/TeleSalesManager/TeamFormLeads" class="tl-filters">
+            <div style="flex:2">
+                <label>بحث</label>
+                <input name="q" value="@q" class="form-control form-control-sm" placeholder="الاسم أو الهاتف أو كود العميل..." />
+            </div>
+            <div>
+                <label>الموظف</label>
+                <select name="member" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">كل الفريق</option>
+                    <option value="unassigned" selected="@(member == "unassigned")">في انتظار التعيين (@unassignedCount)</option>
+                    @foreach (var u in team)
+                    {
+                        string uid = u.Id.ToString();
+                        <option value="@uid" selected="@(member == uid)">@u.FullName (@(memberCounts.TryGetValue(u.Id, out var c) ? c : 0))@(u.IsActive ? "" : " — معطّل")</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label>الحالة</label>
+                <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">كل الحالات</option>
+                    @for (byte s = 1; s < statusLabels.Length; s++)
+                    {
+                        <option value="@s" selected="@(status == s)">@statusLabels[s]</option>
+                    }
+                </select>
+            </div>
+            <div style="flex:0 0 auto;min-width:0" class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">بحث</button>
+                @if (!string.IsNullOrEmpty(member) || status.HasValue || !string.IsNullOrWhiteSpace(q))
+                {
+                    <a href="/TeleSalesManager/TeamFormLeads" class="btn btn-outline-secondary btn-sm">مسح</a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
 
 <div class="card">
     <div class="card-body p-0">
@@ -43,57 +140,88 @@
         {
             <div class="empty-state" style="padding:48px;">
                 <div class="empty-state-icon">📭</div>
-                <div class="empty-state-title">لا توجد ليدز جديدة من فورم الفريق</div>
+                <div class="empty-state-title">لا توجد ليدز بهذه الفلاتر</div>
             </div>
         }
         else
         {
+            <div style="padding:10px 14px;font-size:.78rem;color:var(--text-muted);border-bottom:1px solid var(--border)">
+                @filteredCount عميل@(pageCount > 1 ? $" — صفحة {currentPage} من {pageCount}" : "")
+            </div>
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
+                <table class="table table-hover mb-0" style="font-size:.84rem">
                     <thead>
                         <tr>
                             <th>الكود</th>
                             <th>الاسم</th>
                             <th>الهاتف</th>
                             <th>السن</th>
-                            <th>الوظيفة المطلوبة</th>
-                            <th>ملاحظات</th>
+                            <th>المصدر</th>
+                            <th>الحالة</th>
+                            <th>المسؤول</th>
                             <th>التاريخ</th>
-                            <th>تعيين لـ</th>
+                            <th>تعيين / نقل</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var lead in Model)
                         {
-                            <tr>
-                                <td style="font-family:monospace;font-size:.78rem;color:var(--text-muted);">@(lead.LeadCode ?? "—")</td>
-                                <td style="font-weight:600;">@lead.FullName</td>
-                                <td style="font-family:monospace;font-size:.83rem;" dir="ltr">@lead.Phone</td>
-                                <td>@(lead.Age?.ToString() ?? "—")</td>
-                                <td style="font-size:.82rem;">@(lead.InterestedJobTitle ?? "—")</td>
-                                <td style="font-size:.78rem;color:var(--text-muted);max-width:220px;white-space:normal;">@(lead.Notes ?? "—")</td>
-                                <td style="font-size:.78rem;color:var(--text-muted);">@lead.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
-                                <td>
-                                    @if (myTeam.Any())
+                            int s = lead.Status;
+                            string lbl = s >= 1 && s < statusLabels.Length ? statusLabels[s] : $"حالة {s}";
+                            string col = s >= 1 && s < statusColors.Length ? statusColors[s] : "#64748b";
+                            bool waiting = lead.AssignedSalesId == null;
+                            <tr class="@(waiting ? "tl-row-waiting" : "")">
+                                <td style="font-family:monospace;font-size:.76rem;color:var(--text-muted);">@(lead.LeadCode ?? "—")</td>
+                                <td style="font-weight:600;">
+                                    @lead.FullName
+                                    @if (!string.IsNullOrWhiteSpace(lead.InterestedJobTitle))
                                     {
-                                        <form asp-action="AssignTeamLead" method="post" class="d-flex gap-1">
+                                        <div style="font-size:.72rem;color:var(--text-muted);font-weight:400">@lead.InterestedJobTitle</div>
+                                    }
+                                </td>
+                                <td style="font-family:monospace;font-size:.8rem;" dir="ltr">@lead.Phone</td>
+                                <td>@(lead.Age?.ToString() ?? "—")</td>
+                                <td><span class="tl-src">@SourceLabel(lead)</span></td>
+                                <td>
+                                    <span style="background:@(col+"20");color:@col;border:1px solid @(col+"40");font-size:.7rem;padding:3px 10px;border-radius:99px;font-weight:700;white-space:nowrap">@lbl</span>
+                                </td>
+                                <td>
+                                    @if (waiting)
+                                    {
+                                        <span class="tl-waiting">في انتظار التعيين</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="tl-assigned"><i class="bi bi-person-fill"></i> @(lead.AssignedSales?.FullName ?? "—")</span>
+                                    }
+                                </td>
+                                <td style="font-size:.76rem;color:var(--text-muted);white-space:nowrap">@lead.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>
+                                    @if (lead.IsConverted)
+                                    {
+                                        <span style="font-size:.74rem;color:var(--text-muted)">تم التحويل</span>
+                                    }
+                                    else if (myTeam.Any())
+                                    {
+                                        <form asp-action="AssignTeamLead" method="post" class="tl-assign">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="leadId" value="@lead.Id" />
-                                            <select name="salesUserId" class="form-select form-select-sm" style="min-width:140px" required>
-                                                <option value="" selected disabled>اختر</option>
-                                                @foreach (var m in myTeam)
+                                            <input type="hidden" name="returnQuery" value="@currentQuery" />
+                                            <select name="salesUserId" class="form-select form-select-sm" required>
+                                                <option value="" selected disabled>@(waiting ? "تعيين لـ" : "نقل لـ")</option>
+                                                @foreach (var m in myTeam.Where(m => m.Id != lead.AssignedSalesId))
                                                 {
                                                     <option value="@m.Id">@m.FullName</option>
                                                 }
                                             </select>
-                                            <button type="submit" class="btn btn-primary btn-sm" title="تعيين">
-                                                <i class="bi bi-check-lg"></i>
+                                            <button type="submit" class="btn btn-sm @(waiting ? "btn-primary" : "btn-outline-primary")" title="@(waiting ? "تعيين" : "نقل")">
+                                                <i class="bi @(waiting ? "bi-check-lg" : "bi-arrow-left-right")"></i>
                                             </button>
                                         </form>
                                     }
                                     else
                                     {
-                                        <span style="font-size:.75rem;color:var(--text-muted)">لا يوجد موظفين في فريقك</span>
+                                        <span style="font-size:.74rem;color:var(--text-muted)">لا يوجد موظفين نشطين</span>
                                     }
                                 </td>
                             </tr>
@@ -101,6 +229,21 @@
                     </tbody>
                 </table>
             </div>
+
+            @if (pageCount > 1)
+            {
+                <div class="d-flex justify-content-center gap-2 p-3">
+                    @if (currentPage > 1)
+                    {
+                        <a class="btn btn-outline-secondary btn-sm" href="/TeleSalesManager/TeamFormLeads@(Query(p: currentPage - 1))">السابق</a>
+                    }
+                    <span style="align-self:center;font-size:.8rem;color:var(--text-muted)">@currentPage / @pageCount</span>
+                    @if (currentPage < pageCount)
+                    {
+                        <a class="btn btn-outline-secondary btn-sm" href="/TeleSalesManager/TeamFormLeads@(Query(p: currentPage + 1))">التالي</a>
+                    }
+                </div>
+            }
         }
     </div>
 </div>

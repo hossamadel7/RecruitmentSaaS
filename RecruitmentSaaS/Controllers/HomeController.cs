@@ -278,7 +278,7 @@ namespace RecruitmentSaaS.Controllers
                     await _notifications.SendAsync(managerId,
                         "ليد جديد في فورم الفريق",
                         $"{fullName} — السن {age}",
-                        link: "/TeleSalesManager/TeamFormLeads");
+                        link: "/TeleSalesManager/TeamFormLeads?member=unassigned");
             }
             catch (Exception ex)
             {
