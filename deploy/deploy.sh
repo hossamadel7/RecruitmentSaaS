@@ -17,6 +17,7 @@ SERVICE="recruitmentsaas"                                     # systemd service 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # this repo (auto)
 PUBLISH_DIR="/c/deploy/recruitmentsaas"                       # local publish output (outside repo)
 REMOTE_TARBALL="/home/ubuntu/recruitmentsaas-deploy.tgz"      # staging path on the VPS
+CF_ENV="${CF_ENV:-$HOME/.recruitmentsaas-cloudflare.env}"     # CF_API_TOKEN + CF_ZONE_ID — private, never in git
 # ------------------------------------------------------------------
 
 echo "==> [1/4] Publishing (Release, linux-x64, self-contained)..."
@@ -40,4 +41,22 @@ ssh "$VPS" "sudo /usr/local/bin/recruitmentsaas-deploy.sh"
 echo "==> Health check"
 sleep 3
 ssh "$VPS" "curl -fsS http://127.0.0.1:8082/health && echo"
+
+# The site is behind Cloudflare, which caches CSS/JS/images. Purge after every deploy so
+# everyone gets the new files at once. Needs CF_ENV (see deploy/README.md); skipped without it.
+if [ -f "$CF_ENV" ]; then
+  # shellcheck disable=SC1090
+  . "$CF_ENV"
+  echo "==> Purging Cloudflare cache"
+  if curl -fsS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+       -H "Authorization: Bearer ${CF_API_TOKEN}" -H "Content-Type: application/json" \
+       --data '{"purge_everything":true}' | grep -q '"success":true'; then
+    echo "    purged"
+  else
+    echo "    WARNING: Cloudflare purge failed — purge manually (Caching > Configuration > Purge Everything)"
+  fi
+else
+  echo "==> Cloudflare purge skipped (no $CF_ENV)"
+fi
+
 echo "==> Deployed."

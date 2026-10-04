@@ -21,6 +21,21 @@ bash deploy/deploy.sh
 
 Builds locally, uploads one tarball over SSH, the server swaps it in and restarts the service.
 
+## Cloudflare cache purge (automatic after each deploy)
+
+The site is behind Cloudflare, which caches static files. `deploy.sh` purges that cache after
+a successful deploy when this **private** file exists on the machine you deploy from
+(it is never committed — the repo must not contain tokens):
+
+```bash
+# ~/.recruitmentsaas-cloudflare.env
+CF_API_TOKEN=...   # Cloudflare > My Profile > API Tokens > Create Token > Custom:
+                   #   Permissions: Zone / Cache Purge / Purge — Zone Resources: thearabianfahd.com
+CF_ZONE_ID=...     # Cloudflare > thearabianfahd.com > Overview > API > Zone ID
+```
+
+Without the file the deploy still works and just skips the purge.
+
 ## One-time server setup (already done)
 
 ```bash
