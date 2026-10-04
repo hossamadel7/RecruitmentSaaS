@@ -42,14 +42,14 @@
 }
 
 @* Filters *@
-<div class="card mb-4">
+<div class="card mb-4 users-filter-card">
     <div class="card-body">
         <form method="get" action="/Admin/Users" class="row g-2 align-items-end" id="usersFilter">
-            <div class="col-md-3">
+            <div class="col-12 col-md-3">
                 <label class="form-label form-label-sm">بحث</label>
                 <input name="q" value="@q" class="form-control form-control-sm" placeholder="اسم أو بريد إلكتروني..." />
             </div>
-            <div class="col-md-2">
+            <div class="col-6 col-md-2">
                 <label class="form-label form-label-sm">الحالة</label>
                 <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="active" selected="@(status == "active")">النشطين (@activeCount)</option>
@@ -57,7 +57,7 @@
                     <option value="all" selected="@(status == "all")">الكل (@(activeCount + inactiveCount))</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-6 col-md-2">
                 <label class="form-label form-label-sm">الفريق</label>
                 <select name="team" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="">كل الفرق</option>
@@ -69,7 +69,7 @@
                     <option value="none" selected="@(team == "none")">تيلي سيلز بدون فريق</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-6 col-md-2">
                 <label class="form-label form-label-sm">الدور</label>
                 <select name="role" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="">كل الأدوار</option>
@@ -86,7 +86,7 @@
                     }
                 </select>
             </div>
-            <div class="col-md-2 d-flex gap-2">
+            <div class="col-6 col-md-2 d-flex gap-2">
                 <button type="submit" class="btn btn-primary btn-sm flex-fill">بحث</button>
                 @if (anyFilter)
                 {
@@ -109,7 +109,7 @@
         }
         else
         {
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0 users-table">
                 <thead>
                     <tr>
                         <th>المستخدم</th>
@@ -135,8 +135,8 @@
                         ? allTeleSales.Count(x => x.ManagerId == u.Id)
                         : 0;
 
-                        <tr style="@(!u.IsActive ? "opacity:.5;" : "")">
-                            <td>
+                        <tr class="@(!u.IsActive ? "u-inactive" : "")">
+                            <td class="u-user">
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="avatar avatar-sm"
                                          style="background:@rColorBg;color:@rColor;border:1.5px solid @rColorBorder;">
@@ -155,8 +155,8 @@
                                     </div>
                                 </div>
                             </td>
-                            <td style="font-family:monospace;font-size:.82rem;">@u.Email</td>
-                            <td>
+                            <td class="u-email" dir="ltr">@u.Email</td>
+                            <td class="u-role">
                                 <span style="background:@rColorBg;color:@rColor;border:1px solid @rColorBorder;
                                              font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">
                                     @rName
@@ -164,7 +164,7 @@
                             </td>
 
                             @* Manager / Team column *@
-                            <td style="font-size:.82rem;">
+                            <td class="u-team">
                                 @if (u.Role == 7)
                                 {
                                     @* Manager row: show team count + manage button *@
@@ -202,7 +202,7 @@
                                 }
                             </td>
 
-                            <td>
+                            <td class="u-status">
                                 @if (u.IsActive)
                                 {
                                     <span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;
@@ -214,8 +214,8 @@
                                                  font-size:.72rem;padding:3px 10px;border-radius:99px;font-weight:700;">معطّل</span>
                                 }
                             </td>
-                            <td style="font-size:.78rem;color:var(--text-muted);">@u.CreatedAt.ToString("dd/MM/yyyy")</td>
-                            <td>
+                            <td class="u-date"><span class="u-date-label">أُنشئ </span>@u.CreatedAt.ToString("dd/MM/yyyy")</td>
+                            <td class="u-actions">
                                 <div class="d-flex gap-1 flex-wrap">
                                     <form method="post" action="/Admin/ToggleUser" class="d-inline">
                                         @Html.AntiForgeryToken()
@@ -321,6 +321,35 @@
 }
 
 <style>
+    .users-table .u-email { font-family: monospace; font-size: .82rem; text-align: right; }
+    .users-table .u-team { font-size: .82rem; }
+    .users-table .u-date { font-size: .78rem; color: var(--text-muted); white-space: nowrap; }
+    .users-table .u-date-label { display: none; }
+    .users-table tr.u-inactive { opacity: .5; }
+
+    /* Phones: each user becomes a card — name + status, email, role + team, then actions */
+    @@media (max-width: 767.98px) {
+        .page-header .btn-primary { flex: 1 1 100%; }
+        .users-filter-card .card-body { padding: 12px; }
+        .users-table thead { display: none; }
+        .users-table, .users-table tbody { display: block; width: 100%; }
+        .users-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 14px; border-bottom: 1px solid var(--border); }
+        .users-table tr:last-child { border-bottom: 0; }
+        .users-table td { display: block; border: 0 !important; padding: 0 !important; background: transparent !important; }
+        .users-table .u-user { order: 1; flex: 1 1 0; min-width: 0; }
+        .users-table .u-user .avatar { width: 40px; height: 40px; font-size: 1rem; flex-shrink: 0; }
+        .users-table .u-status { order: 2; flex: 0 0 auto; align-self: flex-start; }
+        .users-table .u-email { order: 3; flex: 1 1 100%; font-size: .78rem; color: var(--text-muted); word-break: break-all; text-align: left; }
+        .users-table .u-role { order: 4; flex: 0 0 auto; }
+        .users-table .u-team { order: 5; flex: 1 1 auto; min-width: 0; }
+        .users-table .u-date { order: 6; flex: 1 1 auto; align-self: center; }
+        .users-table .u-date-label { display: inline; }
+        .users-table .u-actions { order: 7; flex: 1 1 100%; }
+        .users-table .u-actions > div { flex-wrap: nowrap !important; gap: 6px !important; }
+        .users-table .u-actions > div > .btn, .users-table .u-actions > div > form { flex: 1 1 0; }
+        .users-table .u-actions .btn { width: 100%; height: 40px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.05rem; }
+    }
+
     .team-toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
     .team-search { position: relative; }
     .team-search i { position: absolute; top: 50%; inset-inline-start: 12px; transform: translateY(-50%); color: var(--text-muted); }
@@ -354,7 +383,7 @@
                                      .OrderBy(t => t.Manager?.FullName).ThenBy(t => t.FullName).ToList();
 
     <div class="modal fade team-modal" id="manageTeamModal_@mgr.Id" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg modal-fullscreen-sm-down">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
@@ -421,7 +450,7 @@
 }
 
 @* ── CREATE USER MODAL ───────────────────────────────────────────────────── *@<div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">مستخدم جديد</h5>
@@ -478,7 +507,7 @@
 
 @* ── EDIT USER MODAL ─────────────────────────────────────────────────────── *@
 <div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>تعديل بيانات المستخدم</h5>
@@ -516,7 +545,7 @@
 
 @* ── RESET PASSWORD MODAL ────────────────────────────────────────────────── *@
 <div class="modal fade" id="resetPwdModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">تغيير كلمة المرور</h5>
