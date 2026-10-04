@@ -147,7 +147,7 @@ namespace RecruitmentSaaS.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Exception during Meta code exchange.");
-                return (false, null, ex.Message);
+                return (false, null, "Could not reach Meta to finish connecting. Please try again.");
             }
         }
 

@@ -68,13 +68,15 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("WalkIn");
             }
 
+            var normalizedPhone = RecruitmentSaaS.Services.PhoneNumbers.Normalize(phone);
+            var phoneVariants = RecruitmentSaaS.Services.PhoneNumbers.StoredVariants(normalizedPhone);
             var lead = await _context.Leads
                 .Include(l => l.AssignedSales)
-                .FirstOrDefaultAsync(l => l.Phone == phone.Trim());
+                .FirstOrDefaultAsync(l => phoneVariants.Contains(l.Phone));
 
             if (lead == null)
             {
-                TempData["NewWalkInPhone"] = phone.Trim();
+                TempData["NewWalkInPhone"] = normalizedPhone;
                 TempData["Info"] = "لم يتم العثور على العميل — يمكنك تسجيله كعميل جديد";
                 return RedirectToAction("NewWalkIn");
             }
@@ -233,8 +235,15 @@ namespace RecruitmentSaaS.Controllers
         {
             var userId = CurrentUserId;
 
+            dto.Phone = RecruitmentSaaS.Services.PhoneNumbers.Normalize(dto.Phone);
+            if (!RecruitmentSaaS.Services.PhoneNumbers.IsValid(dto.Phone))
+            {
+                TempData["Error"] = "رقم الهاتف غير صحيح";
+                return RedirectToAction("WalkIn");
+            }
+            var phoneVariants = RecruitmentSaaS.Services.PhoneNumbers.StoredVariants(dto.Phone);
             var existing = await _context.Leads
-                .FirstOrDefaultAsync(l => l.Phone == dto.Phone);
+                .FirstOrDefaultAsync(l => phoneVariants.Contains(l.Phone));
 
             if (existing != null)
             {

@@ -1,4 +1,5 @@
 @model List<RecruitmentSaaS.Controllers.SalaryUserDto>
+@{ ViewData["OwnSuccessAlert"] = true; ViewData["OwnErrorAlert"] = true; } @* this page shows its own TempData alerts; _Layout skips them *@
 @{
     ViewData["Title"] = "صرف المرتبات";
     int     selMonth     = (int)ViewBag.SelectedMonth;

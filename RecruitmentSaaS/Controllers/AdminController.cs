@@ -165,9 +165,17 @@ namespace RecruitmentSaaS.Controllers
                 .Select(u => new { u.Id, u.FullName })
                 .ToListAsync();
 
+            // Team counts and the "manage team" modal must ignore the search/role filter
+            var allTeleSales = await _context.Users
+                .Include(u => u.Manager)
+                .Where(u => u.Role == 3)
+                .OrderBy(u => u.FullName)
+                .ToListAsync();
+
             ViewBag.Q        = q;
             ViewBag.Role     = role;
             ViewBag.Managers = managers;
+            ViewBag.AllTeleSales = allTeleSales;
 
             return View(users);
         }
@@ -249,7 +257,55 @@ namespace RecruitmentSaaS.Controllers
             user.IsActive = !user.IsActive;
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = user.IsActive ? $"تم تفعيل {user.FullName}" : $"تم تعطيل {user.FullName}";
+            // A deactivated user is logged out on their very next click, not after the cache expires
+            RecruitmentSaaS.Services.UserSessionValidator.Forget(
+                HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), user.Id);
+
+            TempData["Success"] = user.IsActive ? $"تم تفعيل {user.FullName}" : $"تم تعطيل {user.FullName} — تم تسجيل خروجه من النظام";
+            return RedirectToAction("Users");
+        }
+
+        // ── POST /Admin/UpdateUser — change a user's name / login email ─────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateUser(Guid userId, string fullName, string email)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                TempData["Error"] = "المستخدم غير موجود";
+                return RedirectToAction("Users");
+            }
+
+            fullName = (fullName ?? "").Trim();
+            email = (email ?? "").Trim();
+
+            if (fullName.Length < 2 || fullName.Length > 200)
+            {
+                TempData["Error"] = "الاسم مطلوب (من 2 لـ 200 حرف)";
+                return RedirectToAction("Users");
+            }
+
+            if (email.Length > 255 || !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email))
+            {
+                TempData["Error"] = "البريد الإلكتروني غير صحيح";
+                return RedirectToAction("Users");
+            }
+
+            if (await _context.Users.AnyAsync(u => u.Email == email && u.Id != userId))
+            {
+                TempData["Error"] = "البريد الإلكتروني مستخدم بالفعل لمستخدم آخر";
+                return RedirectToAction("Users");
+            }
+
+            var emailChanged = !string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase);
+            user.FullName = fullName;
+            user.Email = email;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = emailChanged
+                ? $"تم تحديث بيانات {fullName} — تسجيل الدخول من الآن بالبريد {email}"
+                : $"تم تحديث بيانات {fullName}";
             return RedirectToAction("Users");
         }
 
@@ -2505,6 +2561,36 @@ namespace RecruitmentSaaS.Controllers
             await _context.SaveChangesAsync();
 
             TempData["Success"] = account.IsActive ? "تم تفعيل الرقم" : "تم إيقاف الرقم";
+            return RedirectToAction("WhatsAppAccounts");
+        }
+
+        // ── POST /Admin/DeleteWhatsAppAccount ───────────────────────────────
+        // Only numbers with no chat history can be deleted — conversations, messages and
+        // handoffs reference the account, so a used number must be switched off instead.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteWhatsAppAccount(Guid accountId)
+        {
+            var account = await _context.WhatsAppAccounts.FindAsync(accountId);
+            if (account == null)
+            {
+                TempData["Error"] = "رقم الواتساب غير موجود";
+                return RedirectToAction("WhatsAppAccounts");
+            }
+
+            var inUse = await _context.WhatsAppConversations.AnyAsync(c => c.WhatsAppAccountId == accountId)
+                     || await _context.WhatsAppMessages.AnyAsync(m => m.WhatsAppAccountId == accountId)
+                     || await _context.WhatsAppHandoffs.AnyAsync(h => h.WhatsAppAccountId == accountId);
+            if (inUse)
+            {
+                TempData["Error"] = $"الرقم \"{account.Name}\" عليه محادثات — لا يمكن حذفه حفاظاً على سجل المحادثات. أوقفه بدلاً من الحذف.";
+                return RedirectToAction("WhatsAppAccounts");
+            }
+
+            _context.WhatsAppAccounts.Remove(account);
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"تم حذف رقم \"{account.Name}\"";
             return RedirectToAction("WhatsAppAccounts");
         }
     }

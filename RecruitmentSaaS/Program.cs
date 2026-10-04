@@ -19,7 +19,14 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.AccessDeniedPath = "/Auth/AccessDenied";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
+        // Log out users who were deactivated (or whose role changed) — see UserSessionValidator
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnValidatePrincipal = UserSessionValidator.ValidateAsync
+        };
     });
+
+builder.Services.AddMemoryCache();
 
 builder.Services.AddControllersWithViews();
 
@@ -55,7 +62,21 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (!ctx.Context.Request.Path.StartsWithSegments("/uploads")) return;
+        var headers = ctx.Context.Response.Headers;
+        headers["X-Content-Type-Options"] = "nosniff";
+        // Anything uploaded before type checks existed (.html, .svg, …) downloads instead of running on our domain
+        if (SafeUploads.IsActiveContent(ctx.File.Name))
+        {
+            headers["Content-Disposition"] = "attachment";
+            headers["Content-Security-Policy"] = "sandbox";
+        }
+    }
+});
 app.UseRouting();
 
 app.UseAuthentication(); // ← must be before UseAuthorization

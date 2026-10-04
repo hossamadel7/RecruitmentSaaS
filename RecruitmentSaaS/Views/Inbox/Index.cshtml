@@ -6,7 +6,7 @@
 }
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/inbox.css" />
+    <link rel="stylesheet" href="~/css/inbox.css" asp-append-version="true" />
 }
 
 <div class="inbox-app" id="inbox-app">
@@ -25,11 +25,20 @@
                     <i class="bi bi-search"></i>
                     <input type="text" id="conv-search" placeholder="بحث بالاسم أو الهاتف أو كود العميل..." />
                 </div>
-                <div class="inbox-filter-row" id="filter-row">
+                @if (currentRole == "1" || currentRole == "7")
+                {
+                    @* Admin / TeleSales Manager: chats of one salesperson or one team *@
+                    <div class="inbox-agent-filter">
+                        <i class="bi bi-person"></i>
+                        <select id="agent-filter" aria-label="فلترة حسب المندوب">
+                            <option value="">كل المندوبين</option>
+                        </select>
+                        <i class="bi bi-chevron-down inbox-agent-filter-caret"></i>
+                    </div>
+                }
+                <div class="inbox-filter-row" id="filter-row" role="tablist" aria-label="حالة المحادثة">
                     <button class="inbox-filter-chip active" data-filter="all">الكل</button>
                     <button class="inbox-filter-chip" data-filter="unread">غير مقروء</button>
-                    <button class="inbox-filter-chip" data-filter="me">مخصص لي</button>
-                    <button class="inbox-filter-chip" data-filter="unassigned">غير مخصص</button>
                     <button class="inbox-filter-chip" data-filter="open">مفتوح</button>
                     <button class="inbox-filter-chip" data-filter="followup">متابعة</button>
                     <button class="inbox-filter-chip" data-filter="closed">مغلق</button>
@@ -52,7 +61,7 @@
 
             <div id="chat-active" style="display:none;flex-direction:column;flex:1;min-height:0">
                 <div class="chat-header" id="chat-header" onclick="Inbox.showScreen('customer')">
-                    <button class="mobile-back-btn" onclick="event.stopPropagation();Inbox.showScreen('list')"><i class="bi bi-chevron-right"></i></button>
+                    <button class="mobile-back-btn" onclick="event.stopPropagation();Inbox.showScreen('list')"><i class="bi bi-arrow-right"></i></button>
                     <div class="conv-avatar" id="chat-avatar">؟</div>
                     <div style="flex:1;min-width:0">
                         <div class="chat-header-name" id="chat-header-name">—</div>
@@ -63,11 +72,41 @@
 
                 <div class="chat-messages" id="chat-messages"></div>
 
-                <div class="chat-composer">
-                    <textarea id="composer-input" rows="1" placeholder="اكتب رسالة... (Enter للإرسال، Shift+Enter لسطر جديد)"></textarea>
-                    <button class="composer-send-btn" id="composer-send-btn" title="إرسال">
-                        <i class="bi bi-send-fill"></i>
+                <div class="chat-composer" id="chat-composer">
+                    <button type="button" class="composer-icon-btn" id="composer-attach-btn" title="إرفاق صورة أو ملف">
+                        <i class="bi bi-plus-lg"></i>
                     </button>
+                    <div class="composer-input-wrap">
+                        <textarea id="composer-input" rows="1" placeholder="اكتب رسالة... (Enter للإرسال، Shift+Enter لسطر جديد)"></textarea>
+                        <button type="button" class="composer-inline-btn" id="composer-camera-btn" title="الكاميرا">
+                            <i class="bi bi-camera"></i>
+                        </button>
+                    </div>
+                    <button type="button" class="composer-send-btn is-mic" id="composer-send-btn" title="تسجيل رسالة صوتية">
+                        <i class="bi bi-mic-fill"></i>
+                    </button>
+                    <input type="file" id="composer-file" hidden
+                           accept="image/*,video/mp4,video/3gpp,application/pdf,.doc,.docx,.xls,.xlsx,.txt" />
+                    <input type="file" id="composer-camera" hidden accept="image/*" capture="environment" />
+                </div>
+
+                @* Voice-note recording bar (replaces the composer while recording) *@
+                <div class="chat-recorder" id="chat-recorder" hidden>
+                    <button type="button" class="recorder-cancel" id="recorder-cancel" title="إلغاء"><i class="bi bi-trash3"></i></button>
+                    <div class="recorder-status"><span class="recorder-dot"></span><span id="recorder-time">0:00</span><span class="recorder-label">جارٍ التسجيل…</span></div>
+                    <button type="button" class="composer-send-btn" id="recorder-send" title="إرسال الرسالة الصوتية"><i class="bi bi-send-fill"></i></button>
+                </div>
+
+                @* Photo / video preview with caption, like WhatsApp *@
+                <div class="media-preview" id="media-preview" hidden>
+                    <div class="media-preview-top">
+                        <button type="button" class="media-preview-close" id="media-preview-cancel" title="إلغاء"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                    <div class="media-preview-body" id="media-preview-body"></div>
+                    <div class="media-preview-bar">
+                        <input type="text" id="media-preview-caption" placeholder="أضف تعليقاً..." maxlength="1000" />
+                        <button type="button" class="composer-send-btn" id="media-preview-send" title="إرسال"><i class="bi bi-send-fill"></i></button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -75,7 +114,7 @@
         <!-- ══════════ SCREEN 3 (mobile) / COLUMN 3 (desktop) — Customer / Lead panel ══════════ -->
         <aside class="inbox-col inbox-col-customer" id="col-customer">
             <div class="chat-header">
-                <button class="mobile-back-btn" onclick="Inbox.showScreen('chat')"><i class="bi bi-chevron-right"></i></button>
+                <button class="mobile-back-btn" onclick="Inbox.showScreen('chat')"><i class="bi bi-arrow-right"></i></button>
                 <div style="font-weight:700;font-size:13.5px">بيانات العميل</div>
             </div>
             <div class="customer-panel-body" id="customer-panel-body">
@@ -99,5 +138,5 @@
         // Let the inbox use the full page body instead of the default padded layout.
         document.querySelector('.page-body')?.classList.add('inbox-page-body');
     </script>
-    <script src="~/js/inbox.js"></script>
+    <script src="~/js/inbox.js" asp-append-version="true"></script>
 }

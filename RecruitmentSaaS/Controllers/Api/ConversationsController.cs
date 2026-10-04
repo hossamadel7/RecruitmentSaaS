@@ -37,12 +37,13 @@ namespace RecruitmentSaaS.Controllers.Api
         private bool IsOrgWide => WhatsAppAuthorization.IsOrgWide(CurrentRole);
 
         // ── GET /api/conversations ────────────────────────────────────────────
-        // accountId=<guid|all>  assigned=<me|unassigned|<agentGuid>>  status=<byte>
+        // accountId=<guid|all>  assigned=<me|unassigned|<agentGuid>>  team=<managerGuid>  status=<byte>
         // unreadOnly=<bool>  search=<text>  page=<int>
         [HttpGet]
         public async Task<IActionResult> List(
             [FromQuery] Guid? accountId,
             [FromQuery] string? assigned,
+            [FromQuery] Guid? team,
             [FromQuery] byte? status,
             [FromQuery] bool unreadOnly = false,
             [FromQuery] string? search = null,
@@ -73,6 +74,10 @@ namespace RecruitmentSaaS.Controllers.Api
                 else if (Guid.TryParse(assigned, out var agentId))
                     query = query.Where(c => c.AssignedSalesAgentId == agentId);
             }
+
+            // All chats of one TeleSales team (agents whose manager is <team>)
+            if (team.HasValue)
+                query = query.Where(c => c.AssignedSalesAgent != null && c.AssignedSalesAgent.ManagerId == team.Value);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -186,6 +191,7 @@ namespace RecruitmentSaaS.Controllers.Api
                     MessageType = m.MessageType,
                     TextBody = m.TextBody,
                     MediaUrl = m.MediaUrl,
+                    HasMedia = m.MediaId != null,
                     Status = m.Status,
                     ErrorMessage = m.ErrorMessage,
                     SenderUserId = m.SenderUserId,
@@ -201,6 +207,155 @@ namespace RecruitmentSaaS.Controllers.Api
         }
 
         // ── POST /api/conversations/{id}/messages ─────────────────────────────
+        // ── GET /api/conversations/{id}/messages/{messageId}/media ───────────
+        // Streams a message's photo / voice note / file. Meta's media URLs need our access token,
+        // so the browser can't load them directly.
+        [HttpGet("{id:guid}/messages/{messageId:guid}/media")]
+        public async Task<IActionResult> GetMedia(Guid id, Guid messageId, CancellationToken ct)
+        {
+            var conversation = await _context.WhatsAppConversations.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
+            if (conversation == null) return NotFound();
+            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+                return Forbid();
+
+            var mediaId = await _context.WhatsAppMessages.AsNoTracking()
+                .Where(m => m.Id == messageId && m.ConversationId == id)
+                .Select(m => m.MediaId)
+                .FirstOrDefaultAsync(ct);
+            if (string.IsNullOrWhiteSpace(mediaId)) return NotFound();
+
+            var file = await _cloudApi.DownloadMediaAsync(mediaId, ct);
+            if (file == null) return NotFound(new { error = "تعذر تحميل الملف من واتساب (قد يكون انتهت صلاحيته)" });
+
+            Response.Headers.CacheControl = "private, max-age=86400";
+            return File(file.Data, file.ContentType, enableRangeProcessing: true); // range = seekable audio/video
+        }
+
+        // What WhatsApp accepts (https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media)
+        private static readonly Dictionary<string, (string type, long maxBytes)> AllowedMedia = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["image/jpeg"] = ("image", 5 * 1024 * 1024),
+            ["image/png"] = ("image", 5 * 1024 * 1024),
+            ["audio/ogg"] = ("audio", 16 * 1024 * 1024),
+            ["audio/mp4"] = ("audio", 16 * 1024 * 1024),
+            ["audio/aac"] = ("audio", 16 * 1024 * 1024),
+            ["audio/mpeg"] = ("audio", 16 * 1024 * 1024),
+            ["audio/amr"] = ("audio", 16 * 1024 * 1024),
+            ["video/mp4"] = ("video", 16 * 1024 * 1024),
+            ["video/3gpp"] = ("video", 16 * 1024 * 1024),
+            ["application/pdf"] = ("document", 16 * 1024 * 1024),
+            ["application/msword"] = ("document", 16 * 1024 * 1024),
+            ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"] = ("document", 16 * 1024 * 1024),
+            ["application/vnd.ms-excel"] = ("document", 16 * 1024 * 1024),
+            ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] = ("document", 16 * 1024 * 1024),
+            ["text/plain"] = ("document", 16 * 1024 * 1024),
+        };
+
+        // ── POST /api/conversations/{id}/media ────────────────────────────────
+        // multipart: file, caption? — photo, voice note (audio/ogg opus), video or document
+        [HttpPost("{id:guid}/media")]
+        [RequestSizeLimit(20 * 1024 * 1024)]
+        public async Task<IActionResult> SendMedia(Guid id, IFormFile? file, [FromForm] string? caption, CancellationToken ct)
+        {
+            if (file == null || file.Length == 0) return BadRequest(new { error = "لم يتم اختيار ملف" });
+
+            var mime = (file.ContentType ?? "").Split(';')[0].Trim();
+            if (!AllowedMedia.TryGetValue(mime, out var kind))
+                return BadRequest(new { error = $"نوع الملف غير مدعوم في واتساب ({mime})" });
+            if (file.Length > kind.maxBytes)
+                return BadRequest(new { error = $"حجم الملف أكبر من المسموح ({kind.maxBytes / (1024 * 1024)} ميجا)" });
+
+            var conversation = await _context.WhatsAppConversations
+                .Include(c => c.Contact)
+                .Include(c => c.WhatsAppAccount)
+                .FirstOrDefaultAsync(c => c.Id == id, ct);
+            if (conversation == null) return NotFound();
+            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+                return Forbid();
+
+            caption = string.IsNullOrWhiteSpace(caption) ? null : caption.Trim();
+            var fileName = Path.GetFileName(file.FileName);
+            var now = DateTime.UtcNow;
+
+            var message = new WhatsAppMessage
+            {
+                Id = Guid.NewGuid(),
+                ConversationId = conversation.Id,
+                WhatsAppAccountId = conversation.WhatsAppAccountId,
+                Direction = (byte)MessageDirection.Outgoing,
+                MessageType = (byte)(kind.type switch
+                {
+                    "image" => WhatsAppMessageType.Image,
+                    "audio" => WhatsAppMessageType.Audio,
+                    "video" => WhatsAppMessageType.Video,
+                    _ => WhatsAppMessageType.Document
+                }),
+                MessageSource = (byte)MessageSource.CloudApi,
+                TextBody = kind.type == "document" ? (caption ?? fileName) : caption,
+                SenderUserId = CurrentUserId,
+                Status = (byte)MessageStatus.Queued,
+                WhatsAppTimestamp = now,
+                CreatedAt = now
+            };
+            _context.WhatsAppMessages.Add(message);
+
+            conversation.LastMessageAt = now;
+            conversation.UpdatedAt = now;
+            if (conversation.Status == (byte)ConversationStatus.New || conversation.Status == (byte)ConversationStatus.Open)
+                conversation.Status = (byte)ConversationStatus.WaitingForCustomer;
+            await _context.SaveChangesAsync(ct);
+
+            byte[] data;
+            using (var ms = new MemoryStream())
+            {
+                await file.CopyToAsync(ms, ct);
+                data = ms.ToArray();
+            }
+
+            var phoneNumberId = conversation.WhatsAppAccount.PhoneNumberId;
+            var upload = await _cloudApi.UploadMediaAsync(phoneNumberId, data, mime, string.IsNullOrWhiteSpace(fileName) ? "file" : fileName, ct);
+            var result = upload.Success && upload.MediaId != null
+                ? await _cloudApi.SendMediaMessageAsync(phoneNumberId, conversation.Contact.WhatsAppPhoneNumber, kind.type, upload.MediaId, caption, fileName, ct)
+                : upload;
+
+            message.MediaId = upload.MediaId; // lets us show our own sent photo / voice note back in the chat
+            message.Status = result.Success ? (byte)MessageStatus.Sent : (byte)MessageStatus.Failed;
+            message.WhatsAppMessageId = result.WhatsAppMessageId;
+            message.ErrorCode = result.ErrorCode;
+            message.ErrorMessage = result.ErrorMessage;
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                ActorId = CurrentUserId,
+                ActorType = 1,
+                EventType = "MediaSent",
+                EntityType = "WhatsAppConversation",
+                EntityId = conversation.Id,
+                NewValueJson = $"{{\"type\":\"{kind.type}\",\"mime\":\"{mime}\",\"bytes\":{file.Length}}}",
+                CreatedAt = now
+            });
+            await _context.SaveChangesAsync(ct);
+
+            await _notifier.NewMessageAsync(message, conversation.AssignedSalesAgentId, CurrentUserName);
+            if (!result.Success)
+                await _notifier.MessageStatusUpdatedAsync(message.Id, conversation.Id, message.Status, message.ErrorMessage);
+
+            return Ok(new WhatsAppMessageDto
+            {
+                Id = message.Id,
+                Direction = message.Direction,
+                MessageType = message.MessageType,
+                TextBody = message.TextBody,
+                HasMedia = message.MediaId != null,
+                Status = message.Status,
+                ErrorMessage = message.ErrorMessage,
+                SenderUserId = message.SenderUserId,
+                SenderUserName = CurrentUserName,
+                WhatsAppTimestamp = message.WhatsAppTimestamp
+            });
+        }
+
         [HttpPost("{id:guid}/messages")]
         public async Task<IActionResult> SendMessage(Guid id, [FromBody] SendMessageDto dto)
         {
@@ -265,7 +420,7 @@ namespace RecruitmentSaaS.Controllers.Api
             });
             await _context.SaveChangesAsync();
 
-            await _notifier.NewMessageAsync(message, conversation.AssignedSalesAgentId);
+            await _notifier.NewMessageAsync(message, conversation.AssignedSalesAgentId, CurrentUserName);
             if (!result.Success)
                 await _notifier.MessageStatusUpdatedAsync(message.Id, conversation.Id, message.Status, message.ErrorMessage);
 

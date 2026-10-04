@@ -17,6 +17,13 @@ namespace RecruitmentSaaS.Services
     {
         Task<string?> GetCurrentAccessTokenAsync(CancellationToken ct = default);
 
+        /// <summary>
+        /// Every token we have, preferred first: the Embedded Signup token, then WhatsApp:AccessToken.
+        /// They can cover different WABAs (e.g. a number added manually with a System User token
+        /// next to one connected through Embedded Signup), so senders fall back on permission errors.
+        /// </summary>
+        Task<IReadOnlyList<string>> GetAccessTokensAsync(CancellationToken ct = default);
+
         Task SaveAccessTokenAsync(string accessToken, CancellationToken ct = default);
     }
 
@@ -44,6 +51,21 @@ namespace RecruitmentSaaS.Services
 
             var configured = _config["WhatsApp:AccessToken"];
             return string.IsNullOrWhiteSpace(configured) ? null : configured;
+        }
+
+        public async Task<IReadOnlyList<string>> GetAccessTokensAsync(CancellationToken ct = default)
+        {
+            var stored = await _context.MetaSystemCredentials
+                .AsNoTracking()
+                .OrderByDescending(c => c.ObtainedAt)
+                .Select(c => c.AccessToken)
+                .FirstOrDefaultAsync(ct);
+
+            return new[] { stored, _config["WhatsApp:AccessToken"] }
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Select(t => t!)
+                .Distinct()
+                .ToList();
         }
 
         public async Task SaveAccessTokenAsync(string accessToken, CancellationToken ct = default)

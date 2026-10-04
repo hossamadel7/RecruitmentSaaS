@@ -10,7 +10,7 @@ namespace RecruitmentSaaS.Services
     /// </summary>
     public interface IInboxRealtimeNotifier
     {
-        Task NewMessageAsync(WhatsAppMessage message, Guid? assignedAgentId);
+        Task NewMessageAsync(WhatsAppMessage message, Guid? assignedAgentId, string? senderUserName = null);
 
         Task MessageStatusUpdatedAsync(Guid messageId, Guid conversationId, byte status, string? errorMessage);
 
@@ -30,7 +30,7 @@ namespace RecruitmentSaaS.Services
             _hub = hub;
         }
 
-        public async Task NewMessageAsync(WhatsAppMessage message, Guid? assignedAgentId)
+        public async Task NewMessageAsync(WhatsAppMessage message, Guid? assignedAgentId, string? senderUserName = null)
         {
             var payload = new
             {
@@ -41,9 +41,12 @@ namespace RecruitmentSaaS.Services
                 message.MessageType,
                 message.TextBody,
                 message.MediaUrl,
+                HasMedia = message.MediaId != null,
                 message.Status,
                 message.WhatsAppTimestamp,
-                message.CreatedAt
+                message.CreatedAt,
+                message.SenderUserId,
+                SenderUserName = senderUserName ?? message.SenderUser?.FullName
             };
 
             await BroadcastAsync("NewMessage", message.ConversationId, assignedAgentId, payload);

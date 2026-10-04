@@ -1448,11 +1448,11 @@
 
     <main class="main-content">
         <div class="page-body">
-            @if (TempData["Success"] != null)
+            @if (TempData["Success"] != null && ViewData["OwnSuccessAlert"] == null)
             {
                 <div class="alert alert-success mb-4"><i class="bi bi-check-circle-fill"></i> @TempData["Success"]</div>
             }
-            @if (TempData["Error"] != null)
+            @if (TempData["Error"] != null && ViewData["OwnErrorAlert"] == null)
             {
                 <div class="alert alert-danger mb-4"><i class="bi bi-exclamation-circle-fill"></i> @TempData["Error"]</div>
             }

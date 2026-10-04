@@ -60,6 +60,14 @@ namespace RecruitmentSaaS.Services
                         continue;
                     }
 
+                    // Manually-added accounts start as Pending; a delivered webhook proves the subscription works
+                    if (account.WebhookSubscriptionStatus != (byte)WebhookSubscriptionStatus.Subscribed)
+                    {
+                        account.WebhookSubscriptionStatus = (byte)WebhookSubscriptionStatus.Subscribed;
+                        account.UpdatedAt = DateTime.UtcNow;
+                        await _context.SaveChangesAsync(ct);
+                    }
+
                     var contactsJ = value["contacts"] as JArray ?? new JArray();
                     var messagesJ = value["messages"] as JArray ?? new JArray();
                     var statusesJ = value["statuses"] as JArray ?? new JArray();
@@ -156,7 +164,7 @@ namespace RecruitmentSaaS.Services
             conversation.LastMessageAt = whatsAppTimestamp;
             conversation.UpdatedAt = now;
 
-            await TryConnectHandoffAsync(conversation, textBody, now, ct);
+            await TryConnectHandoffAsync(conversation, account, fromWaId, textBody, now, ct);
 
             await _context.SaveChangesAsync(ct);
 
@@ -396,14 +404,19 @@ namespace RecruitmentSaaS.Services
             }
         }
 
-        private async Task TryConnectHandoffAsync(WhatsAppConversation conversation, string? textBody, DateTime now, CancellationToken ct)
+        private async Task TryConnectHandoffAsync(WhatsAppConversation conversation, WhatsAppAccount account,
+                                                  string fromWaId, string? textBody, DateTime now, CancellationToken ct)
         {
-            if (conversation.LeadId != null || string.IsNullOrWhiteSpace(textBody))
+            if (conversation.LeadId != null)
                 return;
 
-            var match = HandoffRefPattern.Match(textBody);
+            var match = string.IsNullOrWhiteSpace(textBody) ? Match.Empty : HandoffRefPattern.Match(textBody);
             if (!match.Success)
+            {
+                // No reference code (deleted by the customer, or they messaged the number directly)
+                await TryLinkLeadByPhoneAsync(conversation, account, fromWaId, now, ct);
                 return;
+            }
 
             var referenceCode = match.Value;
 
@@ -412,7 +425,10 @@ namespace RecruitmentSaaS.Services
                     (h.Status == (byte)HandoffStatus.Generated || h.Status == (byte)HandoffStatus.Sent), ct);
 
             if (handoff == null)
+            {
+                await TryLinkLeadByPhoneAsync(conversation, account, fromWaId, now, ct);
                 return;
+            }
 
             conversation.LeadId = handoff.LeadId;
             if (handoff.AssignedSalesAgentId != Guid.Empty)
@@ -430,6 +446,51 @@ namespace RecruitmentSaaS.Services
                 EntityType = "WhatsAppHandoff",
                 EntityId = handoff.Id,
                 NewValueJson = $"{{\"conversationId\":\"{conversation.Id}\",\"leadId\":\"{handoff.LeadId}\"}}",
+                CreatedAt = now
+            });
+        }
+
+        /// <summary>
+        /// Fallback when there is no handoff reference: link the chat to the lead with the same
+        /// phone number and hand it to that lead's salesperson. Lead phones are stored as entered
+        /// (Egyptian local "01…" from the website form), WhatsApp sends international "201…".
+        /// </summary>
+        private async Task TryLinkLeadByPhoneAsync(WhatsAppConversation conversation, WhatsAppAccount account,
+                                                   string fromWaId, DateTime now, CancellationToken ct)
+        {
+            var normalized = PhoneNumbers.Normalize(fromWaId);
+            if (!PhoneNumbers.IsValid(normalized))
+                return;
+
+            var phones = PhoneNumbers.StoredVariants(normalized);
+
+            var lead = await _context.Leads
+                .AsNoTracking()
+                .Where(l => phones.Contains(l.Phone))
+                .Select(l => new { l.Id, l.AssignedSalesId })
+                .FirstOrDefaultAsync(ct);
+
+            if (lead == null)
+                return;
+
+            conversation.LeadId = lead.Id;
+
+            // Don't take a chat away from someone it was deliberately given to — only replace
+            // "nobody" or the number's default agent
+            if (lead.AssignedSalesId != null
+                && (conversation.AssignedSalesAgentId == null || conversation.AssignedSalesAgentId == account.AssignedSalesAgentId))
+            {
+                conversation.AssignedSalesAgentId = lead.AssignedSalesId;
+            }
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                ActorType = 3,
+                EventType = "WhatsAppLinkedByPhone",
+                EntityType = "WhatsAppConversation",
+                EntityId = conversation.Id,
+                NewValueJson = $"{{\"leadId\":\"{lead.Id}\",\"assignedTo\":\"{conversation.AssignedSalesAgentId}\"}}",
                 CreatedAt = now
             });
         }

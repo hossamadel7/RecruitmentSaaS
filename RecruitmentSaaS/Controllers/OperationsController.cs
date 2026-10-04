@@ -361,7 +361,13 @@ namespace RecruitmentSaaS.Controllers
             var uploadFolder = Path.Combine(_env.WebRootPath, "uploads", "candidates", candidateId.ToString());
             Directory.CreateDirectory(uploadFolder);
 
-            var ext = Path.GetExtension(file.FileName);
+            // Only PDF / JPG / PNG, checked by content — never trust the uploaded name
+            var ext = await RecruitmentSaaS.Services.SafeUploads.CheckAsync(file, RecruitmentSaaS.Services.SafeUploads.DocumentTypes);
+            if (ext == null)
+            {
+                TempData["Error"] = RecruitmentSaaS.Services.SafeUploads.DocumentTypesError;
+                return RedirectToAction("CandidateDetail", new { id = candidateId });
+            }
             var uniqueFileName = $"{Guid.NewGuid()}{ext}";
             var filePath = Path.Combine(uploadFolder, uniqueFileName);
 

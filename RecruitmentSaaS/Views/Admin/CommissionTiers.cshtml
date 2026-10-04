@@ -1,4 +1,5 @@
 @model List<RecruitmentSaaS.Controllers.CommissionTierDto>
+@{ ViewData["OwnSuccessAlert"] = true; ViewData["OwnErrorAlert"] = true; } @* this page shows its own TempData alerts; _Layout skips them *@
 @{
     ViewData["Title"] = "شرائح العمولة";
     ViewData["Subtitle"] = "إدارة نظام العمولات حسب عدد الصفقات";

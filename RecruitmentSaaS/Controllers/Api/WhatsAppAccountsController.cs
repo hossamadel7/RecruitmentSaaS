@@ -78,7 +78,13 @@ namespace RecruitmentSaaS.Controllers.Api
                 .AsNoTracking()
                 .Where(u => u.IsActive && (u.Role == 6 || u.Role == 3))
                 .OrderBy(u => u.FullName)
-                .Select(u => new { u.Id, u.FullName })
+                .Select(u => new
+                {
+                    u.Id,
+                    u.FullName,
+                    u.ManagerId,
+                    ManagerName = u.Manager != null && u.Manager.IsActive ? u.Manager.FullName : null
+                })
                 .ToListAsync();
 
             return Ok(agents);

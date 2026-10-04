@@ -1,5 +1,6 @@
 @using RecruitmentSaaS.Models.Entities
 @model IEnumerable<User>
+@{ ViewData["OwnSuccessAlert"] = true; ViewData["OwnErrorAlert"] = true; } @* this page shows its own TempData alerts; _Layout skips them *@
 @{
     ViewData["Title"] = "المستخدمون";
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -7,6 +8,7 @@
     string? q = ViewBag.Q;
     int? role = ViewBag.Role;
     var managers = ViewBag.Managers as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var allTeleSales = ViewBag.AllTeleSales as List<RecruitmentSaaS.Models.Entities.User> ?? new List<RecruitmentSaaS.Models.Entities.User>();
 
     string[] roleNames = { "", "مدير", "استقبال", "تيلي سيلز", "محاسب", "عمليات", "مبيعات مكتبية", "مدير تيلي سيلز" };
     string[] roleColors = { "", "#dc2626", "#0ea5e9", "#8b5cf6", "#16a34a", "#f59e0b", "#6366f1", "#7c3aed" };
@@ -107,7 +109,7 @@
 
                         // Count team members for managers (Role 7)
                         int teamCount = u.Role == 7
-                        ? Model.Count(x => x.ManagerId == u.Id)
+                        ? allTeleSales.Count(x => x.ManagerId == u.Id)
                         : 0;
 
                         <tr style="@(!u.IsActive ? "opacity:.5;" : "")">
@@ -192,6 +194,12 @@
                                         </button>
                                     </form>
 
+                                    <button class="btn btn-outline-secondary btn-sm edit-user-btn"
+                                            title="تعديل الاسم والبريد"
+                                            data-user-id="@u.Id" data-user-name="@u.FullName" data-user-email="@u.Email">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+
                                     <button class="btn btn-outline-secondary btn-sm"
                                             title="تغيير كلمة المرور"
                                             onclick="openResetPwd('@u.Id', '@u.FullName')">
@@ -226,7 +234,7 @@
 
 @* ── MANAGE TEAM MODAL (for Role 7 managers) ────────────────────────────── *@
 @{
-    var telesalesUsers = Model.Where(u => u.Role == 3).OrderBy(u => u.FullName).ToList();
+    var telesalesUsers = allTeleSales;
     var managers7 = Model.Where(u => u.Role == 7).OrderBy(u => u.FullName).ToList();
 }
 
@@ -377,6 +385,40 @@
     </div>
 </div>
 
+@* ── EDIT USER MODAL ─────────────────────────────────────────────────────── *@
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>تعديل بيانات المستخدم</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="/Admin/UpdateUser">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" id="editUserId" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">الاسم <span class="text-danger">*</span></label>
+                        <input name="fullName" id="editUserName" type="text" class="form-control" required minlength="2" maxlength="200" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">البريد الإلكتروني <span class="text-danger">*</span></label>
+                        <input name="email" id="editUserEmail" type="email" class="form-control" dir="ltr" required maxlength="255" />
+                    </div>
+                    <div id="editUserEmailNote" class="alert alert-warning py-2 px-3 mb-0" style="font-size:.8rem;display:none">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                        البريد هو اسم الدخول — بعد الحفظ هيدخل المستخدم بالبريد الجديد. كلمة المرور مش هتتغير.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">حفظ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @* ── RESET PASSWORD MODAL ────────────────────────────────────────────────── *@
 <div class="modal fade" id="resetPwdModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -408,6 +450,23 @@
 
 @section Scripts {
     <script>
+        // ── Edit user modal (data-* attributes, so names with quotes are safe) ─
+        var editOriginalEmail = '';
+        document.querySelectorAll('.edit-user-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                editOriginalEmail = btn.dataset.userEmail || '';
+                document.getElementById('editUserId').value = btn.dataset.userId;
+                document.getElementById('editUserName').value = btn.dataset.userName || '';
+                document.getElementById('editUserEmail').value = editOriginalEmail;
+                document.getElementById('editUserEmailNote').style.display = 'none';
+                new bootstrap.Modal(document.getElementById('editUserModal')).show();
+            });
+        });
+        document.getElementById('editUserEmail').addEventListener('input', function (e) {
+            var changed = e.target.value.trim().toLowerCase() !== editOriginalEmail.toLowerCase();
+            document.getElementById('editUserEmailNote').style.display = changed ? 'block' : 'none';
+        });
+
         // ── Reset password modal ──────────────────────────────────────────────
         function openResetPwd(userId, userName) {
             document.getElementById('resetUserId').value         = userId;

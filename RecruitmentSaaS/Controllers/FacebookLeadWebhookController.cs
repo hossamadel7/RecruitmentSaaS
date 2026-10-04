@@ -189,24 +189,7 @@ namespace RecruitmentSaaS.Controllers
                     return null;
                 }
 
-                string NormalizePhone(string phone)
-                {
-                    if (string.IsNullOrWhiteSpace(phone))
-                        return phone;
-
-                    phone = phone.Trim()
-                                 .Replace(" ", "")
-                                 .Replace("-", "")
-                                 .Replace("(", "")
-                                 .Replace(")", "");
-
-                    if (phone.StartsWith("+2"))
-                        phone = phone.Substring(2);
-                    else if (phone.StartsWith("2") && phone.Length > 10)
-                        phone = phone.Substring(1);
-
-                    return phone;
-                }
+                string NormalizePhone(string? raw) => RecruitmentSaaS.Services.PhoneNumbers.Normalize(raw);
 
                 var fullName = GetFieldValue("full_name", "full name", "name", "الاسم");
                 var phone = GetFieldValue("phone_number", "phone", "mobile_phone", "رقم_الهاتف", "رقم الهاتف");
@@ -232,8 +215,9 @@ namespace RecruitmentSaaS.Controllers
                 Lead existingLead = null;
                 if (!string.IsNullOrWhiteSpace(phone))
                 {
+                    var phoneVariants = RecruitmentSaaS.Services.PhoneNumbers.StoredVariants(phone);
                     existingLead = await _context.Leads
-                        .FirstOrDefaultAsync(l => l.Phone == phone);
+                        .FirstOrDefaultAsync(l => phoneVariants.Contains(l.Phone));
                 }
 
                 if (existingLead != null)

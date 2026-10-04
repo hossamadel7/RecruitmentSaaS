@@ -1,4 +1,5 @@
 @model dynamic
+@{ ViewData["OwnSuccessAlert"] = true; } @* this page shows its own TempData alerts; _Layout skips them *@
 @{
     ViewData["Title"] = "ملخص مالي للمرشحين";
     Layout = "~/Views/Shared/_Layout.cshtml";

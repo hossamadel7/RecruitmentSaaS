@@ -16,13 +16,16 @@ namespace RecruitmentSaaS.Controllers
         private readonly RecruitmentCrmContext _context;
         private readonly IWebHostEnvironment _env;
         private readonly RecruitmentSaaS.Services.INotificationService _notifications;
+        private readonly ILogger<SalesController> _logger;
 
         public SalesController(RecruitmentCrmContext context, IWebHostEnvironment env,
-                               RecruitmentSaaS.Services.INotificationService notifications)
+                               RecruitmentSaaS.Services.INotificationService notifications,
+                               ILogger<SalesController> logger)
         {
             _context = context;
             _env = env;
             _notifications = notifications;
+            _logger = logger;
         }
 
         private Guid CurrentUserId =>
@@ -195,32 +198,17 @@ namespace RecruitmentSaaS.Controllers
                     await _context.SaveChangesAsync();
                 }
 
-                // Auto-create commission for this deal (Status=1 pending admin approval)
-                var existingCommission = await _context.Commissions
-                    .AnyAsync(c => c.CandidateId == newCandidateId);
-
-                if (!existingCommission)
-                {
-                    _context.Commissions.Add(new RecruitmentSaaS.Models.Entities.Commission
-                    {
-                        Id = Guid.NewGuid(),
-                        SalesUserId = userId,
-                        CandidateId = newCandidateId,
-                        CommissionMonth = DateOnly.FromDateTime(DateTime.UtcNow),
-                        AmountEgp = 0, // Admin sets the actual amount when approving
-                        DealsThisMonth = 1,
-                        Status = 1, // Pending admin approval
-                        CreatedAt = DateTime.UtcNow
-                    });
-                    await _context.SaveChangesAsync();
-                }
+                // No commission here — it's created by AccountantController.ApprovePayment once the
+                // package is fully paid, with the tier amount for the current reset period.
 
                 TempData["Success"] = "تم تحويل العميل إلى مرشح بنجاح";
                 return RedirectToAction("CandidateDetail", new { id = newCandidateId });
             }
             catch (Exception ex)
             {
-                TempData["Error"] = "حدث خطأ أثناء التحويل: " + ex.Message;
+                // Details go to the log, never to the screen (they can expose database internals)
+                _logger.LogError(ex, "Converting lead {LeadId} to a candidate failed", leadId);
+                TempData["Error"] = "حدث خطأ أثناء تحويل العميل. حاول مرة أخرى، ولو تكررت المشكلة بلّغ الإدارة.";
                 return RedirectToAction("LeadDetail", new { id = leadId });
             }
         }
@@ -696,7 +684,7 @@ namespace RecruitmentSaaS.Controllers
             }
 
             candidate.FullName = fullName;
-            candidate.Phone = phone;
+            candidate.Phone = RecruitmentSaaS.Services.PhoneNumbers.Normalize(phone);
             candidate.NationalId = nationalId;
             candidate.Age = age;
             candidate.City = city;
@@ -803,7 +791,13 @@ namespace RecruitmentSaaS.Controllers
             var uploadFolder = Path.Combine(_env.WebRootPath, "uploads", "candidates", candidateId.ToString());
             Directory.CreateDirectory(uploadFolder);
 
-            var ext = Path.GetExtension(file.FileName);
+            // Only PDF / JPG / PNG, checked by content — never trust the uploaded name
+            var ext = await RecruitmentSaaS.Services.SafeUploads.CheckAsync(file, RecruitmentSaaS.Services.SafeUploads.DocumentTypes);
+            if (ext == null)
+            {
+                TempData["Error"] = RecruitmentSaaS.Services.SafeUploads.DocumentTypesError;
+                return RedirectToAction("CandidateDetail", new { id = candidateId });
+            }
             var uniqueFileName = $"{Guid.NewGuid()}{ext}";
             var filePath = Path.Combine(uploadFolder, uniqueFileName);
 

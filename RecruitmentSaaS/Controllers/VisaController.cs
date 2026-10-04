@@ -74,7 +74,7 @@ namespace RecruitmentSaaS.Controllers
             foreach (var file in files)
             {
                 if (file.Length == 0) continue;
-                if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                if (await RecruitmentSaaS.Services.SafeUploads.CheckAsync(file, RecruitmentSaaS.Services.SafeUploads.PdfOnly) == null)
                     continue;
 
                 // Save file to disk

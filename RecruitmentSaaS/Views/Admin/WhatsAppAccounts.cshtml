@@ -1,6 +1,7 @@
 @using RecruitmentSaaS.Models.Entities
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @model IEnumerable<WhatsAppAccount>
+@{ ViewData["OwnSuccessAlert"] = true; ViewData["OwnErrorAlert"] = true; } @* this page shows its own TempData alerts; _Layout skips them *@
 @{
     ViewData["Title"] = "أرقام الواتساب";
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -143,6 +144,14 @@
                                     <input type="hidden" name="accountId" value="@a.Id" />
                                     <button type="submit" class="btn btn-ghost btn-sm" title="@(a.IsActive ? "إيقاف" : "تفعيل")">
                                         <i class="bi @(a.IsActive ? "bi-toggle-on" : "bi-toggle-off")"></i>
+                                    </button>
+                                </form>
+                                <form method="post" action="/Admin/DeleteWhatsAppAccount" class="d-inline"
+                                      onsubmit="return confirm('حذف هذا الرقم نهائياً؟ (مسموح فقط لو مفيش عليه محادثات)')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="accountId" value="@a.Id" />
+                                    <button type="submit" class="btn btn-ghost btn-sm text-danger" title="حذف">
+                                        <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
                             </td>

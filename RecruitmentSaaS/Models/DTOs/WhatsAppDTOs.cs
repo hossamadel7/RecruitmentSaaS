@@ -57,6 +57,8 @@ namespace RecruitmentSaaS.Models.DTOs
         public byte MessageType { get; set; }
         public string? TextBody { get; set; }
         public string? MediaUrl { get; set; }
+        /// <summary>True when the file can be fetched from /api/conversations/{id}/messages/{messageId}/media.</summary>
+        public bool HasMedia { get; set; }
         public byte Status { get; set; }
         public string? ErrorMessage { get; set; }
         public Guid? SenderUserId { get; set; }

@@ -194,7 +194,8 @@ namespace RecruitmentSaaS.Services
                     // Duplicate check by normalized phone
                     if (!string.IsNullOrWhiteSpace(phone))
                     {
-                        var exists = await context.Leads.AnyAsync(l => l.Phone == phone);
+                        var phoneVariants = PhoneNumbers.StoredVariants(phone);
+                        var exists = await context.Leads.AnyAsync(l => phoneVariants.Contains(l.Phone));
                         if (exists)
                         {
                             result.Duplicates++;
@@ -279,23 +280,7 @@ namespace RecruitmentSaaS.Services
         }
 
         // ── Normalize Egyptian phone numbers ──────────────────────────────────
-        private static string NormalizePhone(string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw)) return raw;
-
-            var digits = new string(raw.Where(char.IsDigit).ToArray());
-
-            // +201xxxxxxxxx or 201xxxxxxxxx → 01xxxxxxxxx
-            if (digits.StartsWith("20") && digits.Length == 12)
-                digits = "0" + digits[2..];
-
-            // 2010/2011/2012/2015 prefix edge case
-            if ((digits.StartsWith("2010") || digits.StartsWith("2011") ||
-                 digits.StartsWith("2012") || digits.StartsWith("2015")) && digits.Length == 11)
-                digits = "0" + digits[1..];
-
-            return digits;
-        }
+        private static string NormalizePhone(string raw) => PhoneNumbers.Normalize(raw);
     }
 
     // ── Background service — runs every 30 minutes ────────────────────────────

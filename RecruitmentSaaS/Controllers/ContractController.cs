@@ -78,13 +78,17 @@ namespace RecruitmentSaaS.Controllers
 
             foreach (var file in files)
             {
-                if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                if (await RecruitmentSaaS.Services.SafeUploads.CheckAsync(file, RecruitmentSaaS.Services.SafeUploads.PdfOnly) == null)
+                {
+                    extractionLog.Add($"⚠️ {file.FileName} → {RecruitmentSaaS.Services.SafeUploads.PdfOnlyError}");
                     continue;
+                }
 
                 // ── Save file ─────────────────────────────────────────────────
                 var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "contracts");
                 Directory.CreateDirectory(uploadsDir);
-                var fileKey = $"contracts/{Guid.NewGuid()}_{file.FileName}";
+                // The uploaded name can contain "../" — only a cleaned name may go into the path
+                var fileKey = $"contracts/{Guid.NewGuid()}_{RecruitmentSaaS.Services.SafeUploads.SafeFileName(file.FileName)}";
                 var filePath = Path.Combine(_env.WebRootPath, "uploads", fileKey);
 
                 using (var fs = new FileStream(filePath, FileMode.Create))

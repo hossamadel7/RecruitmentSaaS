@@ -140,11 +140,17 @@ namespace RecruitmentSaaS.Controllers
             var isSenior = age.Value >= (settings?.SeniorAgeThreshold ?? DefaultSeniorAgeThreshold);
             var teamForm = string.IsNullOrWhiteSpace(team) ? null : await FindTeamFormAsync(team);
 
-            // 3. Duplicate phone — silent success
-            phone = phone?.Trim() ?? "";
+            // 3. Duplicate phone — silent success (same number in any format = same person)
+            phone = PhoneNumbers.Normalize(phone);
+            if (!PhoneNumbers.IsValid(phone))
+            {
+                TempData["FormError"] = "رقم الهاتف غير صحيح";
+                return BackToForm();
+            }
             fullName = fullName?.Trim() ?? "";
             interestedJobTitle = interestedJobTitle?.Trim();
-            if (await _context.Leads.AnyAsync(l => l.Phone == phone))
+            var phoneVariants = PhoneNumbers.StoredVariants(phone);
+            if (await _context.Leads.AnyAsync(l => phoneVariants.Contains(l.Phone)))
                 return ThankYou(isSenior
                     ? BuildWhatsAppUrl(settings, teamForm, fullName, age.Value, interestedJobTitle, referenceCode: null)
                     : null);
