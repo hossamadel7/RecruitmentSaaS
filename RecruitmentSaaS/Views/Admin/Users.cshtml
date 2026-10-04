@@ -236,95 +236,147 @@
 @{
     var telesalesUsers = allTeleSales;
     var managers7 = Model.Where(u => u.Role == 7).OrderBy(u => u.FullName).ToList();
+
+    async Task TeamRow(RecruitmentSaaS.Models.Entities.User ts, Guid mgrId, string group)
+    {
+        <div class="team-row @(ts.IsActive ? "" : "is-inactive")" data-group="@group" data-name="@ts.FullName.ToLowerInvariant() @ts.Email.ToLowerInvariant()">
+            <div class="d-flex align-items-center gap-2" style="min-width:0">
+                <div class="team-avatar">@ts.FullName.FirstOrDefault()</div>
+                <div style="min-width:0">
+                    <div class="team-name">
+                        @ts.FullName
+                        @if (!ts.IsActive) { <span class="team-badge-off">معطّل</span> }
+                    </div>
+                    <div class="team-sub">
+                        @if (group == "other" && ts.Manager != null)
+                        {
+                            <span><i class="bi bi-people"></i> في فريق @ts.Manager.FullName</span>
+                        }
+                        else if (group == "free")
+                        {
+                            <span>غير مسند لأي فريق</span>
+                        }
+                        else
+                        {
+                            <span class="text-success"><i class="bi bi-check-circle-fill"></i> في هذا الفريق</span>
+                        }
+                    </div>
+                </div>
+            </div>
+            <form method="post" action="/Admin/AssignManager" class="flex-shrink-0">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" value="@ts.Id" />
+                <input type="hidden" name="reopenTeam" value="@mgrId" />
+                @if (group == "in")
+                {
+                    <input type="hidden" name="managerId" value="" />
+                    <button type="submit" class="btn btn-sm team-btn-remove" onclick="return confirm('إزالة الموظف من الفريق؟')">
+                        <i class="bi bi-x-circle"></i> إزالة
+                    </button>
+                }
+                else
+                {
+                    <input type="hidden" name="managerId" value="@mgrId" />
+                    <button type="submit" class="btn btn-sm team-btn-add"
+                            @(group == "other" ? "onclick=\"return confirm('الموظف ده في فريق تاني — هيتنقل لهذا الفريق. متأكد؟')\"" : "")>
+                        <i class="bi bi-plus-circle-fill"></i> @(group == "other" ? "نقل للفريق" : "إضافة للفريق")
+                    </button>
+                }
+            </form>
+        </div>
+    }
 }
 
-@* One modal per manager — no JS needed *@
+<style>
+    .team-toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+    .team-search { position: relative; }
+    .team-search i { position: absolute; top: 50%; inset-inline-start: 12px; transform: translateY(-50%); color: var(--text-muted); }
+    .team-search input { width: 100%; padding: 8px 36px; border: 1px solid var(--border); border-radius: 10px; font-size: .85rem; }
+    .team-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .team-chip { border: 1px solid var(--border); background: #fff; color: var(--text-muted); border-radius: 99px; padding: 4px 12px; font-size: .78rem; font-weight: 600; cursor: pointer; }
+    .team-chip.active { background: #f3e8ff; border-color: #d8b4fe; color: #7c3aed; }
+    .team-chip .cnt { background: rgba(0,0,0,.06); border-radius: 99px; padding: 0 7px; margin-inline-start: 4px; font-size: .72rem; }
+    .team-section-title { display: flex; align-items: center; gap: 8px; font-size: .8rem; font-weight: 700; color: var(--text-muted); margin: 16px 2px 8px; }
+    .team-section-title:first-of-type { margin-top: 4px; }
+    .team-section-title .cnt { background: #f1f5f9; border-radius: 99px; padding: 0 8px; font-size: .72rem; }
+    .team-section-title.in { color: #16a34a; }
+    .team-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; background: #fff; }
+    .team-row[data-group="in"] { border-color: #bbf7d0; background: #f7fef9; }
+    .team-row.is-inactive { opacity: .55; }
+    .team-avatar { width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; background: #8b5cf620; color: #8b5cf6; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .9rem; }
+    .team-name { font-weight: 600; font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .team-sub { font-size: .74rem; color: var(--text-muted); }
+    .team-badge-off { background: #fef2f2; color: #dc2626; border-radius: 99px; padding: 0 7px; font-size: .68rem; margin-inline-start: 4px; }
+    .team-btn-add { background: #7c3aed; color: #fff; border: none; font-size: .75rem; padding: 4px 12px; border-radius: 8px; }
+    .team-btn-add:hover { background: #6d28d9; color: #fff; }
+    .team-btn-remove { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-size: .75rem; padding: 4px 10px; border-radius: 8px; }
+    .team-empty { text-align: center; color: var(--text-muted); padding: 24px; font-size: .85rem; }
+</style>
+
 @foreach (var mgr in managers7)
 {
-    <div class="modal fade" id="manageTeamModal_@mgr.Id" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+    var inTeam = telesalesUsers.Where(t => t.ManagerId == mgr.Id).OrderBy(t => !t.IsActive).ThenBy(t => t.FullName).ToList();
+    var unassigned = telesalesUsers.Where(t => t.ManagerId == null).OrderBy(t => !t.IsActive).ThenBy(t => t.FullName).ToList();
+    var inOtherTeams = telesalesUsers.Where(t => t.ManagerId != null && t.ManagerId != mgr.Id)
+                                     .OrderBy(t => t.Manager?.FullName).ThenBy(t => t.FullName).ToList();
+
+    <div class="modal fade team-modal" id="manageTeamModal_@mgr.Id" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
                         <i class="bi bi-people-fill" style="color:#7c3aed;margin-left:8px;"></i>
                         إدارة فريق: @mgr.FullName
+                        <span style="font-size:.8rem;color:var(--text-muted);font-weight:500"> · @inTeam.Count موظف</span>
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body" style="padding:20px;">
-                    <p style="font-size:.83rem;color:var(--text-muted);margin-bottom:16px;">
-                        اختر موظفي التيلي سيلز الذين تريد إسنادهم لهذا المدير.
-                    </p>
+                <div class="modal-body" style="padding:16px 20px 20px;">
                     @if (!telesalesUsers.Any())
                     {
-                        <div style="text-align:center;color:var(--text-muted);padding:24px;font-size:.85rem;">
-                            لا يوجد موظفو تيلي سيلز في النظام
-                        </div>
+                        <div class="team-empty">لا يوجد موظفو تيلي سيلز في النظام</div>
                     }
                     else
                     {
-                        @foreach (var ts in telesalesUsers)
+                        <div class="team-toolbar">
+                            <div class="team-search">
+                                <i class="bi bi-search"></i>
+                                <input type="search" class="team-search-input" placeholder="ابحث بالاسم أو البريد..." />
+                            </div>
+                            <div class="team-chips">
+                                <button type="button" class="team-chip active" data-filter="all">الكل<span class="cnt">@telesalesUsers.Count</span></button>
+                                <button type="button" class="team-chip" data-filter="in">في الفريق<span class="cnt">@inTeam.Count</span></button>
+                                <button type="button" class="team-chip" data-filter="free">غير مسندين<span class="cnt">@unassigned.Count</span></button>
+                                <button type="button" class="team-chip" data-filter="other">في فرق أخرى<span class="cnt">@inOtherTeams.Count</span></button>
+                            </div>
+                        </div>
+
+                        <div class="team-section" data-section="in">
+                            <div class="team-section-title in"><i class="bi bi-people-fill"></i> في الفريق <span class="cnt">@inTeam.Count</span></div>
+                            @if (!inTeam.Any())
+                            {
+                                <div class="team-empty" style="padding:10px">لسه مفيش موظفين في الفريق — أضف من القائمة تحت</div>
+                            }
+                            @foreach (var ts in inTeam) { await TeamRow(ts, mgr.Id, "in"); }
+                        </div>
+
+                        @if (unassigned.Any())
                         {
-                            bool isInThisTeam = ts.ManagerId == mgr.Id;
-                            <div class="d-flex align-items-center justify-content-between"
-                                 style="padding:10px 14px;border:1px solid var(--bs-border-color,#e2e8f0);border-radius:10px;margin-bottom:8px;">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div style="width:34px;height:34px;border-radius:50%;background:#8b5cf620;color:#8b5cf6;
-                                                display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;">
-                                        @ts.FullName.FirstOrDefault()
-                                    </div>
-                                    <div>
-                                        <div style="font-weight:600;font-size:.88rem;">@ts.FullName</div>
-                                        <div style="font-size:.74rem;color:var(--text-muted);">
-                                            @if (ts.Manager != null)
-                                            {
-                                                <span style="color:#7c3aed;"><i class="bi bi-person-check-fill"></i> @ts.Manager.FullName</span>
-                                            }
-                                            else
-                                            {
-                                                <span>غير مسند</span>
-                                            }
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="d-flex gap-2">
-                                    @if (!isInThisTeam)
-                                    {
-                                        @* Assign to this manager *@
-                                        <form method="post" action="/Admin/AssignManager">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="userId" value="@ts.Id" />
-                                            <input type="hidden" name="managerId" value="@mgr.Id" />
-                                            <button type="submit" class="btn btn-sm"
-                                                    style="background:#7c3aed;color:#fff;border:none;font-size:.75rem;padding:4px 12px;border-radius:8px;">
-                                                <i class="bi bi-plus-circle-fill"></i> إضافة للفريق
-                                            </button>
-                                        </form>
-                                    }
-                                    else
-                                    {
-                                        <span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;
-                                                     font-size:.73rem;padding:4px 10px;border-radius:8px;font-weight:600;">
-                                            <i class="bi bi-check-circle-fill"></i> في الفريق
-                                        </span>
-                                    }
-                                    @* Remove from team *@
-                                    @if (isInThisTeam)
-                                    {
-                                        <form method="post" action="/Admin/AssignManager">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="userId" value="@ts.Id" />
-                                            <input type="hidden" name="managerId" value="" />
-                                            <button type="submit" class="btn btn-sm"
-                                                    style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-size:.75rem;padding:4px 10px;border-radius:8px;"
-                                                    onclick="return confirm('إزالة @ts.FullName من الفريق؟')">
-                                                <i class="bi bi-x-circle-fill"></i>
-                                            </button>
-                                        </form>
-                                    }
-                                </div>
+                            <div class="team-section" data-section="free">
+                                <div class="team-section-title"><i class="bi bi-person-plus"></i> غير مسندين لأي فريق <span class="cnt">@unassigned.Count</span></div>
+                                @foreach (var ts in unassigned) { await TeamRow(ts, mgr.Id, "free"); }
                             </div>
                         }
+
+                        @if (inOtherTeams.Any())
+                        {
+                            <div class="team-section" data-section="other">
+                                <div class="team-section-title"><i class="bi bi-arrow-left-right"></i> في فرق أخرى <span class="cnt">@inOtherTeams.Count</span></div>
+                                @foreach (var ts in inOtherTeams) { await TeamRow(ts, mgr.Id, "other"); }
+                            </div>
+                        }
+
+                        <div class="team-empty team-no-results" style="display:none">لا توجد نتائج</div>
                     }
                 </div>
                 <div class="modal-footer">
@@ -333,7 +385,9 @@
             </div>
         </div>
     </div>
-}@* ── CREATE USER MODAL ───────────────────────────────────────────────────── *@<div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
+}
+
+@* ── CREATE USER MODAL ───────────────────────────────────────────────────── *@<div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -450,6 +504,47 @@
 
 @section Scripts {
     <script>
+        // ── Team popup: search + group filter; reopen after add/remove ─────────
+        document.querySelectorAll('.team-modal').forEach(function (modal) {
+            var filter = 'all', term = '';
+            function apply() {
+                var any = false;
+                modal.querySelectorAll('.team-section').forEach(function (section) {
+                    var groupOk = filter === 'all' || section.dataset.section === filter;
+                    var visible = 0;
+                    section.querySelectorAll('.team-row').forEach(function (row) {
+                        var show = groupOk && (!term || row.dataset.name.indexOf(term) !== -1);
+                        row.style.display = show ? '' : 'none';
+                        if (show) visible++;
+                    });
+                    var hasRows = section.querySelector('.team-row') !== null;
+                    // keep the "in team" section (with its empty hint) when nothing is filtered
+                    section.style.display = groupOk && (visible > 0 || (!term && !hasRows)) ? '' : 'none';
+                    if (visible > 0) any = true;
+                });
+                var none = modal.querySelector('.team-no-results');
+                if (none) none.style.display = any || (!term && filter === 'all') ? 'none' : '';
+            }
+            modal.querySelectorAll('.team-chip').forEach(function (chip) {
+                chip.addEventListener('click', function () {
+                    modal.querySelectorAll('.team-chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
+                    filter = chip.dataset.filter;
+                    apply();
+                });
+            });
+            var search = modal.querySelector('.team-search-input');
+            if (search) search.addEventListener('input', function () { term = search.value.trim().toLowerCase(); apply(); });
+        });
+
+        (function () {
+            var openTeam = new URLSearchParams(location.search).get('openTeam');
+            var modal = openTeam && document.getElementById('manageTeamModal_' + openTeam);
+            if (modal) {
+                new bootstrap.Modal(modal).show();
+                history.replaceState(null, '', location.pathname); // don't reopen on refresh
+            }
+        })();
+
         // ── Edit user modal (data-* attributes, so names with quotes are safe) ─
         var editOriginalEmail = '';
         document.querySelectorAll('.edit-user-btn').forEach(function (btn) {

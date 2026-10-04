@@ -367,3 +367,6 @@ FodyWeavers.xsd
 RecruitmentSaaS/wwwroot/uploads/candidates/
 RecruitmentSaaS/wwwroot/uploads/visas/
 RecruitmentSaaS/wwwroot/uploads/contracts/
+
+# WhatsApp media saved by the server (see WhatsAppMediaCache)
+RecruitmentSaaS/App_Data/

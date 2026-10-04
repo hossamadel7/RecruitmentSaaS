@@ -215,13 +215,13 @@ namespace RecruitmentSaaS.Controllers
         // Assign/unassign a TeleSales user to a manager
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AssignManager(Guid userId, Guid? managerId)
+        public async Task<IActionResult> AssignManager(Guid userId, Guid? managerId, Guid? reopenTeam)
         {
             var user = await _context.Users.FindAsync(userId);
             if (user == null || user.Role != 3)
             {
                 TempData["Error"] = "المستخدم غير موجود أو ليس تيلي سيلز";
-                return RedirectToAction("Users");
+                return RedirectToAction("Users", new { openTeam = reopenTeam });
             }
 
             user.ManagerId = managerId;
@@ -232,7 +232,7 @@ namespace RecruitmentSaaS.Controllers
                 : "بدون مدير";
 
             TempData["Success"] = $"تم تعيين {user.FullName} تحت إشراف {managerName}";
-            return RedirectToAction("Users");
+            return RedirectToAction("Users", new { openTeam = reopenTeam });
         }
 
         // ── POST /Admin/ToggleUser ──────────────────────────────────────────

@@ -20,15 +20,19 @@ namespace RecruitmentSaaS.Controllers.Api
         private readonly RecruitmentCrmContext _context;
         private readonly IWhatsAppCloudApiService _cloudApi;
         private readonly IInboxRealtimeNotifier _notifier;
+        private readonly WhatsAppMediaCache _mediaCache;
 
         public ConversationsController(
             RecruitmentCrmContext context,
             IWhatsAppCloudApiService cloudApi,
-            IInboxRealtimeNotifier notifier)
+            IInboxRealtimeNotifier notifier,
+            IWebHostEnvironment env,
+            IConfiguration config)
         {
             _context = context;
             _cloudApi = cloudApi;
             _notifier = notifier;
+            _mediaCache = WhatsAppMediaCache.For(env, config);
         }
 
         private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -224,8 +228,14 @@ namespace RecruitmentSaaS.Controllers.Api
                 .FirstOrDefaultAsync(ct);
             if (string.IsNullOrWhiteSpace(mediaId)) return NotFound();
 
-            var file = await _cloudApi.DownloadMediaAsync(mediaId, ct);
-            if (file == null) return NotFound(new { error = "تعذر تحميل الملف من واتساب (قد يكون انتهت صلاحيته)" });
+            // From the server's own copy when we have one; otherwise from Meta, then keep a copy
+            var file = await _mediaCache.TryGetAsync(mediaId, ct);
+            if (file == null)
+            {
+                file = await _cloudApi.DownloadMediaAsync(mediaId, ct);
+                if (file == null) return NotFound(new { error = "تعذر تحميل الملف من واتساب (قد يكون انتهت صلاحيته)" });
+                await _mediaCache.SaveAsync(mediaId, file, ct);
+            }
 
             Response.Headers.CacheControl = "private, max-age=86400";
             return File(file.Data, file.ContentType, enableRangeProcessing: true); // range = seekable audio/video
@@ -319,6 +329,8 @@ namespace RecruitmentSaaS.Controllers.Api
                 : upload;
 
             message.MediaId = upload.MediaId; // lets us show our own sent photo / voice note back in the chat
+            if (upload.MediaId != null) // we already have the bytes — no need to fetch our own file back from Meta later
+                await _mediaCache.SaveAsync(upload.MediaId, new WhatsAppMediaFile { Data = data, ContentType = mime }, ct);
             message.Status = result.Success ? (byte)MessageStatus.Sent : (byte)MessageStatus.Failed;
             message.WhatsAppMessageId = result.WhatsAppMessageId;
             message.ErrorCode = result.ErrorCode;

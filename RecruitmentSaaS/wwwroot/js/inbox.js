@@ -1004,6 +1004,21 @@
         showScreen(SCREENS[depth] || 'list', true);
     });
 
+    // Several realtime events arrive per message (new message, unread count, assignment…) and
+    // each used to reload the chat list + account tabs. Coalesce a burst into one reload.
+    var refreshTimer = null, pendingRefresh = { accounts: false, list: false };
+    function scheduleRefresh(accounts, list) {
+        pendingRefresh.accounts = pendingRefresh.accounts || accounts;
+        pendingRefresh.list = pendingRefresh.list || list;
+        clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(function () {
+            var todo = pendingRefresh;
+            pendingRefresh = { accounts: false, list: false };
+            if (todo.accounts) loadAccounts();
+            if (todo.list) loadConversations();
+        }, 300);
+    }
+
     // ── SignalR realtime ─────────────────────────────────────────────────────
     function connectSignalR() {
         if (typeof signalR === 'undefined') return;
@@ -1014,25 +1029,25 @@
             .build();
 
         state.hub.on('NewMessage', function (payload) {
-            loadAccounts();
             if (payload.conversationId === state.selectedConversationId) {
                 var container = document.getElementById('chat-messages');
                 if (container) appendBubble(container, payload);
                 if (payload.direction === 1) markRead(payload.conversationId);
             }
-            loadConversations();
+            scheduleRefresh(true, true);
         });
 
         state.hub.on('MessageStatusUpdated', function (payload) { updateBubbleStatus(payload); });
 
         state.hub.on('UnreadCountUpdated', function (payload) {
-            loadAccounts();
-            patchListRow(payload.conversationId, { unreadCount: payload.unreadCount });
+            var conv = state.conversations.find(function (c) { return c.id === payload.conversationId; });
+            if (conv) { conv.unreadCount = payload.unreadCount; renderConversationList(); }
+            scheduleRefresh(true, !conv);
         });
 
-        state.hub.on('ConversationAssigned', function () { loadConversations(); });
+        state.hub.on('ConversationAssigned', function () { scheduleRefresh(false, true); });
         state.hub.on('ConversationUpdated', function (payload) {
-            loadConversations();
+            scheduleRefresh(false, true);
             // Re-render the open chat for changes made elsewhere — but not over the user's unsaved
             // edits, and not right after their own save (keeps the "saved" confirmation visible)
             var justSaved = Date.now() - (state.panelSavedAt || 0) < 4000;
@@ -1115,6 +1130,7 @@
         // Lightweight fallback so the list/badges stay fresh even if SignalR can't connect
         // (e.g. behind a proxy that blocks WebSockets) — matches the existing 30s notif poll.
         setInterval(function () {
+            if (state.hub && state.hub.state === 'Connected') return; // realtime already keeps it fresh
             loadAccounts();
             if (!state.selectedConversationId) loadConversations();
         }, 30000);
