@@ -279,6 +279,7 @@ public partial class RecruitmentCrmContext
         });
 
         ConfigureLeadForm(modelBuilder);
+        ConfigureLeadRotation(modelBuilder);
 
         ApplyPostgresConventions(modelBuilder);   // last, so it covers every entity above
     }

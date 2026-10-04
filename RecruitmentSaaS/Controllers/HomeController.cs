@@ -183,7 +183,7 @@ namespace RecruitmentSaaS.Controllers
 
             // No shared pool anymore: general-form leads go straight to the next TeleSales in rotation
             if (teamForm == null && assignedSalesId == null)
-                assignedSalesId = await LeadDistributor.NextTeleSalesAsync(_context, _context.Users);
+                assignedSalesId = await LeadDistributor.NextTeleSalesAsync(_context, _context.Users, LeadDistributor.AllScope);
 
             // 5. Create Lead
             var leadId = Guid.NewGuid();
@@ -261,9 +261,10 @@ namespace RecruitmentSaaS.Controllers
         public const byte MaxAge = 65;
         public const byte DefaultSeniorAgeThreshold = 45;
 
-        // Round-robin within the team (same fair rotation as the rest of the system)
+        // The team's own rotation (order and leads-per-turn set by the manager on "توزيع الليدز")
         private Task<Guid?> NextTeamMemberAsync(Guid managerId) =>
-            LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => u.ManagerId == managerId));
+            LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => u.ManagerId == managerId),
+                LeadDistributor.TeamScope(managerId));
 
         private async Task NotifyTeamAsync(Guid managerId, Guid? assignedSalesId, Guid leadId, string fullName, byte age)
         {

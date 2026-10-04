@@ -5,53 +5,133 @@ using RecruitmentSaaS.Models.Entities;
 namespace RecruitmentSaaS.Services
 {
     /// <summary>
-    /// Round-robin lead assignment to TeleSales (there is no shared "pool" anymore).
-    /// The next person is the active TeleSales whose most recent lead is the oldest (or who has none),
-    /// so new leads spread evenly no matter where earlier ones came from.
+    /// Weighted round-robin lead assignment to TeleSales (there is no shared "pool" anymore).
+    /// Each rotation is an ordered list of people, each taking <c>Share</c> leads per turn
+    /// (e.g. 3, then 2, then 1, 1, 1 — set by the admin or the team manager; 0 = paused).
+    /// Rotations: "all" for general leads, "team:{managerId}" for a team form's leads.
     /// </summary>
     public static class LeadDistributor
     {
-        public static async Task<Guid?> NextTeleSalesAsync(RecruitmentCrmContext db, IQueryable<User> candidates, CancellationToken ct = default)
+        public const string AllScope = "all";
+
+        public static string TeamScope(Guid managerId) => "team:" + managerId.ToString("N");
+
+        public static Guid? ManagerOfScope(string? scope) =>
+            scope != null && scope.StartsWith("team:") && Guid.TryParse(scope[5..], out var id) ? id : null;
+
+        public record RotationSlot(Guid UserId, string Name, short Share);
+
+        // One pick at a time across the app, so two leads arriving together never get the same turn
+        private static readonly SemaphoreSlim Gate = new(1, 1);
+
+        /// <summary>The active TeleSales among <paramref name="candidates"/>, in rotation order with their shares.</summary>
+        public static async Task<List<RotationSlot>> RotationAsync(RecruitmentCrmContext db, IQueryable<User> candidates, string configScope, CancellationToken ct = default)
         {
-            var ids = await candidates
+            var users = await candidates
                 .Where(u => u.Role == 3 && u.IsActive)
-                .Select(u => u.Id)
+                .Select(u => new { u.Id, Name = u.FullNameAr != null && u.FullNameAr != "" ? u.FullNameAr : u.FullName })
                 .ToListAsync(ct);
-            if (ids.Count == 0) return null;
+            var ids = users.Select(u => u.Id).ToList();
 
-            // When did each person last *receive* a lead? A new lead counts at its creation; an older
-            // lead handed over later counts at its "assigned" activity (type 8) — otherwise a backlog of
-            // old leads would all go to the same person.
-            var lastCreated = await db.Leads
-                .Where(l => l.AssignedSalesId != null && ids.Contains(l.AssignedSalesId.Value))
-                .GroupBy(l => l.AssignedSalesId!.Value)
-                .Select(g => new { UserId = g.Key, Last = g.Max(l => l.CreatedAt) })
-                .ToDictionaryAsync(x => x.UserId, x => x.Last, ct);
+            var config = await db.LeadRotationMembers.AsNoTracking()
+                .Where(m => m.ScopeKey == configScope && ids.Contains(m.UserId))
+                .ToDictionaryAsync(m => m.UserId, ct);
 
-            var lastAssigned = await db.LeadActivities
-                .Where(a => a.ActivityType == 8 && a.Lead.AssignedSalesId != null && ids.Contains(a.Lead.AssignedSalesId.Value))
-                .GroupBy(a => a.Lead.AssignedSalesId!.Value)
-                .Select(g => new { UserId = g.Key, Last = g.Max(a => a.CreatedAt) })
-                .ToDictionaryAsync(x => x.UserId, x => x.Last, ct);
-
-            DateTime LastReceived(Guid id)
-            {
-                var a = lastCreated.TryGetValue(id, out var c) ? c : DateTime.MinValue;
-                var b = lastAssigned.TryGetValue(id, out var s) ? s : DateTime.MinValue;
-                return a > b ? a : b;
-            }
-
-            return ids.OrderBy(LastReceived).ThenBy(id => id).First();
+            // People not configured yet (e.g. just joined) come last with 1 lead per turn
+            return users
+                .OrderBy(u => config.TryGetValue(u.Id, out var m) ? m.Position : int.MaxValue)
+                .ThenBy(u => u.Name).ThenBy(u => u.Id)
+                .Select(u => new RotationSlot(u.Id, u.Name, config.TryGetValue(u.Id, out var m) ? m.Share : (short)1))
+                .ToList();
         }
 
-        /// <summary>Everyone who may receive a Google Sheets lead: the sheet's assigned users, else all TeleSales.</summary>
-        public static async Task<IQueryable<User>> CandidatesForSheetAsync(RecruitmentCrmContext db, Guid? sheetId, CancellationToken ct = default)
+        public static Task<Guid?> NextTeleSalesAsync(RecruitmentCrmContext db, IQueryable<User> candidates, string scope, CancellationToken ct = default) =>
+            NextTeleSalesAsync(db, candidates, scope, scope, ct);
+
+        /// <summary>
+        /// Picks who gets the next lead and moves the rotation on. <paramref name="stateScope"/> lets a
+        /// subset (a Google Sheet's users) keep its own turn while using the <paramref name="configScope"/> shares.
+        /// Returns null when nobody can receive leads (no active TeleSales, or all paused).
+        /// </summary>
+        public static async Task<Guid?> NextTeleSalesAsync(RecruitmentCrmContext db, IQueryable<User> candidates,
+            string configScope, string stateScope, CancellationToken ct = default)
         {
-            if (sheetId == null) return db.Users;
+            var rotation = await RotationAsync(db, candidates, configScope, ct);
+            if (!rotation.Any(r => r.Share > 0)) return null;
+
+            await Gate.WaitAsync(ct);
+            try
+            {
+                var state = await db.LeadRotationStates.FirstOrDefaultAsync(s => s.ScopeKey == stateScope, ct);
+                if (state == null)
+                {
+                    state = new LeadRotationState { ScopeKey = stateScope };
+                    db.LeadRotationStates.Add(state);
+                }
+
+                var (userId, given) = Advance(rotation, state.CurrentUserId, state.GivenInTurn);
+                state.CurrentUserId = userId;
+                state.GivenInTurn = given;
+                state.UpdatedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync(ct);
+                return userId;
+            }
+            finally
+            {
+                Gate.Release();
+            }
+        }
+
+        /// <summary>
+        /// One step of the rotation: the current person keeps the turn until they've had their share,
+        /// then it passes to the next person (in order) whose share isn't 0. If the current person
+        /// left the rotation, it starts again from the top.
+        /// </summary>
+        public static (Guid UserId, int GivenInTurn) Advance(IReadOnlyList<RotationSlot> rotation, Guid? currentUserId, int givenInTurn)
+        {
+            var index = -1;
+            for (var i = 0; i < rotation.Count; i++)
+                if (rotation[i].UserId == currentUserId) { index = i; break; }
+
+            if (index >= 0 && givenInTurn < rotation[index].Share)
+                return (rotation[index].UserId, givenInTurn + 1);
+
+            for (var step = 1; step <= rotation.Count; step++)
+            {
+                var next = rotation[(index + step) % rotation.Count];
+                if (next.Share > 0) return (next.UserId, 1);
+            }
+            throw new InvalidOperationException("Rotation has nobody with a share above 0");
+        }
+
+        /// <summary>Who the next <paramref name="count"/> leads would go to, without changing anything.</summary>
+        public static List<Guid> Preview(IReadOnlyList<RotationSlot> rotation, Guid? currentUserId, int givenInTurn, int count)
+        {
+            var result = new List<Guid>();
+            if (!rotation.Any(r => r.Share > 0)) return result;
+            for (var i = 0; i < count; i++)
+            {
+                var (userId, given) = Advance(rotation, currentUserId, givenInTurn);
+                result.Add(userId);
+                currentUserId = userId;
+                givenInTurn = given;
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Who may receive a Google Sheets lead: the sheet's assigned users (their own turn, the general
+        /// shares), else every TeleSales in the general rotation.
+        /// </summary>
+        public static async Task<(IQueryable<User> Candidates, string StateScope)> CandidatesForSheetAsync(RecruitmentCrmContext db, Guid? sheetId, CancellationToken ct = default)
+        {
+            if (sheetId == null) return (db.Users, AllScope);
 
             var sheetUsers = db.Users.Where(u => db.SalesGoogleSheetUsers.Any(su =>
                 su.SheetId == sheetId && su.SalesUserId == u.Id && su.IsActive));
-            return await sheetUsers.AnyAsync(u => u.Role == 3 && u.IsActive, ct) ? sheetUsers : db.Users;
+            return await sheetUsers.AnyAsync(u => u.Role == 3 && u.IsActive, ct)
+                ? (sheetUsers, "sheet:" + sheetId.Value.ToString("N"))
+                : (db.Users, AllScope);
         }
     }
 
@@ -106,11 +186,11 @@ namespace RecruitmentSaaS.Services
             var assigned = 0;
             foreach (var lead in waiting)
             {
-                var candidates = await LeadDistributor.CandidatesForSheetAsync(db, lead.GoogleSheetId, ct);
-                var salesId = await LeadDistributor.NextTeleSalesAsync(db, candidates, ct);
+                var (candidates, stateScope) = await LeadDistributor.CandidatesForSheetAsync(db, lead.GoogleSheetId, ct);
+                var salesId = await LeadDistributor.NextTeleSalesAsync(db, candidates, LeadDistributor.AllScope, stateScope, ct);
                 if (salesId == null)
                 {
-                    _logger.LogWarning("No active TeleSales to receive lead {LeadId}", lead.Id);
+                    _logger.LogWarning("No active TeleSales (or all paused) to receive lead {LeadId}", lead.Id);
                     break;
                 }
 

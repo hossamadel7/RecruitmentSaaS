@@ -1,0 +1,200 @@
+@using RecruitmentSaaS.Services
+@model List<LeadDistributor.RotationSlot>
+@{
+    ViewData["Title"] = "توزيع الليدز";
+    ViewData["Subtitle"] = "مين ياخد الليد الجاي، وكام ليد في كل دور";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    string scope = ViewBag.Scope;
+    string scopeTitle = ViewBag.ScopeTitle;
+    bool isAdmin = ViewBag.IsAdmin;
+    bool isTeam = ViewBag.IsTeam;
+    short maxShare = ViewBag.MaxShare;
+    var teams = ViewBag.Teams as List<(string Scope, string Name)> ?? new();
+    var upcoming = ViewBag.Upcoming as List<string> ?? new();
+    string? currentName = ViewBag.CurrentName;
+    int currentGiven = ViewBag.CurrentGiven;
+    int currentShare = ViewBag.CurrentShare;
+}
+
+<style>
+    .rr-wrap { padding: 24px; max-width: 900px; }
+    .rr-help { font-size: 12.5px; color: #64748B; line-height: 1.9; }
+    .rr-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border, #e2e8f0); border-radius: 12px; background: #fff; margin-bottom: 8px; transition: opacity .15s; }
+    .rr-row.paused { opacity: .55; background: #f8fafc; }
+    .rr-pos { width: 28px; height: 28px; border-radius: 50%; background: #eef2ff; color: #4338ca; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rr-name { flex: 1; font-weight: 600; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rr-move { display: flex; flex-direction: column; gap: 2px; }
+    .rr-move button { border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; width: 30px; height: 22px; line-height: 1; padding: 0; color: #475569; }
+    .rr-move button:disabled { opacity: .3; }
+    .rr-share { display: flex; align-items: center; gap: 4px; }
+    .rr-share button { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; font-size: 18px; line-height: 1; padding: 0; }
+    .rr-share input { width: 52px; text-align: center; font-weight: 800; font-size: 15px; }
+    .rr-unit { font-size: 11.5px; color: #64748B; width: 58px; }
+    .rr-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .rr-chip { background: #eef2ff; color: #3730a3; border-radius: 99px; padding: 3px 10px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+    .rr-chip.next { background: #16a34a; color: #fff; }
+    .rr-arrow { color: #94a3b8; font-size: 12px; }
+    @@media (max-width: 576px) {
+        .rr-wrap { padding: 14px; }
+        .rr-unit { display: none; }
+    }
+</style>
+
+<div class="rr-wrap">
+
+    @if (isAdmin)
+    {
+        <div class="card mb-3">
+            <div class="card-body p-3 d-flex align-items-center gap-2 flex-wrap">
+                <label class="fw-semibold" style="font-size:13px" for="scopePicker">التوزيع:</label>
+                <select id="scopePicker" class="form-select" style="max-width:420px" onchange="location.href='/LeadRotation/Index?scope='+encodeURIComponent(this.value)">
+                    <option value="@LeadDistributor.AllScope" selected="@(scope == LeadDistributor.AllScope)">التوزيع العام — كل التيلي سيلز (الموقع، فيسبوك، Google Sheets)</option>
+                    @foreach (var t in teams)
+                    {
+                        <option value="@t.Scope" selected="@(scope == t.Scope)">فريق @t.Name — ليدز فورم الفريق</option>
+                    }
+                </select>
+            </div>
+        </div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body p-4">
+            <div style="font-weight:800;font-size:16px;margin-bottom:6px">@scopeTitle</div>
+            <div class="rr-help">
+                @if (isTeam)
+                {
+                    <span>الليدز اللي سنها يساوي أو أكبر من السن المحدد في فورم الفريق بتتوزع على الفريق بالترتيب ده.</span>
+                }
+                else
+                {
+                    <span>ليدز الموقع العام وإعلانات فيسبوك و Google Sheets بتتوزع على التيلي سيلز بالترتيب ده.</span>
+                }
+                <br />• رتّب الأسماء بالأسهم، وحدد كل واحد ياخد كام ليد ورا بعض قبل ما الدور ينتقل للي بعده.
+                <br />• مثال: ٣ للأول، ٢ للتاني، ١ للتالت… وبعد آخر واحد الدورة ترجع من الأول.
+                <br />• <strong>0 = موقوف</strong> (مثلاً في إجازة) — مش هياخد ليدز لحد ما ترجّع الرقم.
+            </div>
+        </div>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="card"><div class="card-body p-4 text-center" style="color:#64748B">
+            @(isTeam ? "مفيش تيلي سيلز نشطين في الفريق ده." : "مفيش تيلي سيلز نشطين.")
+        </div></div>
+    }
+    else
+    {
+        <form asp-action="Save" method="post" id="rrForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="scope" value="@scope" />
+
+            <div id="rrList">
+                @foreach (var r in Model)
+                {
+                    <div class="rr-row @(r.Share == 0 ? "paused" : "")" data-name="@r.Name">
+                        <div class="rr-pos"></div>
+                        <div class="rr-move">
+                            <button type="button" class="rr-up" title="لفوق"><i class="bi bi-chevron-up"></i></button>
+                            <button type="button" class="rr-down" title="لتحت"><i class="bi bi-chevron-down"></i></button>
+                        </div>
+                        <div class="rr-name">@r.Name</div>
+                        <input type="hidden" name="userIds" value="@r.UserId" />
+                        <div class="rr-share">
+                            <button type="button" class="rr-minus">−</button>
+                            <input type="number" name="shares" class="form-control form-control-sm" min="0" max="@maxShare" value="@r.Share" inputmode="numeric" />
+                            <button type="button" class="rr-plus">+</button>
+                        </div>
+                        <div class="rr-unit">ليد / دور</div>
+                    </div>
+                }
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-body p-3">
+                    <div style="font-size:12.5px;color:#64748B;margin-bottom:8px">شكل الدورة الواحدة:</div>
+                    <div class="rr-chips" id="rrCycle"></div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-3 flex-wrap">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> حفظ</button>
+            </div>
+        </form>
+
+        <div class="card mt-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div>
+                        <div style="font-weight:700;font-size:15px">الدور دلوقتي</div>
+                        <div style="font-size:13px;color:#64748B;margin-top:4px">
+                            @if (currentName != null)
+                            {
+                                <span>آخر ليد راح لـ <strong>@currentName</strong> (@currentGiven من @currentShare في الدور ده)</span>
+                            }
+                            else
+                            {
+                                <span>الدورة لسه هتبدأ من أول واحد في القائمة.</span>
+                            }
+                        </div>
+                    </div>
+                    <form asp-action="Restart" method="post" onsubmit="return confirm('الليد الجاي هيروح لأول واحد في القائمة. متأكد؟')">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="scope" value="@scope" />
+                        <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i> ابدأ الدورة من الأول</button>
+                    </form>
+                </div>
+                @if (upcoming.Any())
+                {
+                    <div style="font-size:12.5px;color:#64748B;margin:14px 0 8px">الليدز الجاية هتروح لـ (حسب الإعدادات المحفوظة):</div>
+                    <div class="rr-chips">
+                        @for (var i = 0; i < upcoming.Count; i++)
+                        {
+                            if (i > 0) { <span class="rr-arrow"><i class="bi bi-arrow-left"></i></span> }
+                            <span class="rr-chip @(i == 0 ? "next" : "")">@(i + 1). @upcoming[i]</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<script>
+    (function () {
+        var list = document.getElementById('rrList');
+        if (!list) return;
+        var max = @maxShare;
+
+        function rows() { return Array.prototype.slice.call(list.querySelectorAll('.rr-row')); }
+
+        function refresh() {
+            var all = rows(), cycle = document.getElementById('rrCycle'), html = [];
+            all.forEach(function (row, i) {
+                row.querySelector('.rr-pos').textContent = i + 1;
+                row.querySelector('.rr-up').disabled = i === 0;
+                row.querySelector('.rr-down').disabled = i === all.length - 1;
+                var n = parseInt(row.querySelector('input[name=shares]').value, 10) || 0;
+                row.classList.toggle('paused', n === 0);
+                if (n > 0) html.push('<span class="rr-chip">' + row.dataset.name.replace(/</g, '&lt;') + ' × ' + n + '</span>');
+            });
+            cycle.innerHTML = html.length
+                ? html.join('<span class="rr-arrow"><i class="bi bi-arrow-left"></i></span>') + '<span class="rr-arrow"><i class="bi bi-arrow-repeat"></i> وترجع من الأول</span>'
+                : '<span style="color:#dc2626;font-size:13px">الكل موقوف — لازم شخص واحد على الأقل ياخد ليدز</span>';
+        }
+
+        list.addEventListener('click', function (e) {
+            var btn = e.target.closest('button');
+            if (!btn) return;
+            var row = btn.closest('.rr-row'), input = row.querySelector('input[name=shares]');
+            if (btn.classList.contains('rr-up') && row.previousElementSibling) list.insertBefore(row, row.previousElementSibling);
+            else if (btn.classList.contains('rr-down') && row.nextElementSibling) list.insertBefore(row.nextElementSibling, row);
+            else if (btn.classList.contains('rr-plus')) input.value = Math.min(max, (parseInt(input.value, 10) || 0) + 1);
+            else if (btn.classList.contains('rr-minus')) input.value = Math.max(0, (parseInt(input.value, 10) || 0) - 1);
+            refresh();
+        });
+        list.addEventListener('input', refresh);
+        refresh();
+    })();
+</script>
