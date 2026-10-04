@@ -506,6 +506,8 @@ namespace RecruitmentSaaS.Controllers.Api
                 return Forbid();
             if (dto.AgentId.HasValue && !await CanSeeAsync(dto.AgentId))
                 return BadRequest(new { error = "تقدر تحوّل بس لموظفين في فريقك" });
+            if (!dto.AgentId.HasValue && await VisibleAgentsAsync() != null)
+                return BadRequest(new { error = "اختار موظف تحوّل له المحادثة" });
 
             User? agent = null;
             if (dto.AgentId.HasValue)

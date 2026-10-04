@@ -77,10 +77,11 @@ namespace RecruitmentSaaS.Controllers.Api
 
             // The TeleSales manager only sees (and transfers between) their own team
             var visible = await WhatsAppScope.VisibleAgentIdsAsync(_context, CurrentRole, CurrentUserId);
-            var agents = await _context.Users
-                .AsNoTracking()
-                .Where(u => u.IsActive && (u.Role == 6 || u.Role == 3 || u.Role == 8))
-                .Where(u => visible == null || visible.Contains(u.Id))
+            var agentsQuery = _context.Users.AsNoTracking()
+                .Where(u => u.IsActive && (u.Role == 6 || u.Role == 3 || u.Role == 8));
+            if (visible != null)
+                agentsQuery = agentsQuery.Where(u => visible.Contains(u.Id));
+            var agents = await agentsQuery
                 .OrderBy(u => u.FullName)
                 .Select(u => new
                 {

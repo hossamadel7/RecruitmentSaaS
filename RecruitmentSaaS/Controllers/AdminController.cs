@@ -214,6 +214,11 @@ namespace RecruitmentSaaS.Controllers
                 TempData["Error"] = "الدور غير صحيح";
                 return RedirectToAction("Users");
             }
+            if (role == 8 && managerId.HasValue && await _context.Users.AnyAsync(u => u.Role == 8 && u.ManagerId == managerId))
+            {
+                TempData["Error"] = "الفريق ده عنده مدير تيلي سيلز بالفعل";
+                return RedirectToAction("Users");
+            }
 
             var user = new User
             {

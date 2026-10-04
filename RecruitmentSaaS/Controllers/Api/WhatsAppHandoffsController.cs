@@ -46,6 +46,10 @@ namespace RecruitmentSaaS.Controllers.Api
             if (assignedAgentId == null)
                 return BadRequest(new { error = "This account has no default sales agent — pick one explicitly." });
 
+            var visible = await WhatsAppScope.VisibleAgentIdsAsync(_context, CurrentRole, CurrentUserId);
+            if (!WhatsAppScope.CanSee(visible, assignedAgentId))
+                return BadRequest(new { error = "تقدر تحوّل بس لموظفين في فريقك" });
+
             var referenceCode = await WhatsAppHandoffCodes.GenerateUniqueAsync(_context);
             var waUrl = $"https://wa.me/{account.DisplayPhoneNumber.TrimStart('+')}" +
                         $"?text={Uri.EscapeDataString($"Hello, I'm interested in getting more information. Reference: #{referenceCode}")}";
