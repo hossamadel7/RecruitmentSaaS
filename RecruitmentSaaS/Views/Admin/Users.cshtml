@@ -7,6 +7,11 @@
 
     string? q = ViewBag.Q;
     int? role = ViewBag.Role;
+    string status = ViewBag.Status ?? "active";
+    string? team = ViewBag.Team;
+    int activeCount = ViewBag.ActiveCount ?? 0;
+    int inactiveCount = ViewBag.InactiveCount ?? 0;
+    bool anyFilter = !string.IsNullOrWhiteSpace(q) || role.HasValue || status != "active" || !string.IsNullOrEmpty(team);
     var managers = ViewBag.Managers as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
     var allTeleSales = ViewBag.AllTeleSales as List<RecruitmentSaaS.Models.Entities.User> ?? new List<RecruitmentSaaS.Models.Entities.User>();
 
@@ -19,7 +24,7 @@
         <div class="page-header-icon" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);">👤</div>
         <div>
             <h1 class="page-title">المستخدمون</h1>
-            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@Model.Count() مستخدم</p>
+            <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">@Model.Count() مستخدم@(status == "active" ? " نشط" : status == "inactive" ? " معطّل" : "")</p>
         </div>
     </div>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createUserModal">
@@ -39,14 +44,34 @@
 @* Filters *@
 <div class="card mb-4">
     <div class="card-body">
-        <form method="get" action="/Admin/Users" class="row g-2 align-items-end">
-            <div class="col-md-5">
+        <form method="get" action="/Admin/Users" class="row g-2 align-items-end" id="usersFilter">
+            <div class="col-md-3">
                 <label class="form-label form-label-sm">بحث</label>
                 <input name="q" value="@q" class="form-control form-control-sm" placeholder="اسم أو بريد إلكتروني..." />
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <label class="form-label form-label-sm">الحالة</label>
+                <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="active" selected="@(status == "active")">النشطين (@activeCount)</option>
+                    <option value="inactive" selected="@(status == "inactive")">المعطّلين (@inactiveCount)</option>
+                    <option value="all" selected="@(status == "all")">الكل (@(activeCount + inactiveCount))</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label form-label-sm">الفريق</label>
+                <select name="team" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">كل الفرق</option>
+                    @foreach (var m in managers)
+                    {
+                        string mid = m.Id.ToString();
+                        <option value="@mid" selected="@(team == mid)">فريق @m.FullName</option>
+                    }
+                    <option value="none" selected="@(team == "none")">تيلي سيلز بدون فريق</option>
+                </select>
+            </div>
+            <div class="col-md-2">
                 <label class="form-label form-label-sm">الدور</label>
-                <select name="role" class="form-select form-select-sm">
+                <select name="role" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="">كل الأدوار</option>
                     @for (int i = 1; i < roleNames.Length; i++)
                     {
@@ -61,15 +86,13 @@
                     }
                 </select>
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary btn-sm w-100">بحث</button>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm flex-fill">بحث</button>
+                @if (anyFilter)
+                {
+                    <a href="/Admin/Users" class="btn btn-outline-secondary btn-sm flex-fill">مسح</a>
+                }
             </div>
-            @if (!string.IsNullOrWhiteSpace(q) || role.HasValue)
-            {
-                <div class="col-md-2">
-                    <a href="/Admin/Users" class="btn btn-outline-secondary btn-sm w-100">مسح</a>
-                </div>
-            }
         </form>
     </div>
 </div>

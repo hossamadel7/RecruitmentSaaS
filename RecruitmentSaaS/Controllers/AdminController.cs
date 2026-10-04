@@ -144,8 +144,12 @@ namespace RecruitmentSaaS.Controllers
             return View();
         }
         // ── GET /Admin/Users ────────────────────────────────────────────────
-        public async Task<IActionResult> Users(string? q, int? role)
+        // status: active (default) | inactive | all
+        // team:   <managerId> = that manager + their TeleSales | "none" = TeleSales without a team
+        public async Task<IActionResult> Users(string? q, int? role, string? status, string? team)
         {
+            status = status is "inactive" or "all" ? status : "active";
+
             var query = _context.Users
                 .Include(u => u.Manager)
                 .AsQueryable();
@@ -155,6 +159,18 @@ namespace RecruitmentSaaS.Controllers
 
             if (role.HasValue)
                 query = query.Where(u => u.Role == role.Value);
+
+            if (team == "none")
+                query = query.Where(u => u.Role == 3 && u.ManagerId == null);
+            else if (Guid.TryParse(team, out var teamManagerId))
+                query = query.Where(u => u.Id == teamManagerId || u.ManagerId == teamManagerId);
+
+            // Counts for the status options use every other filter, so the numbers match what you'd see
+            ViewBag.ActiveCount = await query.CountAsync(u => u.IsActive);
+            ViewBag.InactiveCount = await query.CountAsync(u => !u.IsActive);
+
+            if (status == "active") query = query.Where(u => u.IsActive);
+            else if (status == "inactive") query = query.Where(u => !u.IsActive);
 
             var users = await query.OrderBy(u => u.Role).ThenBy(u => u.FullName).ToListAsync();
 
@@ -173,6 +189,8 @@ namespace RecruitmentSaaS.Controllers
 
             ViewBag.Q        = q;
             ViewBag.Role     = role;
+            ViewBag.Status   = status;
+            ViewBag.Team     = team;
             ViewBag.Managers = managers;
             ViewBag.AllTeleSales = allTeleSales;
 
