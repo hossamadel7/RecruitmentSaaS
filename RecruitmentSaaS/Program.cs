@@ -46,6 +46,8 @@ builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<IGoogleSheetsLeadImportService, GoogleSheetsLeadImportService>();
 builder.Services.AddHostedService<GoogleSheetsImportBackgroundService>();
+// No shared pool: unassigned leads (Facebook ads, Google Sheets, …) are handed out round-robin every minute
+builder.Services.AddHostedService<LeadAutoAssignService>();
 
 builder.Services.AddScoped<IContractParserService, ContractParserService>();
 

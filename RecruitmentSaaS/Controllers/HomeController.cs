@@ -181,6 +181,10 @@ namespace RecruitmentSaaS.Controllers
                 Response.Cookies.Delete("sales_ref");
             }
 
+            // No shared pool anymore: general-form leads go straight to the next TeleSales in rotation
+            if (teamForm == null && assignedSalesId == null)
+                assignedSalesId = await LeadDistributor.NextTeleSalesAsync(_context, _context.Users);
+
             // 5. Create Lead
             var leadId = Guid.NewGuid();
             var now = DateTime.UtcNow;
@@ -240,6 +244,15 @@ namespace RecruitmentSaaS.Controllers
 
             if (teamForm != null)
                 await NotifyTeamAsync(teamForm.ManagerId, assignedSalesId, leadId, fullName, age.Value);
+            else if (assignedSalesId.HasValue)
+            {
+                try
+                {
+                    await _notifications.SendAsync(assignedSalesId.Value, "عميل جديد تم تعيينه لك",
+                        $"{fullName} — السن {age} — من نموذج التسجيل", link: $"/TeleSales/LeadDetail/{leadId}");
+                }
+                catch (Exception ex) { _logger.LogError(ex, "Failed to notify about lead {LeadId}", leadId); }
+            }
 
             return ThankYou(whatsAppUrl);
         }
@@ -248,30 +261,9 @@ namespace RecruitmentSaaS.Controllers
         public const byte MaxAge = 65;
         public const byte DefaultSeniorAgeThreshold = 45;
 
-        // Round-robin: the team member who got a team-form lead longest ago (or never) is next
-        private async Task<Guid?> NextTeamMemberAsync(Guid managerId)
-        {
-            var members = await _context.Users
-                .Where(u => u.ManagerId == managerId && u.Role == 3 && u.IsActive)
-                .Select(u => u.Id)
-                .ToListAsync();
-
-            if (members.Count == 0)
-                return null; // no team members — lead stays with the manager
-
-            var lastAssigned = await _context.Leads
-                .Where(l => l.TeamManagerId == managerId
-                         && l.AssignedSalesId != null
-                         && members.Contains(l.AssignedSalesId.Value))
-                .GroupBy(l => l.AssignedSalesId!.Value)
-                .Select(g => new { UserId = g.Key, Last = g.Max(l => l.CreatedAt) })
-                .ToDictionaryAsync(x => x.UserId, x => x.Last);
-
-            return members
-                .OrderBy(id => lastAssigned.TryGetValue(id, out var last) ? last : DateTime.MinValue)
-                .ThenBy(id => id)
-                .First();
-        }
+        // Round-robin within the team (same fair rotation as the rest of the system)
+        private Task<Guid?> NextTeamMemberAsync(Guid managerId) =>
+            LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => u.ManagerId == managerId));
 
         private async Task NotifyTeamAsync(Guid managerId, Guid? assignedSalesId, Guid leadId, string fullName, byte age)
         {
