@@ -122,7 +122,7 @@ namespace RecruitmentSaaS.Services
                     LeadId = lead.Id,
                     ActivityType = 8,
                     Description = "تم تعيين العميل تلقائياً (توزيع بالدور)",
-                    ActorType = 3, // system
+                    ActorType = 2, // system (DB allows 1 = user, 2 = system)
                     CreatedAt = DateTime.UtcNow
                 });
                 await db.SaveChangesAsync(ct); // one at a time so the next pick sees this assignment

@@ -284,7 +284,7 @@ namespace RecruitmentSaaS.Controllers
                         Description = $"تم استقبال lead عبر نموذج فيسبوك{(string.IsNullOrWhiteSpace(notes) ? "" : " · " + notes)}",
                         CreatedById = _systemUserId,
                         CreatedByName = "Facebook Lead",
-                        ActorType = 3,
+                        ActorType = 2, // system (DB allows 1 = user, 2 = system)
                         CreatedAt = DateTime.UtcNow
                     });
 
@@ -338,7 +338,7 @@ namespace RecruitmentSaaS.Controllers
                     Description = "تم إنشاء lead من نموذج فيسبوك · المصدر: Facebook",
                     CreatedById = _systemUserId,
                     CreatedByName = "Facebook Lead",
-                    ActorType = 3,
+                    ActorType = 2, // system (DB allows 1 = user, 2 = system)
                     CreatedAt = DateTime.UtcNow
                 });
 

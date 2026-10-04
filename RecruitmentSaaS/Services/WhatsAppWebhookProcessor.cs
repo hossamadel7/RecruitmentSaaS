@@ -173,7 +173,7 @@ namespace RecruitmentSaaS.Services
                 _context.AuditLogs.Add(new AuditLog
                 {
                     Id = Guid.NewGuid(),
-                    ActorType = 3, // system
+                    ActorType = 2, // system (DB allows 1 = user, 2 = system)
                     EventType = "ConversationCreated",
                     EntityType = "WhatsAppConversation",
                     EntityId = conversation.Id,
@@ -307,7 +307,7 @@ namespace RecruitmentSaaS.Services
                     _context.AuditLogs.Add(new AuditLog
                     {
                         Id = Guid.NewGuid(),
-                        ActorType = 3,
+                        ActorType = 2, // system (DB allows 1 = user, 2 = system)
                         EventType = "ConversationCreated",
                         EntityType = "WhatsAppConversation",
                         EntityId = conversation.Id,
@@ -441,7 +441,7 @@ namespace RecruitmentSaaS.Services
             _context.AuditLogs.Add(new AuditLog
             {
                 Id = Guid.NewGuid(),
-                ActorType = 3,
+                ActorType = 2, // system (DB allows 1 = user, 2 = system)
                 EventType = "WhatsAppConnected",
                 EntityType = "WhatsAppHandoff",
                 EntityId = handoff.Id,
@@ -486,7 +486,7 @@ namespace RecruitmentSaaS.Services
             _context.AuditLogs.Add(new AuditLog
             {
                 Id = Guid.NewGuid(),
-                ActorType = 3,
+                ActorType = 2, // system (DB allows 1 = user, 2 = system)
                 EventType = "WhatsAppLinkedByPhone",
                 EntityType = "WhatsAppConversation",
                 EntityId = conversation.Id,
