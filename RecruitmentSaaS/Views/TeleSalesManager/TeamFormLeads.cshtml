@@ -8,8 +8,7 @@
     var team = ViewBag.Team as List<User> ?? new List<User>();
     var myTeam = ViewBag.MyTeam as List<User> ?? new List<User>();
     bool isHead = ViewBag.IsHead == true;
-    // The head sees every team, so each name carries its team
-    string TeamTag(User u) => !isHead ? "" : u.Role == 8 ? " — أنا" : u.Manager != null ? " — فريق " + u.Manager.FullName : " — بدون فريق";
+    string TeamTag(User u) => u.Role == 8 ? (isHead ? " — أنا" : " — مدير التيلي سيلز") : "";
     var memberCounts = ViewBag.MemberCounts as Dictionary<Guid, int> ?? new Dictionary<Guid, int>();
     string? member = ViewBag.Member;
     byte? status = ViewBag.Status;
@@ -65,10 +64,9 @@
     <div class="page-header-left">
         <div class="page-header-icon" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);">📋</div>
         <div>
-            <h1 class="page-title">@(isHead ? "ليدز كل الفرق" : "ليدز الفريق")</h1>
+            <h1 class="page-title">ليدز الفريق</h1>
             <p style="color:var(--text-muted);font-size:.8rem;margin:2px 0 0;">
-                @(isHead ? "كل العملاء المعيّنين للتيلي سيلز في كل الفرق، وليدز فورم الفرق اللي في انتظار التعيين"
-                         : "كل العملاء المعيّنين لفريقك، والعملاء اللي في انتظار تعيينك")
+                كل العملاء المعيّنين لفريقك، والعملاء اللي في انتظار التعيين
             </p>
         </div>
     </div>

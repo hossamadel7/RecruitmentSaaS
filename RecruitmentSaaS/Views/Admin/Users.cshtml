@@ -182,11 +182,7 @@
                                         </button>
                                     </div>
                                 }
-                                else if (u.Role == 8)
-                                {
-                                    <span style="color:#be185d;font-size:.8rem;"><i class="bi bi-diagram-3-fill"></i> كل الفرق + عملائه</span>
-                                }
-                                else if (u.Role == 3)
+                                else if (u.Role == 3 || u.Role == 8)
                                 {
                                     @* TeleSales row: show current manager *@
                                     @if (u.Manager != null)
@@ -282,6 +278,7 @@
                 <div style="min-width:0">
                     <div class="team-name">
                         @ts.FullName
+                        @if (ts.Role == 8) { <span class="team-badge-head">مدير التيلي سيلز</span> }
                         @if (!ts.IsActive) { <span class="team-badge-off">معطّل</span> }
                     </div>
                     <div class="team-sub">
@@ -325,6 +322,7 @@
 }
 
 <style>
+    .users-table .avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .9rem; flex-shrink: 0; text-transform: uppercase; }
     .users-table .u-email { font-family: monospace; font-size: .82rem; text-align: right; }
     .users-table .u-team { font-size: .82rem; }
     .users-table .u-date { font-size: .78rem; color: var(--text-muted); white-space: nowrap; }
@@ -372,6 +370,7 @@
     .team-avatar { width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; background: #8b5cf620; color: #8b5cf6; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .9rem; }
     .team-name { font-weight: 600; font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .team-sub { font-size: .74rem; color: var(--text-muted); }
+    .team-badge-head { background: #fce7f3; color: #be185d; border-radius: 99px; padding: 0 7px; font-size: .68rem; margin-inline-start: 4px; }
     .team-badge-off { background: #fef2f2; color: #dc2626; border-radius: 99px; padding: 0 7px; font-size: .68rem; margin-inline-start: 4px; }
     .team-btn-add { background: #7c3aed; color: #fff; border: none; font-size: .75rem; padding: 4px 12px; border-radius: 8px; }
     .team-btn-add:hover { background: #6d28d9; color: #fff; }
@@ -490,7 +489,7 @@
                     </div>
                     @* Show manager dropdown only when Role = TeleSales (3) *@
                     <div class="mb-3" id="managerFieldWrapper" style="display:none;">
-                        <label class="form-label">تعيين لفريق <span style="color:var(--text-muted);font-weight:400;">(اختياري)</span></label>
+                        <label class="form-label">الفريق (مدير الفريق) <span style="color:var(--text-muted);font-weight:400;">(اختياري)</span></label>
                         <select name="managerId" class="form-select" id="managerSelect">
                             <option value="">— بدون مدير —</option>
                             @foreach (var mgr in managers)
@@ -675,7 +674,7 @@
         // ── Show/hide manager field in create modal ───────────────────────────
         function toggleManagerField(roleVal) {
             var wrapper = document.getElementById('managerFieldWrapper');
-            wrapper.style.display = roleVal === '3' ? 'block' : 'none';
+            wrapper.style.display = roleVal === '3' || roleVal === '8' ? 'block' : 'none';
         }
     </script>
 }

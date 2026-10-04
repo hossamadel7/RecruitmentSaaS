@@ -161,7 +161,7 @@ namespace RecruitmentSaaS.Controllers
                 query = query.Where(u => u.Role == role.Value);
 
             if (team == "none")
-                query = query.Where(u => u.Role == 3 && u.ManagerId == null);
+                query = query.Where(u => (u.Role == 3 || u.Role == 8) && u.ManagerId == null);
             else if (Guid.TryParse(team, out var teamManagerId))
                 query = query.Where(u => u.Id == teamManagerId || u.ManagerId == teamManagerId);
 
@@ -183,7 +183,7 @@ namespace RecruitmentSaaS.Controllers
             // Team counts and the "manage team" modal must ignore the search/role filter
             var allTeleSales = await _context.Users
                 .Include(u => u.Manager)
-                .Where(u => u.Role == 3)
+                .Where(u => u.Role == 3 || u.Role == 8)   // 8 = the team's TeleSales manager
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 
@@ -226,8 +226,8 @@ namespace RecruitmentSaaS.Controllers
                 BranchId = branchId ?? Guid.Parse("00000000-0000-0000-0000-000000000020"),
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
-                // If TeleSales (Role 3) assign to a manager
-                ManagerId = (role == 3 && managerId.HasValue) ? managerId : null
+                // TeleSales (3) and the TeleSales manager (8) belong to a team leader
+                ManagerId = ((role == 3 || role == 8) && managerId.HasValue) ? managerId : null
             };
 
             _context.Users.Add(user);
@@ -244,9 +244,17 @@ namespace RecruitmentSaaS.Controllers
         public async Task<IActionResult> AssignManager(Guid userId, Guid? managerId, Guid? reopenTeam)
         {
             var user = await _context.Users.FindAsync(userId);
-            if (user == null || user.Role != 3)
+            if (user == null || (user.Role != 3 && user.Role != 8))
             {
                 TempData["Error"] = "المستخدم غير موجود أو ليس تيلي سيلز";
+                return RedirectToAction("Users", new { openTeam = reopenTeam });
+            }
+
+            // One TeleSales manager per team
+            if (user.Role == 8 && managerId.HasValue
+                && await _context.Users.AnyAsync(u => u.Role == 8 && u.ManagerId == managerId && u.Id != user.Id))
+            {
+                TempData["Error"] = "الفريق ده عنده مدير تيلي سيلز بالفعل";
                 return RedirectToAction("Users", new { openTeam = reopenTeam });
             }
 
@@ -304,6 +312,12 @@ namespace RecruitmentSaaS.Controllers
 
             if (role.HasValue && role.Value != user.Role)
             {
+                if (role.Value == 8 && user.ManagerId != null
+                    && await _context.Users.AnyAsync(u => u.Role == 8 && u.ManagerId == user.ManagerId && u.Id != user.Id))
+                {
+                    TempData["Error"] = "الفريق ده عنده مدير تيلي سيلز بالفعل";
+                    return RedirectToAction("Users");
+                }
                 if (role.Value < 1 || role.Value > MaxRole)
                 {
                     TempData["Error"] = "الدور غير صحيح";
@@ -352,7 +366,7 @@ namespace RecruitmentSaaS.Controllers
             if (roleChanged)
             {
                 user.Role = (byte)role!.Value;
-                if (user.Role != 3) user.ManagerId = null; // only TeleSales belong to a team
+                if (user.Role != 3 && user.Role != 8) user.ManagerId = null; // only TeleSales / TeleSales manager belong to a team
             }
             await _context.SaveChangesAsync();
             if (roleChanged)

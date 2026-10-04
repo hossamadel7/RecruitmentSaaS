@@ -43,6 +43,22 @@ namespace RecruitmentSaaS.Controllers.Api
         private string? CurrentRole => User.FindFirstValue(ClaimTypes.Role);
         private bool IsOrgWide => WhatsAppAuthorization.IsOrgWide(CurrentRole);
 
+        // Agents whose chats I may see (null = everyone), loaded once per request
+        private List<Guid>? _visible;
+        private bool _visibleLoaded;
+        private async Task<List<Guid>?> VisibleAgentsAsync()
+        {
+            if (!_visibleLoaded)
+            {
+                _visible = await WhatsAppScope.VisibleAgentIdsAsync(_context, CurrentRole, CurrentUserId);
+                _visibleLoaded = true;
+            }
+            return _visible;
+        }
+
+        private async Task<bool> CanSeeAsync(Guid? assignedAgentId) =>
+            WhatsAppScope.CanSee(await VisibleAgentsAsync(), assignedAgentId);
+
         // ── GET /api/conversations ────────────────────────────────────────────
         // accountId=<guid|all>  assigned=<me|unassigned|<agentGuid>>  team=<managerGuid>  status=<byte>
         // unreadOnly=<bool>  search=<text>  page=<int>
@@ -60,8 +76,9 @@ namespace RecruitmentSaaS.Controllers.Api
 
             var query = _context.WhatsAppConversations.AsNoTracking().AsQueryable();
 
-            if (!IsOrgWide)
-                query = query.Where(c => c.AssignedSalesAgentId == userId);
+            var visible = await VisibleAgentsAsync();
+            if (visible != null)
+                query = query.Where(c => c.AssignedSalesAgentId != null && visible.Contains(c.AssignedSalesAgentId.Value));
 
             if (accountId.HasValue)
                 query = query.Where(c => c.WhatsAppAccountId == accountId.Value);
@@ -144,7 +161,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 .FirstOrDefaultAsync(c => c.Id == id);
 
             if (conversation == null) return NotFound();
-            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
                 return Forbid();
 
             var dto = new ConversationDetailDto
@@ -181,7 +198,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id);
             if (conversation == null) return NotFound();
-            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
                 return Forbid();
 
             var query = _context.WhatsAppMessages.AsNoTracking().Where(m => m.ConversationId == id);
@@ -222,7 +239,7 @@ namespace RecruitmentSaaS.Controllers.Api
         {
             var conversation = await _context.WhatsAppConversations.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
             if (conversation == null) return NotFound();
-            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
                 return Forbid();
 
             var mediaId = await _context.WhatsAppMessages.AsNoTracking()
@@ -283,7 +300,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 .Include(c => c.WhatsAppAccount)
                 .FirstOrDefaultAsync(c => c.Id == id, ct);
             if (conversation == null) return NotFound();
-            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
                 return Forbid();
 
             caption = string.IsNullOrWhiteSpace(caption) ? null : caption.Trim();
@@ -381,7 +398,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 .Include(c => c.WhatsAppAccount)
                 .FirstOrDefaultAsync(c => c.Id == id);
             if (conversation == null) return NotFound();
-            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
                 return Forbid();
 
             var now = DateTime.UtcNow;
@@ -460,7 +477,7 @@ namespace RecruitmentSaaS.Controllers.Api
         {
             var conversation = await _context.WhatsAppConversations.FirstOrDefaultAsync(c => c.Id == id);
             if (conversation == null) return NotFound();
-            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
                 return Forbid();
 
             if (conversation.UnreadCount != 0)
@@ -485,6 +502,10 @@ namespace RecruitmentSaaS.Controllers.Api
 
             var conversation = await _context.WhatsAppConversations.FirstOrDefaultAsync(c => c.Id == id);
             if (conversation == null) return NotFound();
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
+                return Forbid();
+            if (dto.AgentId.HasValue && !await CanSeeAsync(dto.AgentId))
+                return BadRequest(new { error = "تقدر تحوّل بس لموظفين في فريقك" });
 
             User? agent = null;
             if (dto.AgentId.HasValue)
@@ -571,7 +592,7 @@ namespace RecruitmentSaaS.Controllers.Api
         {
             var conversation = await _context.WhatsAppConversations.FirstOrDefaultAsync(c => c.Id == id);
             if (conversation == null) return NotFound();
-            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
                 return Forbid();
 
             conversation.Status = dto.Status;
@@ -594,7 +615,7 @@ namespace RecruitmentSaaS.Controllers.Api
 
             var conversation = await _context.WhatsAppConversations.FirstOrDefaultAsync(c => c.Id == id);
             if (conversation == null) return NotFound();
-            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
                 return Forbid();
 
             var previousStage = conversation.LeadStage;
@@ -628,7 +649,7 @@ namespace RecruitmentSaaS.Controllers.Api
         {
             var conversation = await _context.WhatsAppConversations.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
             if (conversation == null) return NotFound();
-            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
                 return Forbid();
 
             var notes = await _context.ConversationNotes
@@ -655,7 +676,7 @@ namespace RecruitmentSaaS.Controllers.Api
 
             var conversation = await _context.WhatsAppConversations.FirstOrDefaultAsync(c => c.Id == id);
             if (conversation == null) return NotFound();
-            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
                 return Forbid();
 
             var note = new ConversationNote
@@ -698,7 +719,7 @@ namespace RecruitmentSaaS.Controllers.Api
 
             var conversation = await _context.WhatsAppConversations.FirstOrDefaultAsync(c => c.Id == id);
             if (conversation == null) return NotFound();
-            if (!WhatsAppAuthorization.CanAccessConversation(CurrentRole, CurrentUserId, conversation.AssignedSalesAgentId))
+            if (!await CanSeeAsync(conversation.AssignedSalesAgentId))
                 return Forbid();
 
             var assignedToId = dto.AssignedToId ?? conversation.AssignedSalesAgentId ?? CurrentUserId;

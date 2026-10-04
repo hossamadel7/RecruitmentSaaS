@@ -1162,7 +1162,7 @@
                 </div>
             }
 
-            @* ── HEAD TELE SALES (Role 8): own leads like a TeleSales + every team ── *@
+            @* ── TELE SALES MANAGER (Role 8): own leads like a TeleSales + their team ── *@
             @if (role == "8")
             {
                 <div class="sidebar-section">شغلي</div>
@@ -1181,7 +1181,7 @@
                         <span class="nav-icon"><i class="bi bi-whatsapp"></i></span> واتساب
                     </a>
                 </div>
-                <div class="sidebar-section">كل الفرق</div>
+                <div class="sidebar-section">فريقي</div>
                 <div class="nav-item">
                     <a class="nav-link @(currentController=="TeleSalesManager"&&currentAction=="Index"?"active":"")" href="/TeleSalesManager/Index">
                         <span class="nav-icon"><i class="bi bi-bar-chart-fill"></i></span> لوحة الأداء
@@ -1189,7 +1189,7 @@
                 </div>
                 <div class="nav-item">
                     <a class="nav-link @(currentController=="TeleSalesManager"&&currentAction=="TeamFormLeads"?"active":"")" href="/TeleSalesManager/TeamFormLeads">
-                        <span class="nav-icon"><i class="bi bi-people-fill"></i></span> ليدز كل الفرق
+                        <span class="nav-icon"><i class="bi bi-people-fill"></i></span> ليدز الفريق
                     </a>
                 </div>
             }
