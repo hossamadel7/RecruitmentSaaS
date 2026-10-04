@@ -217,6 +217,17 @@
                                         </button>
                                     </form>
 
+                                    @if (u.Id.ToString() != User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value)
+                                    {
+                                        <form method="post" action="/Admin/DeleteUser" class="d-inline delete-user-form" data-user-name="@u.FullName">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userId" value="@u.Id" />
+                                            <button type="submit" class="btn btn-outline-danger btn-sm" title="حذف نهائي">
+                                                <i class="bi bi-trash3"></i>
+                                            </button>
+                                        </form>
+                                    }
+
                                     <button class="btn btn-outline-secondary btn-sm edit-user-btn"
                                             title="تعديل الاسم والبريد"
                                             data-user-id="@u.Id" data-user-name="@u.FullName" data-user-email="@u.Email">
@@ -567,6 +578,17 @@
                 history.replaceState(null, '', location.pathname); // don't reopen on refresh
             }
         })();
+
+        // ── Delete user: confirm with the name (data-* so quotes in names are safe) ─
+        document.querySelectorAll('.delete-user-form').forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+                var ok = confirm('حذف "' + form.dataset.userName + '" نهائياً؟\n\n' +
+                    '• عملاؤه المفتوحون يرجعوا للتوزيع التلقائي\n' +
+                    '• لو مرتبط بمدفوعات أو مرشحين أو مستندات، الحذف هيترفض\n\n' +
+                    'لا يمكن التراجع عن الحذف.');
+                if (!ok) e.preventDefault();
+            });
+        });
 
         // ── Edit user modal (data-* attributes, so names with quotes are safe) ─
         var editOriginalEmail = '';

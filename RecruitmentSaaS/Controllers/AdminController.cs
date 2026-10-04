@@ -282,6 +282,45 @@ namespace RecruitmentSaaS.Controllers
             return RedirectToAction("Users");
         }
 
+        // ── POST /Admin/DeleteUser ──────────────────────────────────────────
+        // Permanently removes a staff user (see UserDeletion for exactly what happens to linked data).
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteUser(Guid userId)
+        {
+            var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null)
+            {
+                TempData["Error"] = "المستخدم غير موجود";
+                return RedirectToAction("Users");
+            }
+            if (user.Id == CurrentUserId)
+            {
+                TempData["Error"] = "لا يمكنك حذف حسابك الخاص";
+                return RedirectToAction("Users");
+            }
+            if (user.Role == 1 && !await _context.Users.AnyAsync(u => u.Role == 1 && u.IsActive && u.Id != user.Id))
+            {
+                TempData["Error"] = "لا يمكن حذف آخر مدير نظام نشط";
+                return RedirectToAction("Users");
+            }
+
+            var result = await RecruitmentSaaS.Services.UserDeletion.DeleteAsync(_context, user.Id);
+            if (!result.Deleted)
+            {
+                TempData["Error"] = result.Message;
+                return RedirectToAction("Users");
+            }
+
+            // End any session they still have open right away
+            RecruitmentSaaS.Services.UserSessionValidator.Forget(
+                HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), user.Id);
+
+            TempData["Success"] = $"تم حذف {user.FullName} نهائياً"
+                + (result.LeadsReturned > 0 ? $" — {result.LeadsReturned} عميل رجع للتوزيع التلقائي" : "");
+            return RedirectToAction("Users");
+        }
+
         // ── POST /Admin/UpdateUser — change a user's name / login email ─────
         [HttpPost]
         [ValidateAntiForgeryToken]
