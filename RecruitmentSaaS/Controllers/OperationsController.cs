@@ -256,39 +256,11 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("Candidates");
             }
 
-            var successParam = new Microsoft.Data.SqlClient.SqlParameter
-            {
-                ParameterName = "@Success",
-                SqlDbType = System.Data.SqlDbType.Bit,
-                Direction = System.Data.ParameterDirection.Output
-            };
-            var messageParam = new Microsoft.Data.SqlClient.SqlParameter
-            {
-                ParameterName = "@Message",
-                SqlDbType = System.Data.SqlDbType.NVarChar,
-                Size = 500,
-                Direction = System.Data.ParameterDirection.Output
-            };
-            var stageNameParam = new Microsoft.Data.SqlClient.SqlParameter
-            {
-                ParameterName = "@NewStageName",
-                SqlDbType = System.Data.SqlDbType.NVarChar,
-                Size = 200,
-                Direction = System.Data.ParameterDirection.Output
-            };
+            var move = await _context.Database.MoveToNextStageAsync(
+                candidateId, CurrentUserId, notes, isOverride: false, overrideReason: null);
 
-            await _context.Database.ExecuteSqlRawAsync(
-                "EXEC demorecruitment.sp_MoveToNextStage @CandidateId, @MovedById, @Notes, @IsOverride, @OverrideReason, @Success OUTPUT, @Message OUTPUT, @NewStageName OUTPUT",
-                new Microsoft.Data.SqlClient.SqlParameter("@CandidateId", candidateId),
-                new Microsoft.Data.SqlClient.SqlParameter("@MovedById", CurrentUserId),
-                new Microsoft.Data.SqlClient.SqlParameter("@Notes", (object?)notes ?? DBNull.Value),
-                new Microsoft.Data.SqlClient.SqlParameter("@IsOverride", false),
-                new Microsoft.Data.SqlClient.SqlParameter("@OverrideReason", DBNull.Value),
-                successParam, messageParam, stageNameParam
-            );
-
-            var success = (bool)successParam.Value;
-            var message = messageParam.Value?.ToString() ?? "";
+            var success = move.Success!.Value;
+            var message = move.Message ?? "";
 
             if (success)
                 TempData["Success"] = message;

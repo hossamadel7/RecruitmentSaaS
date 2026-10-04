@@ -94,7 +94,6 @@ public partial class RecruitmentCrmContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.UseCollation("Arabic_CI_AI");
 
         modelBuilder.Entity<AuditLog>(entity =>
         {
@@ -108,10 +107,10 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.EventType, e.CreatedAt }, "IX_demorecruitment_Aud_Ev").IsDescending(false, true);
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.EntityType).HasMaxLength(100);
             entity.Property(e => e.EventType).HasMaxLength(100);
             entity.Property(e => e.Ipaddress)
@@ -125,12 +124,12 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.ToTable("Branches", "demorecruitment");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.Address).HasMaxLength(500);
             entity.Property(e => e.City).HasMaxLength(100);
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.Name).HasMaxLength(200);
         });
@@ -143,19 +142,19 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => e.Status, "IX_demorecruitment_Ca_St");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.BudgetEgp)
-                .HasColumnType("decimal(18, 2)")
+                .HasColumnType("numeric(18,2)")
                 .HasColumnName("BudgetEGP");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.FacebookAdId).HasMaxLength(100);
             entity.Property(e => e.FacebookAdSetId).HasMaxLength(100);
             entity.Property(e => e.FacebookCampaignId).HasMaxLength(100);
             entity.Property(e => e.Name).HasMaxLength(200);
             entity.Property(e => e.SpendEgp)
-                .HasColumnType("decimal(18, 2)")
+                .HasColumnType("numeric(18,2)")
                 .HasColumnName("SpendEGP");
             entity.Property(e => e.Status).HasDefaultValue((byte)1);
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
@@ -185,14 +184,14 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => e.PassportNumber, "UIX_demo_Cand_Passport")
                 .IsUnique()
-                .HasFilter("([PassportNumber] IS NOT NULL)");
+                .HasFilter("(\"PassportNumber\" IS NOT NULL)");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.City).HasMaxLength(100);
             entity.Property(e => e.CompletedAt).HasPrecision(0);
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.FlightDate).HasPrecision(0);
             entity.Property(e => e.FullName).HasMaxLength(200);
             entity.Property(e => e.NationalId).HasMaxLength(50);
@@ -200,7 +199,7 @@ public partial class RecruitmentCrmContext : DbContext
             entity.Property(e => e.Phone).HasMaxLength(30);
             entity.Property(e => e.Status).HasDefaultValue((byte)1);
             entity.Property(e => e.TotalPaidEgp)
-                .HasColumnType("decimal(18, 2)")
+                .HasColumnType("numeric(18,2)")
                 .HasColumnName("TotalPaidEGP");
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
             entity.Property(e => e.VisaNumber).HasMaxLength(100);
@@ -242,10 +241,10 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.CandidateId, e.CreatedAt }, "IX_demo_CA_CandId").IsDescending(false, true);
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.CreatedByName).HasMaxLength(200);
             entity.Property(e => e.Description).HasMaxLength(1000);
 
@@ -267,10 +266,10 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.CandidateId, e.CreatedAt }, "IX_demorecruitment_CSH_Cnd").IsDescending(false, true);
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.Notes).HasMaxLength(500);
             entity.Property(e => e.OverrideReason).HasMaxLength(500);
 
@@ -305,14 +304,14 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => e.CandidateId, "UQ_demorecruitment_Com_Cnd").IsUnique();
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.AmountEgp)
-                .HasColumnType("decimal(18, 2)")
+                .HasColumnType("numeric(18,2)")
                 .HasColumnName("AmountEGP");
             entity.Property(e => e.ApprovedAt).HasPrecision(0);
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.PaidAt).HasPrecision(0);
             entity.Property(e => e.ReversedReason).HasMaxLength(500);
             entity.Property(e => e.Status).HasDefaultValue((byte)1);
@@ -342,7 +341,7 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.ToTable("CommissionSettings", "demorecruitment");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.ResetDayOfMonth).HasDefaultValue((byte)1);
         });
 
@@ -354,11 +353,11 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.IsActive, e.MinDeals }, "IX_demorecruitment_CT_Active");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
-            entity.Property(e => e.AmountPerDeal).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.AmountPerDeal).HasColumnType("numeric(18,2)");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
 
@@ -374,14 +373,14 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.ToTable("Companies", "demorecruitment");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.City).HasMaxLength(100);
             entity.Property(e => e.ContactEmail).HasMaxLength(255);
             entity.Property(e => e.ContactPhone).HasMaxLength(50);
             entity.Property(e => e.Country).HasMaxLength(100);
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.Name).HasMaxLength(200);
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
@@ -400,10 +399,10 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => e.CompanyId, "IX_demorecruitment_CompanyJobs_CompanyId");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.JobTitle).HasMaxLength(200);
             entity.Property(e => e.Notes).HasMaxLength(500);
@@ -420,14 +419,14 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.ToTable("ContractUploads", "demorecruitment");
 
-            entity.HasIndex(e => e.MatchedCandidateId, "IX_demorecruitment_ContractUploads_Candidate").HasFilter("([MatchedCandidateId] IS NOT NULL)");
+            entity.HasIndex(e => e.MatchedCandidateId, "IX_demorecruitment_ContractUploads_Candidate").HasFilter("(\"MatchedCandidateId\" IS NOT NULL)");
 
             entity.HasIndex(e => e.MatchStatus, "IX_demorecruitment_ContractUploads_Status");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.ExtractedEmployerName).HasMaxLength(200);
             entity.Property(e => e.ExtractedPassportNo).HasMaxLength(50);
             entity.Property(e => e.ExtractedTransactionNo).HasMaxLength(100);
@@ -452,7 +451,7 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => e.CandidateId, "IX_demorecruitment_Doc_Cnd");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.FileName).HasMaxLength(255);
             entity.Property(e => e.MimeType).HasMaxLength(100);
             entity.Property(e => e.S3key)
@@ -460,7 +459,7 @@ public partial class RecruitmentCrmContext : DbContext
                 .HasColumnName("S3Key");
             entity.Property(e => e.UploadedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
             entity.HasOne(d => d.Candidate).WithMany(p => p.Documents)
                 .HasForeignKey(d => d.CandidateId)
@@ -483,10 +482,10 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.ReminderDate, e.Status }, "IX_demorecruitment_FUR_Dt");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.DismissedAt).HasPrecision(0);
             entity.Property(e => e.Notes).HasMaxLength(500);
             entity.Property(e => e.Status).HasDefaultValue((byte)1);
@@ -518,16 +517,16 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.ToTable("JobPackages", "demorecruitment");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.DestinationCountry).HasMaxLength(100);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.JobTitle).HasMaxLength(200);
             entity.Property(e => e.Name).HasMaxLength(200);
             entity.Property(e => e.PriceEgp)
-                .HasColumnType("decimal(18, 2)")
+                .HasColumnType("numeric(18,2)")
                 .HasColumnName("PriceEGP");
         });
 
@@ -537,7 +536,7 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.ToTable("Leads", "demorecruitment");
 
-            entity.HasIndex(e => e.GoogleSheetId, "IX_Leads_GoogleSheetId").HasFilter("([GoogleSheetId] IS NOT NULL)");
+            entity.HasIndex(e => e.GoogleSheetId, "IX_Leads_GoogleSheetId").HasFilter("(\"GoogleSheetId\" IS NOT NULL)");
 
             entity.HasIndex(e => e.CampaignId, "IX_demorecruitment_Ld_Ca");
 
@@ -557,14 +556,14 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => e.FacebookLeadId, "UX_Leads_FacebookLeadId")
                 .IsUnique()
-                .HasFilter("([FacebookLeadId] IS NOT NULL)");
+                .HasFilter("(\"FacebookLeadId\" IS NOT NULL)");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.AppointmentDate).HasPrecision(0);
             entity.Property(e => e.ConvertedAt).HasPrecision(0);
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.FacebookFormId).HasMaxLength(100);
             entity.Property(e => e.FacebookLeadId).HasMaxLength(100);
             entity.Property(e => e.FullName).HasMaxLength(200);
@@ -573,7 +572,7 @@ public partial class RecruitmentCrmContext : DbContext
             entity.Property(e => e.LastContactedAt).HasPrecision(0);
             entity.Property(e => e.LeadCode)
                 .HasMaxLength(8)
-                .HasComputedColumnSql("('LD-'+right('00000'+CONVERT([nvarchar](10),[LeadSequence]),(5)))", true);
+                .HasComputedColumnSql("('LD-' || right('00000' || (\"LeadSequence\")::text, 5))::citext", true);
             entity.Property(e => e.LeadSequence).ValueGeneratedOnAdd();
             entity.Property(e => e.Phone).HasMaxLength(30);
             entity.Property(e => e.ReferredByName).HasMaxLength(200);
@@ -618,15 +617,15 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.ToTable("LeadActivities", "demorecruitment");
 
-            entity.HasIndex(e => e.NextFollowUpDate, "IX_demorecruitment_LA_Fup").HasFilter("([NextFollowUpDate] IS NOT NULL)");
+            entity.HasIndex(e => e.NextFollowUpDate, "IX_demorecruitment_LA_Fup").HasFilter("(\"NextFollowUpDate\" IS NOT NULL)");
 
             entity.HasIndex(e => new { e.LeadId, e.CreatedAt }, "IX_demorecruitment_LA_Ld").IsDescending(false, true);
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.ActorType).HasDefaultValue((byte)1);
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.CreatedByName).HasMaxLength(200);
             entity.Property(e => e.Description).HasMaxLength(1000);
             entity.Property(e => e.EntityType).HasMaxLength(50);
@@ -649,10 +648,10 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.LeadId, e.CalledAt }, "IX_demorecruitment_LCL_Ld").IsDescending(false, true);
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CalledAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.Note).HasMaxLength(500);
 
             entity.HasOne(d => d.CalledBy).WithMany(p => p.LeadCallLogs)
@@ -674,10 +673,10 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.LeadId, e.CreatedAt }, "IX_demorecruitment_LFH_Ld").IsDescending(false, true);
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.Note).HasMaxLength(500);
 
             entity.HasOne(d => d.ChangedBy).WithMany(p => p.LeadFunnelHistories)
@@ -701,14 +700,14 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.LeadId, e.CreatedAt }, "IX_demorecruitment_LV_Ld").IsDescending(false, true);
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.Notes).HasMaxLength(1000);
             entity.Property(e => e.VisitDateTime)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
             entity.HasOne(d => d.AssignedSalesUser).WithMany(p => p.LeadVisitAssignedSalesUsers)
                 .HasForeignKey(d => d.AssignedSalesUserId)
@@ -742,13 +741,13 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.UserId, e.IsRead, e.CreatedAt }, "IX_demorecruitment_Not_Us").IsDescending(false, false, true);
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.Body).HasMaxLength(500);
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.Link).HasMaxLength(500);
-            entity.Property(e => e.ReadAt).HasColumnType("datetime");
+            entity.Property(e => e.ReadAt).HasColumnType("timestamp(6) without time zone");
             entity.Property(e => e.Title).HasMaxLength(200);
 
             entity.HasOne(d => d.User).WithMany(p => p.Notifications)
@@ -767,14 +766,14 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.PackageId, e.StageOrder }, "UQ_demo_PS_Order").IsUnique();
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.RequiredMinPaymentEgp)
-                .HasColumnType("decimal(18, 2)")
+                .HasColumnType("numeric(18,2)")
                 .HasColumnName("RequiredMinPaymentEGP");
             entity.Property(e => e.StageName).HasMaxLength(200);
 
@@ -795,10 +794,10 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.ToTable("PassportDownloadLogs", "demorecruitment");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.DownloadedAt)
-                .HasDefaultValueSql("(getutcdate())")
-                .HasColumnType("datetime");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')")
+                .HasColumnType("timestamp(6) without time zone");
 
             entity.HasOne(d => d.DownloadedBy).WithMany(p => p.PassportDownloadLogs)
                 .HasForeignKey(d => d.DownloadedById)
@@ -819,10 +818,10 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => e.CandidateId, "UQ_PDC_Candidate").IsUnique();
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.DownloadedAt)
-                .HasDefaultValueSql("(getutcdate())")
-                .HasColumnType("datetime");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')")
+                .HasColumnType("timestamp(6) without time zone");
 
             entity.HasOne(d => d.Candidate).WithOne(p => p.PassportDownloadedCandidate)
                 .HasForeignKey<PassportDownloadedCandidate>(d => d.CandidateId)
@@ -845,14 +844,14 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => e.PaymentDate, "IX_demorecruitment_Pay_Dt");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.AmountEgp)
-                .HasColumnType("decimal(18, 2)")
+                .HasColumnType("numeric(18,2)")
                 .HasColumnName("AmountEGP");
-            entity.Property(e => e.ApprovedAt).HasColumnType("datetime");
+            entity.Property(e => e.ApprovedAt).HasColumnType("timestamp(6) without time zone");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.Notes).HasMaxLength(500);
             entity.Property(e => e.RejectionReason).HasMaxLength(500);
             entity.Property(e => e.Status).HasDefaultValue((byte)1);
@@ -880,10 +879,10 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => e.Token, "UQ_demorecruitment_RT_Tok").IsUnique();
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.ExpiresAt).HasPrecision(0);
             entity.Property(e => e.Token).HasMaxLength(500);
 
@@ -899,16 +898,16 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.ToTable("Refunds", "demorecruitment");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.AmountEgp)
-                .HasColumnType("decimal(18, 2)")
+                .HasColumnType("numeric(18,2)")
                 .HasColumnName("AmountEGP");
             entity.Property(e => e.ExecutedAt).HasPrecision(0);
             entity.Property(e => e.Reason).HasMaxLength(500);
             entity.Property(e => e.RejectReason).HasMaxLength(500);
             entity.Property(e => e.RequestedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.ReviewedAt).HasPrecision(0);
             entity.Property(e => e.Status).HasDefaultValue((byte)1);
 
@@ -949,19 +948,19 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.UserId, e.SalaryMonth }, "UQ_demorecruitment_SP_UserMonth").IsUnique();
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
-            entity.Property(e => e.Adjustment).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.Adjustment).HasColumnType("numeric(18,2)");
             entity.Property(e => e.AdjustmentNote).HasMaxLength(500);
             entity.Property(e => e.ApprovedAt).HasPrecision(0);
-            entity.Property(e => e.BaseSalary).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.BaseSalary).HasColumnType("numeric(18,2)");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.PaidAt).HasPrecision(0);
             entity.Property(e => e.Status).HasDefaultValue((byte)1);
             entity.Property(e => e.TotalAmount)
-                .HasComputedColumnSql("([BaseSalary]+[Adjustment])", true)
-                .HasColumnType("decimal(19, 2)");
+                .HasComputedColumnSql("(\"BaseSalary\" + \"Adjustment\")", true)
+                .HasColumnType("numeric(19,2)");
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
 
             entity.HasOne(d => d.ApprovedBy).WithMany(p => p.SalaryPaymentApprovedBies)
@@ -987,8 +986,8 @@ public partial class RecruitmentCrmContext : DbContext
         {
             entity.ToTable("SalesGoogleSheets", "demorecruitment");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.LastImportedRow).HasDefaultValue(1);
             entity.Property(e => e.Name).HasMaxLength(200);
@@ -1012,8 +1011,8 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.SheetId, e.SalesUserId }, "UQ_SheetUsers_SheetUser").IsUnique();
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
 
             entity.HasOne(d => d.SalesUser).WithMany(p => p.SalesGoogleSheetUsers)
@@ -1034,10 +1033,10 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => new { e.CandidateId, e.PackageStageId }, "UQ_SAC_CandStage").IsUnique();
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.CompletedAt)
-                .HasDefaultValueSql("(getutcdate())")
-                .HasColumnType("datetime");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')")
+                .HasColumnType("timestamp(6) without time zone");
             entity.Property(e => e.Notes).HasMaxLength(500);
 
             entity.HasOne(d => d.Candidate).WithMany(p => p.StageActionCompletions)
@@ -1062,15 +1061,15 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.ToTable("StageApprovalRequests", "demorecruitment");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.AdminNote).HasMaxLength(500);
-            entity.Property(e => e.AmountPaid).HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.MinPaymentRequired).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.AmountPaid).HasColumnType("numeric(18,2)");
+            entity.Property(e => e.MinPaymentRequired).HasColumnType("numeric(18,2)");
             entity.Property(e => e.RequestNote).HasMaxLength(500);
             entity.Property(e => e.RequestedAt)
-                .HasDefaultValueSql("(getutcdate())")
-                .HasColumnType("datetime");
-            entity.Property(e => e.ReviewedAt).HasColumnType("datetime");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')")
+                .HasColumnType("timestamp(6) without time zone");
+            entity.Property(e => e.ReviewedAt).HasColumnType("timestamp(6) without time zone");
             entity.Property(e => e.Status).HasDefaultValue((byte)1);
 
             entity.HasOne(d => d.Candidate).WithMany(p => p.StageApprovalRequests)
@@ -1106,12 +1105,12 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => e.StageCode, "UQ_DR_ST_Code").IsUnique();
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.ActionFields).HasMaxLength(500);
             entity.Property(e => e.ActionLabel).HasMaxLength(200);
             entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("(getutcdate())")
-                .HasColumnType("datetime");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')")
+                .HasColumnType("timestamp(6) without time zone");
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.Name).HasMaxLength(200);
@@ -1128,11 +1127,11 @@ public partial class RecruitmentCrmContext : DbContext
 
             entity.HasIndex(e => e.Email, "UQ_demorecruitment_Us_Email").IsUnique();
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
-            entity.Property(e => e.BaseSalary).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(e => e.BaseSalary).HasColumnType("numeric(18,2)");
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.Email).HasMaxLength(255);
             entity.Property(e => e.FullName).HasMaxLength(200);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
@@ -1151,7 +1150,7 @@ public partial class RecruitmentCrmContext : DbContext
         {
             entity.ToTable("VisaUploads", "demorecruitment");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.ExtractedFullName).HasMaxLength(200);
             entity.Property(e => e.ExtractedPassportNo).HasMaxLength(100);
             entity.Property(e => e.ExtractedVisaNo).HasMaxLength(100);
@@ -1159,8 +1158,8 @@ public partial class RecruitmentCrmContext : DbContext
             entity.Property(e => e.FileName).HasMaxLength(500);
             entity.Property(e => e.Notes).HasMaxLength(500);
             entity.Property(e => e.UploadedAt)
-                .HasDefaultValueSql("(getutcdate())")
-                .HasColumnType("datetime");
+                .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')")
+                .HasColumnType("timestamp(6) without time zone");
 
             entity.HasOne(d => d.MatchedCandidate).WithMany(p => p.VisaUploads)
                 .HasForeignKey(d => d.MatchedCandidateId)
@@ -1193,7 +1192,7 @@ public partial class RecruitmentCrmContext : DbContext
                 .ToView("vw_DailyPayments", "demorecruitment");
 
             entity.Property(e => e.TotalEgp)
-                .HasColumnType("decimal(38, 2)")
+                .HasColumnType("numeric(38,2)")
                 .HasColumnName("TotalEGP");
         });
 
@@ -1211,7 +1210,7 @@ public partial class RecruitmentCrmContext : DbContext
                 .ToView("vw_SalesPerformance", "demorecruitment");
 
             entity.Property(e => e.RevenueEgp)
-                .HasColumnType("decimal(38, 2)")
+                .HasColumnType("numeric(38,2)")
                 .HasColumnName("RevenueEGP");
         });
 

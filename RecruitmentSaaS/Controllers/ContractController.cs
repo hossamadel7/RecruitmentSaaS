@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
 using RecruitmentSaaS.Models.Entities;
@@ -297,18 +297,19 @@ namespace RecruitmentSaaS.Controllers
                     //    → Move with IsOverride=true (force jump to CONTRACT_ISSUED)
                     try
                     {
+                        // Ported as-is from SQL Server: sp_MoveToNextStage has no ToStageId parameter, so the
+                        // database rejects this call (it did on SQL Server too) and the catch below swallows it.
                         var connStr = _context.Database.GetConnectionString()!;
-                        using var conn = new SqlConnection(connStr);
+                        await using var conn = new NpgsqlConnection(connStr);
                         await conn.OpenAsync();
-                        using var cmd = new SqlCommand("demorecruitment.sp_MoveToNextStage", conn)
-                        {
-                            CommandType = System.Data.CommandType.StoredProcedure
-                        };
-                        cmd.Parameters.AddWithValue("@CandidateId", candidate.Id);
-                        cmd.Parameters.AddWithValue("@ToStageId", contractStage.Id);
-                        cmd.Parameters.AddWithValue("@MovedById", upload.UploadedById);
-                        cmd.Parameters.AddWithValue("@IsOverride", true);
-                        cmd.Parameters.AddWithValue("@Notes", note);
+                        await using var cmd = new NpgsqlCommand(
+                            """SELECT * FROM demorecruitment."sp_MoveToNextStage"(p_candidate_id => @c, p_to_stage_id => @t, p_moved_by_id => @m, p_is_override => @o, p_notes => @n)""",
+                            conn);
+                        cmd.Parameters.AddWithValue("c", candidate.Id);
+                        cmd.Parameters.AddWithValue("t", contractStage.Id);
+                        cmd.Parameters.AddWithValue("m", upload.UploadedById);
+                        cmd.Parameters.AddWithValue("o", true);
+                        cmd.Parameters.AddWithValue("n", note);
                         await cmd.ExecuteNonQueryAsync();
                     }
                     catch { /* Document already saved — stage move failed silently */ }

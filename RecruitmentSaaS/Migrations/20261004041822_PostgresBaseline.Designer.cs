@@ -2,9 +2,9 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RecruitmentSaaS.Data;
 
 #nullable disable
@@ -12,61 +12,61 @@ using RecruitmentSaaS.Data;
 namespace RecruitmentSaaS.Migrations
 {
     [DbContext(typeof(RecruitmentCrmContext))]
-    [Migration("20260923002651_InitialWhatsAppInbox")]
-    partial class InitialWhatsAppInbox
+    [Migration("20261004041822_PostgresBaseline")]
+    partial class PostgresBaseline
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .UseCollation("Arabic_CI_AI")
-                .HasAnnotation("ProductVersion", "8.0.0")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+                .HasAnnotation("ProductVersion", "8.0.11")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid?>("ActorId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("ActorType")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid?>("EntityId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("EntityType")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Ipaddress")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
+                        .HasColumnType("citext")
                         .HasColumnName("IPAddress");
 
                     b.Property<string>("NewValueJson")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("OldValueJson")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("citext");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_Aud");
@@ -87,32 +87,32 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<string>("Address")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("City")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_Branches");
@@ -124,47 +124,47 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<decimal?>("BudgetEgp")
-                        .HasColumnType("decimal(18, 2)")
+                        .HasColumnType("numeric(18,2)")
                         .HasColumnName("BudgetEGP");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("CreatedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
 
                     b.Property<string>("FacebookAdId")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("FacebookAdSetId")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("FacebookCampaignId")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<byte>("Source")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<decimal?>("SpendEgp")
-                        .HasColumnType("decimal(18, 2)")
+                        .HasColumnType("numeric(18,2)")
                         .HasColumnName("SpendEGP");
 
                     b.Property<DateOnly?>("StartDate")
@@ -172,32 +172,32 @@ namespace RecruitmentSaaS.Migrations
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<string>("UtmCampaign")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("UtmContent")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("UtmMedium")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("UtmSource")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("UtmTerm")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_Ca");
@@ -213,101 +213,101 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<int?>("Age")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("AssignedSalesId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BranchId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("City")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid?>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid?>("CurrentPackageStageId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("FlightDate")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<bool>("IsCompleted")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsProfileComplete")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("JobPackageId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("MilitaryStatus")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("NationalId")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("citext");
 
                     b.Property<DateOnly?>("PassportExpiry")
                         .HasColumnType("date");
 
                     b.Property<string>("PassportNumber")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Phone")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid>("RegisteredById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<decimal>("TotalPaidEgp")
-                        .HasColumnType("decimal(18, 2)")
+                        .HasColumnType("numeric(18,2)")
                         .HasColumnName("TotalPaidEGP");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<DateOnly?>("VisaExpiry")
                         .HasColumnType("date");
 
                     b.Property<string>("VisaNumber")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_Cnd");
@@ -330,7 +330,7 @@ namespace RecruitmentSaaS.Migrations
 
                     b.HasIndex(new[] { "PassportNumber" }, "UIX_demo_Cand_Passport")
                         .IsUnique()
-                        .HasFilter("([PassportNumber] IS NOT NULL)");
+                        .HasFilter("(\"PassportNumber\" IS NOT NULL)");
 
                     b.ToTable("Candidates", "demorecruitment");
                 });
@@ -339,34 +339,34 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<byte>("ActivityType")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<Guid>("CandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid?>("CreatedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CreatedByName")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Details")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("citext");
 
                     b.HasKey("Id")
                         .HasName("PK_demo_CandidateActivities");
@@ -383,46 +383,46 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid>("CandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ChangedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<byte?>("FromStage")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<Guid?>("FromStageId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsOverride")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("MeetingOutcome")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("OverrideReason")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<byte>("ToStage")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<Guid?>("ToStageId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_CSH");
@@ -443,22 +443,22 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<decimal>("AmountEgp")
-                        .HasColumnType("decimal(18, 2)")
+                        .HasColumnType("numeric(18,2)")
                         .HasColumnName("AmountEGP");
 
                     b.Property<DateTime?>("ApprovedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("ApprovedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("CandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("CommissionMonth")
                         .HasColumnType("date");
@@ -466,29 +466,29 @@ namespace RecruitmentSaaS.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<int>("DealsThisMonth")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("PaidAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("PaidById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ReversedReason")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid>("SalesUserId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.HasKey("Id")
@@ -512,19 +512,19 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<byte>("ResetDayOfMonth")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<Guid?>("UpdatedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK__Commissi__3214EC071B98EE42");
@@ -536,35 +536,35 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<decimal>("AmountPerDeal")
-                        .HasColumnType("decimal(18, 2)");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("CreatedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<int?>("MaxDeals")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("MinDeals")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_CommissionTiers");
@@ -580,20 +580,20 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<string>("City")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("ContactEmail")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("ContactPhone")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("citext");
 
                     b.Property<DateOnly?>("ContractStartDate")
                         .HasColumnType("date");
@@ -601,33 +601,33 @@ namespace RecruitmentSaaS.Migrations
                     b.Property<string>("Country")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("CreatedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_Companies");
@@ -641,35 +641,35 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<string>("JobTitle")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<int>("RequestedCount")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
+                        .HasColumnType("integer")
                         .HasDefaultValue(1);
 
                     b.HasKey("Id")
@@ -684,45 +684,45 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<string>("ExtractedEmployerName")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("ExtractedPassportNo")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("ExtractedTransactionNo")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("FileKey")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("citext");
 
                     b.Property<byte>("MatchStatus")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<Guid?>("MatchedCandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("UploadedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_ContractUploads");
@@ -730,7 +730,7 @@ namespace RecruitmentSaaS.Migrations
                     b.HasIndex("UploadedById");
 
                     b.HasIndex(new[] { "MatchedCandidateId" }, "IX_demorecruitment_ContractUploads_Candidate")
-                        .HasFilter("([MatchedCandidateId] IS NOT NULL)");
+                        .HasFilter("(\"MatchedCandidateId\" IS NOT NULL)");
 
                     b.HasIndex(new[] { "MatchStatus" }, "IX_demorecruitment_ContractUploads_Status");
 
@@ -741,42 +741,42 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid>("AssignedToId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("CompletedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ConversationId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("CreatedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("DueAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.HasKey("Id")
@@ -799,25 +799,25 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid>("AuthorId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Body")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid>("ConversationId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_WA_Note");
@@ -834,42 +834,42 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid>("CandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("DocumentType")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("citext");
 
                     b.Property<int>("FileSizeBytes")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("MimeType")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("S3key")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
+                        .HasColumnType("citext")
                         .HasColumnName("S3Key");
 
                     b.Property<DateTime>("UploadedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("UploadedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_Doc");
@@ -885,61 +885,61 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid?>("ActivityId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("AssignedToId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("CandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("CreatedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("DismissedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("DismissedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("LeadId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid?>("NotificationId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("ReminderDate")
                         .HasColumnType("date");
 
                     b.Property<int>("SnoozeCount")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateOnly?>("SnoozedUntil")
                         .HasColumnType("date");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_FUR");
@@ -961,40 +961,40 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("DestinationCountry")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<string>("JobTitle")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<decimal>("PriceEgp")
-                        .HasColumnType("decimal(18, 2)")
+                        .HasColumnType("numeric(18,2)")
                         .HasColumnName("PriceEGP");
 
                     b.HasKey("Id")
@@ -1007,133 +1007,139 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<byte?>("Age")
+                        .HasColumnType("smallint");
 
                     b.Property<DateTime?>("AppointmentDate")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("AssignedOfficeSalesId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("AssignedSalesId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BranchId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("CampaignId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("ConvertedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("ConvertedCandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid?>("DuplicateOfLeadId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("FacebookFormId")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("FacebookLeadId")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid?>("GoogleSheetId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("InterestedCountry")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("InterestedJobTitle")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<bool>("IsConverted")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDuplicate")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("LastContactedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<string>("LeadCode")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasMaxLength(8)
-                        .HasColumnType("nvarchar(8)")
-                        .HasComputedColumnSql("('LD-'+right('00000'+CONVERT([nvarchar](10),[LeadSequence]),(5)))", true);
+                        .HasColumnType("citext")
+                        .HasComputedColumnSql("('LD-' || right('00000' || (\"LeadSequence\")::text, 5))::citext", true);
 
                     b.Property<int>("LeadSequence")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LeadSequence"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("LeadSequence"));
 
                     b.Property<byte>("LeadSource")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Phone")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("ReferredByName")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("ReferredByPhone")
                         .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid>("RegisteredById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
+
+                    b.Property<Guid?>("TeamManagerId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<string>("UtmCampaign")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("UtmContent")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("UtmMedium")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("UtmSource")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_Ld");
@@ -1143,7 +1149,7 @@ namespace RecruitmentSaaS.Migrations
                     b.HasIndex("RegisteredById");
 
                     b.HasIndex(new[] { "GoogleSheetId" }, "IX_Leads_GoogleSheetId")
-                        .HasFilter("([GoogleSheetId] IS NOT NULL)");
+                        .HasFilter("(\"GoogleSheetId\" IS NOT NULL)");
 
                     b.HasIndex(new[] { "CampaignId" }, "IX_demorecruitment_Ld_Ca");
 
@@ -1157,16 +1163,18 @@ namespace RecruitmentSaaS.Migrations
 
                     b.HasIndex(new[] { "Status" }, "IX_demorecruitment_Ld_St");
 
+                    b.HasIndex(new[] { "TeamManagerId" }, "IX_demorecruitment_Ld_TeamMgr")
+                        .HasFilter("(\"TeamManagerId\" IS NOT NULL)");
+
                     b.HasIndex(new[] { "LeadCode" }, "UQ_demorecruitment_Ld_Code")
-                        .IsUnique()
-                        .HasFilter("[LeadCode] IS NOT NULL");
+                        .IsUnique();
 
                     b.HasIndex(new[] { "Phone" }, "UQ_demorecruitment_Ld_Ph")
                         .IsUnique();
 
                     b.HasIndex(new[] { "FacebookLeadId" }, "UX_Leads_FacebookLeadId")
                         .IsUnique()
-                        .HasFilter("([FacebookLeadId] IS NOT NULL)");
+                        .HasFilter("(\"FacebookLeadId\" IS NOT NULL)");
 
                     b.ToTable("Leads", "demorecruitment");
                 });
@@ -1175,52 +1183,52 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<byte>("ActivityType")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<byte>("ActorType")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid?>("CreatedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CreatedByName")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("Details")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid?>("EntityId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("EntityType")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid>("LeadId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly?>("NextFollowUpDate")
                         .HasColumnType("date");
 
                     b.Property<Guid?>("ReminderId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_LA");
@@ -1228,7 +1236,7 @@ namespace RecruitmentSaaS.Migrations
                     b.HasIndex("CreatedById");
 
                     b.HasIndex(new[] { "NextFollowUpDate" }, "IX_demorecruitment_LA_Fup")
-                        .HasFilter("([NextFollowUpDate] IS NOT NULL)");
+                        .HasFilter("(\"NextFollowUpDate\" IS NOT NULL)");
 
                     b.HasIndex(new[] { "LeadId", "CreatedAt" }, "IX_demorecruitment_LA_Ld")
                         .IsDescending(false, true);
@@ -1240,30 +1248,30 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CalledAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("CalledById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("Channel")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<Guid>("LeadId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Note")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<byte>("Outcome")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_LCL");
@@ -1277,38 +1285,69 @@ namespace RecruitmentSaaS.Migrations
                         {
                             t.HasTrigger("trg_LCL_WriteActivity");
                         });
+                });
 
-                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.LeadFormSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("SalesWhatsAppMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("SalesWhatsAppNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("citext");
+
+                    b.Property<byte>("SeniorAgeThreshold")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((byte)45);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasPrecision(0)
+                        .HasColumnType("timestamp(0) without time zone");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_demorecruitment_LFS");
+
+                    b.ToTable("LeadFormSettings", "demorecruitment");
                 });
 
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.LeadFunnelHistory", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid>("ChangedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<byte?>("FromStatus")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<Guid>("LeadId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Note")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<byte>("ToStatus")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_LFH");
@@ -1325,45 +1364,45 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid?>("AssignedSalesUserId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BranchId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("ConvertedCandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid?>("JobPackageId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("LeadId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("MeetingOutcome")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid>("ReceptionUserId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("VisitDateTime")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_LV");
@@ -1384,50 +1423,80 @@ namespace RecruitmentSaaS.Migrations
                         {
                             t.HasTrigger("trg_LV_WriteActivity");
                         });
+                });
 
-                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.MetaSystemCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("AccessToken")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("citext");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(0)
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
+
+                    b.Property<DateTime>("ObtainedAt")
+                        .HasPrecision(0)
+                        .HasColumnType("timestamp(0) without time zone");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasPrecision(0)
+                        .HasColumnType("timestamp(0) without time zone");
+
+                    b.HasKey("Id")
+                        .HasName("PK_demorecruitment_Meta_Cred");
+
+                    b.ToTable("MetaSystemCredentials", "demorecruitment");
                 });
 
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.Notification", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<string>("Body")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid?>("EntityId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsRead")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Link")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime?>("ReadAt")
-                        .HasColumnType("datetime");
+                        .HasColumnType("timestamp(6) without time zone");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<byte>("Type")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_Not");
@@ -1442,50 +1511,50 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<bool>("NotifyAdminOnEnter")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("NotifySalesOnEnter")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("PackageId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal?>("RequiredMinPaymentEgp")
-                        .HasColumnType("decimal(18, 2)")
+                        .HasColumnType("numeric(18,2)")
                         .HasColumnName("RequiredMinPaymentEGP");
 
                     b.Property<bool>("RequiresAdminApproval")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("StageName")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<int>("StageOrder")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("StageTypeId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_demo_PackageStages");
@@ -1504,25 +1573,25 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("DownloadedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getutcdate())");
+                        .HasColumnType("timestamp(6) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("DownloadedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsNewOnly")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("PackageId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("PassportCount")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id")
                         .HasName("PK_PDL");
@@ -1538,22 +1607,22 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid>("CandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("DocumentId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("DownloadedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getutcdate())");
+                        .HasColumnType("timestamp(6) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("LogId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_PDC");
@@ -1570,52 +1639,52 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<decimal>("AmountEgp")
-                        .HasColumnType("decimal(18, 2)")
+                        .HasColumnType("numeric(18,2)")
                         .HasColumnName("AmountEGP");
 
                     b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("datetime");
+                        .HasColumnType("timestamp(6) without time zone");
 
                     b.Property<Guid?>("ApprovedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("CandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<DateOnly>("PaymentDate")
                         .HasColumnType("date");
 
                     b.Property<byte>("PaymentMethod")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<Guid>("RecordedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<byte>("TransactionType")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_Pay");
@@ -1635,29 +1704,29 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<DateTime>("ExpiresAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<bool>("IsRevoked")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Token")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_RT");
@@ -1674,54 +1743,54 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<decimal>("AmountEgp")
-                        .HasColumnType("decimal(18, 2)")
+                        .HasColumnType("numeric(18,2)")
                         .HasColumnName("AmountEGP");
 
                     b.Property<Guid>("CandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("ExecutedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("ExecutedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid?>("RefundPaymentId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("RejectReason")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("RequestedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("RequestedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("ReviewedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("ReviewedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.HasKey("Id")
@@ -1744,61 +1813,61 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<decimal>("Adjustment")
-                        .HasColumnType("decimal(18, 2)");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("AdjustmentNote")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime?>("ApprovedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("ApprovedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("BaseSalary")
-                        .HasColumnType("decimal(18, 2)");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("CreatedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("PaidAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("PaidById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("SalaryMonth")
                         .HasColumnType("date");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<decimal?>("TotalAmount")
                         .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("decimal(19, 2)")
-                        .HasComputedColumnSql("([BaseSalary]+[Adjustment])", true);
+                        .HasColumnType("numeric(19,2)")
+                        .HasComputedColumnSql("(\"BaseSalary\" + \"Adjustment\")", true);
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_SalaryPayments");
@@ -1826,52 +1895,52 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid?>("CampaignId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getutcdate())");
+                        .HasColumnType("timestamp without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid?>("CreatedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<DateTime?>("LastImportedAt")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<int>("LastImportedRow")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
+                        .HasColumnType("integer")
                         .HasDefaultValue(1);
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("SheetName")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
+                        .HasColumnType("citext")
                         .HasDefaultValue("Sheet1");
 
                     b.Property<string>("SpreadsheetId")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<int>("TotalImported")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -1886,24 +1955,24 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getutcdate())");
+                        .HasColumnType("timestamp without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<Guid>("SalesUserId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("SheetId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -1919,29 +1988,29 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid>("CandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CompletedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getutcdate())");
+                        .HasColumnType("timestamp(6) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("CompletedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("CompletionType")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid>("PackageStageId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_SAC");
@@ -1960,53 +2029,53 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<string>("AdminNote")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<decimal?>("AmountPaid")
-                        .HasColumnType("decimal(18, 2)");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<Guid>("CandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte?>("ExceptionType")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<Guid>("FromStageId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal?>("MinPaymentRequired")
-                        .HasColumnType("decimal(18, 2)");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("RequestNote")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("RequestedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getutcdate())");
+                        .HasColumnType("timestamp(6) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("RequestedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("ReviewedAt")
-                        .HasColumnType("datetime");
+                        .HasColumnType("timestamp(6) without time zone");
 
                     b.Property<Guid?>("ReviewedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<Guid>("ToStageId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_SAR");
@@ -2028,49 +2097,49 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<string>("ActionFields")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("ActionLabel")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getutcdate())");
+                        .HasColumnType("timestamp(6) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<byte?>("DocumentTypeRequired")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<byte?>("RequiredAction")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("StageCode")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("citext");
 
                     b.HasKey("Id")
                         .HasName("PK_DR_ST");
@@ -2081,54 +2150,95 @@ namespace RecruitmentSaaS.Migrations
                     b.ToTable("StageTypes", "demorecruitment");
                 });
 
-            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.User", b =>
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.TeamLeadForm", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
-
-                    b.Property<decimal>("BaseSalary")
-                        .HasColumnType("decimal(18, 2)");
-
-                    b.Property<Guid>("BranchId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
+
+                    b.Property<Guid>("ManagerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("citext");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasPrecision(0)
+                        .HasColumnType("timestamp(0) without time zone");
+
+                    b.Property<string>("WhatsAppNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("citext");
+
+                    b.HasKey("Id")
+                        .HasName("PK_demorecruitment_TLF");
+
+                    b.HasIndex(new[] { "ManagerId" }, "UQ_demorecruitment_TLF_Mgr")
+                        .IsUnique();
+
+                    b.HasIndex(new[] { "Slug" }, "UQ_demorecruitment_TLF_Slug")
+                        .IsUnique();
+
+                    b.ToTable("TeamLeadForms", "demorecruitment");
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<decimal>("BaseSalary")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(0)
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<DateTime?>("LastLoginAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("ManagerId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<byte>("Role")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_Users");
@@ -2147,51 +2257,51 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<string>("ExtractedFullName")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("ExtractedPassportNo")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<DateOnly?>("ExtractedVisaExpiry")
                         .HasColumnType("date");
 
                     b.Property<string>("ExtractedVisaNo")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("FileKey")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<byte>("MatchStatus")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<Guid?>("MatchedCandidateId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("UploadedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getutcdate())");
+                        .HasColumnType("timestamp(6) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<Guid>("UploadedById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -2205,10 +2315,10 @@ namespace RecruitmentSaaS.Migrations
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.VwCampaignPerformance", b =>
                 {
                     b.Property<Guid?>("CampaignId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<int?>("ConvertedLeads")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<long?>("LostLeads")
                         .HasColumnType("bigint");
@@ -2224,7 +2334,7 @@ namespace RecruitmentSaaS.Migrations
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.VwDailyLead", b =>
                 {
                     b.Property<Guid>("BranchId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<long?>("LeadCount")
                         .HasColumnType("bigint");
@@ -2233,7 +2343,7 @@ namespace RecruitmentSaaS.Migrations
                         .HasColumnType("date");
 
                     b.Property<Guid>("RegisteredById")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.ToTable((string)null);
 
@@ -2249,7 +2359,7 @@ namespace RecruitmentSaaS.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<decimal?>("TotalEgp")
-                        .HasColumnType("decimal(38, 2)")
+                        .HasColumnType("numeric(38,2)")
                         .HasColumnName("TotalEGP");
 
                     b.ToTable((string)null);
@@ -2260,19 +2370,19 @@ namespace RecruitmentSaaS.Migrations
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.VwLeadFunnelSummary", b =>
                 {
                     b.Property<Guid>("BranchId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsConverted")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<long?>("LeadCount")
                         .HasColumnType("bigint");
 
                     b.Property<byte>("LeadSource")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<byte>("Status")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.ToTable((string)null);
 
@@ -2282,7 +2392,7 @@ namespace RecruitmentSaaS.Migrations
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.VwSalesPerformance", b =>
                 {
                     b.Property<Guid>("AssignedSalesId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<long?>("CompletedDeals")
                         .HasColumnType("bigint");
@@ -2291,7 +2401,7 @@ namespace RecruitmentSaaS.Migrations
                         .HasColumnType("date");
 
                     b.Property<decimal?>("RevenueEgp")
-                        .HasColumnType("decimal(38, 2)")
+                        .HasColumnType("numeric(38,2)")
                         .HasColumnName("RevenueEGP");
 
                     b.ToTable((string)null);
@@ -2303,46 +2413,60 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid?>("AssignedSalesAgentId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
+
+                    b.Property<byte>("ConnectionMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((byte)1);
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<string>("DisplayPhoneNumber")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasColumnType("citext");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("PhoneNumberId")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
+
+                    b.Property<string>("VerifiedName")
+                        .HasMaxLength(200)
+                        .HasColumnType("citext");
 
                     b.Property<string>("WabaId")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("citext");
+
+                    b.Property<byte>("WebhookSubscriptionStatus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((byte)1);
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_WA_Acc");
@@ -2361,35 +2485,35 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<DateTime?>("LastSeenAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<string>("Name")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<string>("WhatsAppPhoneNumber")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("WhatsAppUserId")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("citext");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_WA_Cnt");
@@ -2404,63 +2528,63 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid?>("AssignedSalesAgentId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("ClosedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid>("ContactId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<DateTime?>("LastMessageAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("LeadId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("LeadStage")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<string>("LostReason")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("OpenedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<int>("UnreadCount")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
+                        .HasColumnType("integer")
                         .HasDefaultValue(0);
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid>("WhatsAppAccountId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_WA_Cnv");
@@ -2488,53 +2612,53 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid>("AssignedSalesAgentId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("ConnectedAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<Guid?>("ConversationId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<DateTime?>("ExpiredAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<string>("GeneratedWhatsAppUrl")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid>("LeadId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ReferenceCode")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime?>("SentAt")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<Guid>("WhatsAppAccountId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_WA_Hnd");
@@ -2559,65 +2683,70 @@ namespace RecruitmentSaaS.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newsequentialid())");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<Guid>("ConversationId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("timestamp(0) without time zone")
+                        .HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
                     b.Property<byte>("Direction")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<string>("ErrorCode")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("MediaId")
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("citext");
 
                     b.Property<string>("MediaUrl")
                         .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasColumnType("citext");
+
+                    b.Property<byte>("MessageSource")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((byte)1);
 
                     b.Property<byte>("MessageType")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
+                        .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
                     b.Property<Guid?>("ReplyToMessageId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("SenderUserId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<byte>("Status")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("smallint");
 
                     b.Property<string>("TextBody")
                         .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
+                        .HasColumnType("citext");
 
                     b.Property<Guid>("WhatsAppAccountId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("WhatsAppMessageId")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("citext");
 
                     b.Property<DateTime>("WhatsAppTimestamp")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("timestamp(0) without time zone");
 
                     b.HasKey("Id")
                         .HasName("PK_demorecruitment_WA_Msg");
@@ -2635,7 +2764,7 @@ namespace RecruitmentSaaS.Migrations
 
                     b.HasIndex(new[] { "WhatsAppMessageId" }, "UQ_demorecruitment_WA_Msg_WamId")
                         .IsUnique()
-                        .HasFilter("([WhatsAppMessageId] IS NOT NULL)");
+                        .HasFilter("(\"WhatsAppMessageId\" IS NOT NULL)");
 
                     b.ToTable("WhatsAppMessages", "demorecruitment");
                 });
@@ -2977,6 +3106,11 @@ namespace RecruitmentSaaS.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_demorecruitment_Ld_Rg");
 
+                    b.HasOne("RecruitmentSaaS.Models.Entities.User", "TeamManager")
+                        .WithMany()
+                        .HasForeignKey("TeamManagerId")
+                        .HasConstraintName("FK_demorecruitment_Ld_TeamMgr");
+
                     b.Navigation("AssignedOfficeSales");
 
                     b.Navigation("AssignedSales");
@@ -2988,6 +3122,8 @@ namespace RecruitmentSaaS.Migrations
                     b.Navigation("GoogleSheet");
 
                     b.Navigation("RegisteredBy");
+
+                    b.Navigation("TeamManager");
                 });
 
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.LeadActivity", b =>
@@ -3369,6 +3505,17 @@ namespace RecruitmentSaaS.Migrations
                     b.Navigation("ReviewedBy");
 
                     b.Navigation("ToStage");
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.TeamLeadForm", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.User", "Manager")
+                        .WithMany()
+                        .HasForeignKey("ManagerId")
+                        .IsRequired()
+                        .HasConstraintName("FK_demorecruitment_TLF_Mgr");
+
+                    b.Navigation("Manager");
                 });
 
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.User", b =>

@@ -14,10 +14,10 @@ public partial class RecruitmentCrmContext
     {
         modelBuilder.Entity<Lead>(entity =>
         {
-            entity.Property(e => e.Age).HasColumnType("tinyint");
+            entity.Property(e => e.Age).HasColumnType("smallint");
 
             entity.HasIndex(e => e.TeamManagerId, "IX_demorecruitment_Ld_TeamMgr")
-                .HasFilter("([TeamManagerId] IS NOT NULL)");
+                .HasFilter("(\"TeamManagerId\" IS NOT NULL)");
 
             entity.HasOne(d => d.TeamManager).WithMany()
                 .HasForeignKey(d => d.TeamManagerId)
@@ -34,10 +34,10 @@ public partial class RecruitmentCrmContext
             entity.HasIndex(e => e.ManagerId, "UQ_demorecruitment_TLF_Mgr").IsUnique();
             entity.HasIndex(e => e.Slug, "UQ_demorecruitment_TLF_Slug").IsUnique();
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.Slug).HasMaxLength(50);
             entity.Property(e => e.WhatsAppNumber).HasMaxLength(30);
-            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
 
             entity.HasOne(d => d.Manager).WithMany()
@@ -52,7 +52,7 @@ public partial class RecruitmentCrmContext
 
             entity.ToTable("LeadFormSettings", "demorecruitment");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.SeniorAgeThreshold).HasDefaultValue((byte)45);
             entity.Property(e => e.SalesWhatsAppNumber).HasMaxLength(30);
             entity.Property(e => e.SalesWhatsAppMessage).HasMaxLength(1000);

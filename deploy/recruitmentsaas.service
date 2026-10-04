@@ -1,0 +1,20 @@
+[Unit]
+Description=RecruitmentSaaS (Alfahd recruitment CRM)
+After=network.target postgresql.service
+
+[Service]
+WorkingDirectory=/var/www/recruitmentsaas
+ExecStart=/var/www/recruitmentsaas/RecruitmentSaaS
+Restart=always
+RestartSec=5
+User=www-data
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:8082
+Environment=ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+Environment=DataProtection__KeysPath=/var/lib/recruitmentsaas/keys
+Environment=TZ=Etc/UTC
+# Secrets (ConnectionStrings__DefaultConnection, and any Azure App Service setting overrides) live here, root-only:
+EnvironmentFile=/etc/recruitmentsaas/app.env
+
+[Install]
+WantedBy=multi-user.target

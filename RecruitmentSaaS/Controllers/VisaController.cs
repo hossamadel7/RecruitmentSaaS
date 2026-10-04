@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
 using RecruitmentSaaS.Models.Entities;
@@ -280,19 +279,9 @@ namespace RecruitmentSaaS.Controllers
 
             if (visaStage != null)
             {
-                var spSuccess = new SqlParameter { ParameterName = "@Success", SqlDbType = SqlDbType.Bit, Direction = ParameterDirection.Output };
-                var spMessage = new SqlParameter { ParameterName = "@Message", SqlDbType = SqlDbType.NVarChar, Size = 500, Direction = ParameterDirection.Output };
-                var spStage = new SqlParameter { ParameterName = "@NewStageName", SqlDbType = SqlDbType.NVarChar, Size = 200, Direction = ParameterDirection.Output };
-
-                await _context.Database.ExecuteSqlRawAsync(
-                    "EXEC demorecruitment.sp_MoveToNextStage @CandidateId, @MovedById, @Notes, @IsOverride, @OverrideReason, @Success OUTPUT, @Message OUTPUT, @NewStageName OUTPUT",
-                    new SqlParameter("@CandidateId", candidate.Id),
-                    new SqlParameter("@MovedById", CurrentUserId),
-                    new SqlParameter("@Notes", (object)"تم استلام التأشيرة"),
-                    new SqlParameter("@IsOverride", true),
-                    new SqlParameter("@OverrideReason", "visa_upload"),
-                    spSuccess, spMessage, spStage
-                );
+                await _context.Database.MoveToNextStageAsync(
+                    candidate.Id, CurrentUserId, "تم استلام التأشيرة",
+                    isOverride: true, overrideReason: "visa_upload");
 
                 // Notify Sales
                 if (candidate.AssignedSalesId != Guid.Empty)

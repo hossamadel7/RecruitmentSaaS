@@ -35,7 +35,7 @@ public partial class RecruitmentCrmContext
 
             entity.HasIndex(e => e.IsActive, "IX_demorecruitment_WA_Acc_Active");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.Name).HasMaxLength(200);
             entity.Property(e => e.DisplayPhoneNumber).HasMaxLength(30);
             entity.Property(e => e.PhoneNumberId).HasMaxLength(50);
@@ -44,7 +44,7 @@ public partial class RecruitmentCrmContext
             entity.Property(e => e.WebhookSubscriptionStatus).HasDefaultValue((byte)Models.Entities.WebhookSubscriptionStatus.Pending);
             entity.Property(e => e.VerifiedName).HasMaxLength(200);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
 
             entity.HasOne(d => d.AssignedSalesAgent).WithMany()
@@ -61,11 +61,11 @@ public partial class RecruitmentCrmContext
 
             entity.HasIndex(e => e.WhatsAppPhoneNumber, "UQ_demorecruitment_WA_Cnt_Phone").IsUnique();
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.Name).HasMaxLength(200);
             entity.Property(e => e.WhatsAppPhoneNumber).HasMaxLength(30);
             entity.Property(e => e.WhatsAppUserId).HasMaxLength(50);
-            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
             entity.Property(e => e.LastSeenAt).HasPrecision(0);
         });
@@ -85,15 +85,15 @@ public partial class RecruitmentCrmContext
             entity.HasIndex(e => e.LeadStage, "IX_demorecruitment_WA_Cnv_LeadStage");
             entity.HasIndex(e => e.LeadId, "IX_demorecruitment_WA_Cnv_Lead");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.Status).HasDefaultValue((byte)ConversationStatus.New);
             entity.Property(e => e.LeadStage).HasDefaultValue((byte)Models.Entities.LeadStage.New);
             entity.Property(e => e.LostReason).HasMaxLength(200);
             entity.Property(e => e.UnreadCount).HasDefaultValue(0);
-            entity.Property(e => e.OpenedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.OpenedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.LastMessageAt).HasPrecision(0);
             entity.Property(e => e.ClosedAt).HasPrecision(0);
-            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
 
             entity.HasOne(d => d.Contact).WithMany(p => p.WhatsAppConversations)
@@ -125,13 +125,13 @@ public partial class RecruitmentCrmContext
 
             entity.HasIndex(e => e.WhatsAppMessageId, "UQ_demorecruitment_WA_Msg_WamId")
                 .IsUnique()
-                .HasFilter("([WhatsAppMessageId] IS NOT NULL)");
+                .HasFilter("(\"WhatsAppMessageId\" IS NOT NULL)");
 
             entity.HasIndex(e => new { e.ConversationId, e.CreatedAt }, "IX_demorecruitment_WA_Msg_Cnv").IsDescending(false, true);
             entity.HasIndex(e => e.WhatsAppAccountId, "IX_demorecruitment_WA_Msg_Acc");
             entity.HasIndex(e => e.Status, "IX_demorecruitment_WA_Msg_Status");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.WhatsAppMessageId).HasMaxLength(100);
             entity.Property(e => e.MessageType).HasDefaultValue((byte)WhatsAppMessageType.Text);
             entity.Property(e => e.MessageSource).HasDefaultValue((byte)Models.Entities.MessageSource.CloudApi);
@@ -141,7 +141,7 @@ public partial class RecruitmentCrmContext
             entity.Property(e => e.ErrorCode).HasMaxLength(50);
             entity.Property(e => e.ErrorMessage).HasMaxLength(500);
             entity.Property(e => e.WhatsAppTimestamp).HasPrecision(0);
-            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
             entity.HasOne(d => d.Conversation).WithMany(p => p.WhatsAppMessages)
                 .HasForeignKey(d => d.ConversationId)
@@ -174,11 +174,11 @@ public partial class RecruitmentCrmContext
             entity.HasIndex(e => e.LeadId, "IX_demorecruitment_WA_Hnd_Lead");
             entity.HasIndex(e => e.Status, "IX_demorecruitment_WA_Hnd_Status");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.ReferenceCode).HasMaxLength(20);
             entity.Property(e => e.GeneratedWhatsAppUrl).HasMaxLength(500);
             entity.Property(e => e.Status).HasDefaultValue((byte)HandoffStatus.Generated);
-            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.SentAt).HasPrecision(0);
             entity.Property(e => e.ConnectedAt).HasPrecision(0);
             entity.Property(e => e.ExpiredAt).HasPrecision(0);
@@ -212,9 +212,9 @@ public partial class RecruitmentCrmContext
 
             entity.HasIndex(e => new { e.ConversationId, e.CreatedAt }, "IX_demorecruitment_WA_Note_Cnv").IsDescending(false, true);
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.Body).HasMaxLength(1000);
-            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
             entity.HasOne(d => d.Conversation).WithMany(p => p.ConversationNotes)
                 .HasForeignKey(d => d.ConversationId)
@@ -237,12 +237,12 @@ public partial class RecruitmentCrmContext
             entity.HasIndex(e => e.ConversationId, "IX_demorecruitment_WA_FU_Cnv");
             entity.HasIndex(e => e.DueAt, "IX_demorecruitment_WA_FU_Due");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.Status).HasDefaultValue((byte)FollowUpStatus.Pending);
             entity.Property(e => e.Notes).HasMaxLength(500);
             entity.Property(e => e.DueAt).HasPrecision(0);
             entity.Property(e => e.CompletedAt).HasPrecision(0);
-            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
             entity.HasOne(d => d.Conversation).WithMany(p => p.ConversationFollowUps)
                 .HasForeignKey(d => d.ConversationId)
@@ -271,13 +271,15 @@ public partial class RecruitmentCrmContext
 
             entity.ToTable("MetaSystemCredentials", "demorecruitment");
 
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())");
+            entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.AccessToken).HasMaxLength(2000);
             entity.Property(e => e.ObtainedAt).HasPrecision(0);
-            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
         });
 
         ConfigureLeadForm(modelBuilder);
+
+        ApplyPostgresConventions(modelBuilder);   // last, so it covers every entity above
     }
 }

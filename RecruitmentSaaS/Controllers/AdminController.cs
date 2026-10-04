@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
 using RecruitmentSaaS.Models.DTOs;
@@ -945,19 +944,10 @@ namespace RecruitmentSaaS.Controllers
             }
 
             // Move candidate to next stage with override
-            var spSuccess = new SqlParameter { ParameterName = "@Success", SqlDbType = System.Data.SqlDbType.Bit, Direction = System.Data.ParameterDirection.Output };
-            var spMessage = new SqlParameter { ParameterName = "@Message", SqlDbType = System.Data.SqlDbType.NVarChar, Size = 500, Direction = System.Data.ParameterDirection.Output };
-            var spStage = new SqlParameter { ParameterName = "@NewStageName", SqlDbType = System.Data.SqlDbType.NVarChar, Size = 200, Direction = System.Data.ParameterDirection.Output };
-
-            await _context.Database.ExecuteSqlRawAsync(
-                "EXEC demorecruitment.sp_MoveToNextStage @CandidateId, @MovedById, @Notes, @IsOverride, @OverrideReason, @Success OUTPUT, @Message OUTPUT, @NewStageName OUTPUT",
-                new SqlParameter("@CandidateId", request.CandidateId),
-                new SqlParameter("@MovedById", CurrentUserId),
-                new SqlParameter("@Notes", (object?)adminNote ?? DBNull.Value),
-                new SqlParameter("@IsOverride", true),  // Override — admin approved
-                new SqlParameter("@OverrideReason", (object?)adminNote ?? DBNull.Value),
-                spSuccess, spMessage, spStage
-            );
+            var move = await _context.Database.MoveToNextStageAsync(
+                request.CandidateId, CurrentUserId, adminNote,
+                isOverride: true,  // Override — admin approved
+                overrideReason: adminNote);
 
             // Update request status
             request.Status = 2; // Approved
@@ -966,7 +956,7 @@ namespace RecruitmentSaaS.Controllers
             request.AdminNote = adminNote;
             await _context.SaveChangesAsync();
 
-            var stageName = spStage.Value?.ToString() ?? request.ToStage?.StageName ?? "";
+            var stageName = move.NewStageName ?? "";
 
             // Notify the requester (Sales user)
             await _notifications.SendAsync(
@@ -1412,22 +1402,13 @@ namespace RecruitmentSaaS.Controllers
                 return Json(new { success = false, message = "لا توجد مرحلة إرسال جواز في هذه الباقة" });
 
             // Call sp_MoveToNextStage
-            var successParam = new SqlParameter { ParameterName = "@Success", SqlDbType = SqlDbType.Bit, Direction = ParameterDirection.Output };
-            var messageParam = new SqlParameter { ParameterName = "@Message", SqlDbType = SqlDbType.NVarChar, Size = 500, Direction = ParameterDirection.Output };
-            var stageParam = new SqlParameter { ParameterName = "@NewStageName", SqlDbType = SqlDbType.NVarChar, Size = 200, Direction = ParameterDirection.Output };
+            var move = await _context.Database.MoveToNextStageAsync(
+                candidateId, CurrentUserId, "تم إرسال الجواز للوكيل",
+                isOverride: true,   // override to jump to PASSPORT_SEND
+                overrideReason: "Admin confirmed passport sent");
 
-            await _context.Database.ExecuteSqlRawAsync(
-                "EXEC demorecruitment.sp_MoveToNextStage @CandidateId, @MovedById, @Notes, @IsOverride, @OverrideReason, @Success OUTPUT, @Message OUTPUT, @NewStageName OUTPUT",
-                new SqlParameter("@CandidateId", candidateId),
-                new SqlParameter("@MovedById", CurrentUserId),
-                new SqlParameter("@Notes", (object?)"تم إرسال الجواز للوكيل" ?? DBNull.Value),
-                new SqlParameter("@IsOverride", true),   // override to jump to PASSPORT_SEND
-                new SqlParameter("@OverrideReason", "Admin confirmed passport sent"),
-                successParam, messageParam, stageParam
-            );
-
-            var success = (bool)successParam.Value;
-            var message = messageParam.Value?.ToString() ?? "";
+            var success = move.Success!.Value;
+            var message = move.Message ?? "";
 
             return Json(new { success, message, alreadyDone = false });
         }
@@ -2427,19 +2408,9 @@ namespace RecruitmentSaaS.Controllers
 
                 foreach (var cand in onPassportSend)
                 {
-                    var spSuccess = new SqlParameter { ParameterName = "@Success", SqlDbType = System.Data.SqlDbType.Bit, Direction = System.Data.ParameterDirection.Output };
-                    var spMessage = new SqlParameter { ParameterName = "@Message", SqlDbType = System.Data.SqlDbType.NVarChar, Size = 500, Direction = System.Data.ParameterDirection.Output };
-                    var spStage = new SqlParameter { ParameterName = "@NewStageName", SqlDbType = System.Data.SqlDbType.NVarChar, Size = 200, Direction = System.Data.ParameterDirection.Output };
-
-                    await _context.Database.ExecuteSqlRawAsync(
-                        "EXEC demorecruitment.sp_MoveToNextStage @CandidateId, @MovedById, @Notes, @IsOverride, @OverrideReason, @Success OUTPUT, @Message OUTPUT, @NewStageName OUTPUT",
-                        new SqlParameter("@CandidateId", cand.Id),
-                        new SqlParameter("@MovedById", CurrentUserId),
-                        new SqlParameter("@Notes", (object)"تم إرسال الجواز للوكيل — تحميل تلقائي"),
-                        new SqlParameter("@IsOverride", false),
-                        new SqlParameter("@OverrideReason", DBNull.Value),
-                        spSuccess, spMessage, spStage
-                    );
+                    await _context.Database.MoveToNextStageAsync(
+                        cand.Id, CurrentUserId, "تم إرسال الجواز للوكيل — تحميل تلقائي",
+                        isOverride: false, overrideReason: null);
                 }
             }
 
