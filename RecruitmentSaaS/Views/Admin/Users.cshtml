@@ -142,7 +142,17 @@
                                          style="background:@rColorBg;color:@rColor;border:1.5px solid @rColorBorder;">
                                         @(u.FullName.FirstOrDefault())
                                     </div>
-                                    <div style="font-weight:600;">@u.FullName</div>
+                                    <div>
+                                        <div style="font-weight:600;">@u.FullName</div>
+                                        @if (!string.IsNullOrWhiteSpace(u.FullNameAr))
+                                        {
+                                            <div style="font-size:.76rem;color:var(--text-muted)">@u.FullNameAr</div>
+                                        }
+                                        else if (u.Role == 3 || u.Role == 6)
+                                        {
+                                            <div style="font-size:.72rem;color:#d97706"><i class="bi bi-exclamation-circle"></i> بدون اسم عربي</div>
+                                        }
+                                    </div>
                                 </div>
                             </td>
                             <td style="font-family:monospace;font-size:.82rem;">@u.Email</td>
@@ -219,7 +229,7 @@
 
                                     <button class="btn btn-outline-secondary btn-sm edit-user-btn"
                                             title="تعديل الاسم والبريد"
-                                            data-user-id="@u.Id" data-user-name="@u.FullName" data-user-email="@u.Email">
+                                            data-user-id="@u.Id" data-user-name="@u.FullName" data-user-name-ar="@u.FullNameAr" data-user-email="@u.Email">
                                         <i class="bi bi-pencil"></i>
                                     </button>
 
@@ -422,7 +432,11 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">الاسم الكامل <span class="text-danger">*</span></label>
-                        <input name="fullName" class="form-control" required placeholder="مثال: أحمد محمد" />
+                        <input name="fullName" class="form-control" required placeholder="مثال: Ahmed Mohamed" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">الاسم بالعربي <span style="font-size:.75rem;color:var(--text-muted)">(يظهر للعملاء في رسالة الترحيب)</span></label>
+                        <input name="fullNameAr" class="form-control" maxlength="200" placeholder="مثال: أحمد محمد" />
                     </div>
                     <div class="mb-3">
                         <label class="form-label">البريد الإلكتروني <span class="text-danger">*</span></label>
@@ -477,6 +491,10 @@
                     <div class="mb-3">
                         <label class="form-label">الاسم <span class="text-danger">*</span></label>
                         <input name="fullName" id="editUserName" type="text" class="form-control" required minlength="2" maxlength="200" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">الاسم بالعربي <span style="font-size:.75rem;color:var(--text-muted)">(يظهر للعملاء في رسالة الترحيب)</span></label>
+                        <input name="fullNameAr" id="editUserNameAr" type="text" class="form-control" maxlength="200" dir="rtl" />
                     </div>
                     <div class="mb-2">
                         <label class="form-label">البريد الإلكتروني <span class="text-danger">*</span></label>
@@ -575,6 +593,7 @@
                 editOriginalEmail = btn.dataset.userEmail || '';
                 document.getElementById('editUserId').value = btn.dataset.userId;
                 document.getElementById('editUserName').value = btn.dataset.userName || '';
+                document.getElementById('editUserNameAr').value = btn.dataset.userNameAr || '';
                 document.getElementById('editUserEmail').value = editOriginalEmail;
                 document.getElementById('editUserEmailNote').style.display = 'none';
                 new bootstrap.Modal(document.getElementById('editUserModal')).show();

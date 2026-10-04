@@ -200,7 +200,7 @@ namespace RecruitmentSaaS.Controllers
         // ── POST /Admin/CreateUser ──────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateUser(string fullName, string email, string password, int role, Guid? branchId, Guid? managerId)
+        public async Task<IActionResult> CreateUser(string fullName, string email, string password, int role, Guid? branchId, Guid? managerId, string? fullNameAr)
         {
             if (await _context.Users.AnyAsync(u => u.Email == email))
             {
@@ -212,6 +212,7 @@ namespace RecruitmentSaaS.Controllers
             {
                 Id = Guid.NewGuid(),
                 FullName = fullName,
+                FullNameAr = string.IsNullOrWhiteSpace(fullNameAr) ? null : fullNameAr.Trim(),
                 Email = email,
                 PasswordHash = password, // plain text for now
                 Role = (byte)role,
@@ -285,7 +286,7 @@ namespace RecruitmentSaaS.Controllers
         // ── POST /Admin/UpdateUser — change a user's name / login email ─────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateUser(Guid userId, string fullName, string email)
+        public async Task<IActionResult> UpdateUser(Guid userId, string fullName, string email, string? fullNameAr)
         {
             var user = await _context.Users.FindAsync(userId);
             if (user == null)
@@ -317,6 +318,8 @@ namespace RecruitmentSaaS.Controllers
 
             var emailChanged = !string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase);
             user.FullName = fullName;
+            fullNameAr = fullNameAr?.Trim();
+            user.FullNameAr = string.IsNullOrEmpty(fullNameAr) ? null : fullNameAr[..Math.Min(fullNameAr.Length, 200)];
             user.Email = email;
             await _context.SaveChangesAsync();
 
@@ -1678,8 +1681,46 @@ namespace RecruitmentSaaS.Controllers
                 .OrderBy(f => f.Manager.FullName)
                 .ToListAsync();
             ViewBag.BaseUrl = $"{Request.Scheme}://{Request.Host}";
+            ViewBag.MissingArabicNames = await _context.Users.AsNoTracking()
+                .Where(u => u.IsActive && (u.Role == 3 || u.Role == 6) && (u.FullNameAr == null || u.FullNameAr == ""))
+                .OrderBy(u => u.FullName)
+                .Select(u => u.FullName)
+                .ToListAsync();
 
             return View(settings);
+        }
+
+        // ── POST /Admin/UpdateWelcomeMessage ────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateWelcomeMessage(bool enabled, string? message)
+        {
+            message = message?.Trim();
+            if (enabled && string.IsNullOrEmpty(message))
+            {
+                TempData["Error"] = "اكتب نص رسالة الترحيب قبل تفعيلها";
+                return RedirectToAction("LeadFormSettings");
+            }
+            if (message?.Length > 4000)
+            {
+                TempData["Error"] = "رسالة الترحيب أطول من المسموح (4000 حرف)";
+                return RedirectToAction("LeadFormSettings");
+            }
+
+            var settings = await _context.LeadFormSettings.FirstOrDefaultAsync();
+            if (settings == null)
+            {
+                settings = new LeadFormSetting { Id = Guid.NewGuid(), SeniorAgeThreshold = HomeController.DefaultSeniorAgeThreshold };
+                _context.LeadFormSettings.Add(settings);
+            }
+            settings.WelcomeMessageEnabled = enabled;
+            settings.WelcomeMessage = string.IsNullOrEmpty(message) ? null : message;
+            settings.UpdatedAt = DateTime.UtcNow;
+            settings.UpdatedById = CurrentUserId;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = enabled ? "تم حفظ رسالة الترحيب وتفعيلها ✅" : "تم حفظ رسالة الترحيب (غير مفعّلة)";
+            return RedirectToAction("LeadFormSettings");
         }
 
         // ── POST /Admin/UpdateTeamLeadForm ──────────────────────────────────

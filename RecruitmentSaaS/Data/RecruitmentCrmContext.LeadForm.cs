@@ -25,6 +25,18 @@ public partial class RecruitmentCrmContext
                 .HasConstraintName("FK_demorecruitment_Ld_TeamMgr");
         });
 
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.Property(e => e.FullNameAr).HasMaxLength(200);
+            entity.Ignore(e => e.DisplayNameAr);
+        });
+
+        modelBuilder.Entity<LeadFormSetting>(entity =>
+        {
+            entity.Property(e => e.WelcomeMessageEnabled).HasDefaultValue(false);
+            entity.Property(e => e.WelcomeMessage).HasMaxLength(4000);
+        });
+
         modelBuilder.Entity<TeamLeadForm>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK_demorecruitment_TLF");

@@ -24,14 +24,18 @@ namespace RecruitmentSaaS.Services
         private readonly IInboxRealtimeNotifier _notifier;
         private readonly ILogger<WhatsAppWebhookProcessor> _logger;
 
+        private readonly IWhatsAppCloudApiService _cloudApi;
+
         public WhatsAppWebhookProcessor(
             RecruitmentCrmContext context,
             IInboxRealtimeNotifier notifier,
-            ILogger<WhatsAppWebhookProcessor> logger)
+            ILogger<WhatsAppWebhookProcessor> logger,
+            IWhatsAppCloudApiService cloudApi)
         {
             _context = context;
             _notifier = notifier;
             _logger = logger;
+            _cloudApi = cloudApi;
         }
 
         public async Task ProcessAsync(JObject payload, CancellationToken ct = default)
@@ -184,6 +188,81 @@ namespace RecruitmentSaaS.Services
 
             await _notifier.NewMessageAsync(message, conversation.AssignedSalesAgentId);
             await _notifier.UnreadCountUpdatedAsync(conversation.Id, account.Id, conversation.UnreadCount, conversation.AssignedSalesAgentId);
+
+            await TrySendWelcomeAsync(conversation, account, ct);
+        }
+
+        // Conversations already welcomed by this server process — the customer often sends several
+        // messages at once, and each arrives as its own webhook.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, byte> Welcomed = new();
+
+        /// <summary>
+        /// The automatic welcome from the assigned TeleSales (Admin > نموذج التسجيل). Sent once, when
+        /// the customer's chat starts: WhatsApp only allows free text after the customer writes first,
+        /// so this always lands inside the 24-hour window.
+        /// </summary>
+        private async Task TrySendWelcomeAsync(WhatsAppConversation conversation, WhatsAppAccount account, CancellationToken ct)
+        {
+            try
+            {
+                if (conversation.AssignedSalesAgentId == null) return;   // no salesperson yet — nobody to introduce
+
+                var settings = await _context.LeadFormSettings.AsNoTracking().FirstOrDefaultAsync(ct);
+                if (settings?.WelcomeMessageEnabled != true || string.IsNullOrWhiteSpace(settings.WelcomeMessage)) return;
+
+                // Only the very first reply in this chat
+                if (await _context.WhatsAppMessages.AnyAsync(m => m.ConversationId == conversation.Id
+                                                               && m.Direction == (byte)MessageDirection.Outgoing, ct))
+                    return;
+                if (!Welcomed.TryAdd(conversation.Id, 0)) return;
+
+                var agent = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == conversation.AssignedSalesAgentId, ct);
+                if (agent == null) return;
+
+                var customer = await _context.WhatsAppConversations.AsNoTracking()
+                    .Where(c => c.Id == conversation.Id)
+                    .Select(c => c.Lead != null ? c.Lead.FullName : c.Contact.Name)
+                    .FirstOrDefaultAsync(ct);
+                var contactWaId = await _context.WhatsAppContacts.AsNoTracking()
+                    .Where(c => c.Id == conversation.ContactId).Select(c => c.WhatsAppPhoneNumber).FirstAsync(ct);
+
+                var text = settings.WelcomeMessage
+                    .Replace("{agent}", agent.DisplayNameAr)
+                    .Replace("{name}", string.IsNullOrWhiteSpace(customer) ? "" : customer);
+
+                var now = DateTime.UtcNow;
+                var welcome = new WhatsAppMessage
+                {
+                    Id = Guid.NewGuid(),
+                    ConversationId = conversation.Id,
+                    WhatsAppAccountId = account.Id,
+                    Direction = (byte)MessageDirection.Outgoing,
+                    MessageType = (byte)WhatsAppMessageType.Text,
+                    MessageSource = (byte)MessageSource.System,
+                    TextBody = text,
+                    Status = (byte)MessageStatus.Queued,
+                    WhatsAppTimestamp = now,
+                    CreatedAt = now
+                };
+                _context.WhatsAppMessages.Add(welcome);
+                await _context.SaveChangesAsync(ct);
+
+                var result = await _cloudApi.SendTextMessageAsync(account.PhoneNumberId, contactWaId, text, ct);
+                welcome.Status = result.Success ? (byte)MessageStatus.Sent : (byte)MessageStatus.Failed;
+                welcome.WhatsAppMessageId = result.WhatsAppMessageId;
+                welcome.ErrorCode = result.ErrorCode;
+                welcome.ErrorMessage = result.ErrorMessage;
+                await _context.SaveChangesAsync(ct);
+
+                await _notifier.NewMessageAsync(welcome, conversation.AssignedSalesAgentId, "رسالة ترحيب تلقائية");
+                if (!result.Success)
+                    _logger.LogWarning("Welcome message to conversation {ConversationId} failed: {Error}", conversation.Id, result.ErrorMessage);
+            }
+            catch (Exception ex)
+            {
+                // Never let the welcome break processing of the customer's own message
+                _logger.LogError(ex, "Could not send the welcome message for conversation {ConversationId}", conversation.Id);
+            }
         }
 
         private async Task<WhatsAppContact> FindOrCreateContactAsync(string waPhoneNumber, string? profileName, DateTime now, CancellationToken ct)
