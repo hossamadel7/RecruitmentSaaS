@@ -7,7 +7,7 @@ using System.Security.Claims;
 
 namespace RecruitmentSaaS.Controllers
 {
-    [Authorize(Roles = "7")]
+    [Authorize(Roles = "7,8")] // 7 = team leader (their team), 8 = head TeleSales (all teams)
     public class TeleSalesManagerController : Controller
     {
         private readonly RecruitmentCrmContext _context;
@@ -25,6 +25,17 @@ namespace RecruitmentSaaS.Controllers
         private string CurrentUserName =>
             User.FindFirstValue(ClaimTypes.Name) ?? "مدير تيلي سيلز";
 
+        private bool IsHead => User.IsInRole("8");
+
+        // Who I oversee: a team leader's own TeleSales, or for the head every TeleSales plus themselves
+        private IQueryable<Models.Entities.User> TeamMembersQuery()
+        {
+            var me = CurrentUserId;
+            return IsHead
+                ? _context.Users.Where(u => u.Role == 3 || u.Id == me)
+                : _context.Users.Where(u => u.ManagerId == me && u.Role == 3);
+        }
+
         // ── GET /TeleSalesManager/Index ──────────────────────────────────────
         public async Task<IActionResult> Index(int? month, int? year)
         {
@@ -40,8 +51,8 @@ namespace RecruitmentSaaS.Controllers
             var prevEnd = curStart;
 
             // My TeleSales team (users with ManagerId = me)
-            var myTeam = await _context.Users
-                .Where(u => u.ManagerId == CurrentUserId && u.Role == 3 && u.IsActive)
+            var myTeam = await TeamMembersQuery()
+                .Where(u => u.IsActive)
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 
@@ -178,10 +189,8 @@ namespace RecruitmentSaaS.Controllers
             var curEnd = curStart.AddMonths(1);
 
             // Verify this TeleSales belongs to me
-            var member = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == userId
-                                       && u.ManagerId == CurrentUserId
-                                       && u.Role == 3);
+            var member = await TeamMembersQuery()
+                .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (member == null) return Forbid();
 
@@ -207,14 +216,15 @@ namespace RecruitmentSaaS.Controllers
         public async Task<IActionResult> TeamFormLeads(string? member, byte? status, string? q, int page = 1)
         {
             const int pageSize = 50;
-            await TeamLeadForms.EnsureForManagersAsync(_context, new[] { CurrentUserId });
+            if (!IsHead) // the head has no team form of their own
+                await TeamLeadForms.EnsureForManagersAsync(_context, new[] { CurrentUserId });
 
             var form = await _context.TeamLeadForms.AsNoTracking()
                 .FirstOrDefaultAsync(f => f.ManagerId == CurrentUserId);
 
             // Include deactivated members: their leads are still the team's
-            var team = await _context.Users.AsNoTracking()
-                .Where(u => u.ManagerId == CurrentUserId && u.Role == 3)
+            var team = await TeamMembersQuery().AsNoTracking()
+                .Include(u => u.Manager)
                 .OrderByDescending(u => u.IsActive).ThenBy(u => u.FullName)
                 .ToListAsync();
             var teamIds = team.Select(u => u.Id).ToList();
@@ -267,14 +277,22 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.Page = page;
             ViewBag.PageCount = (int)Math.Ceiling(filteredCount / (double)pageSize);
             ViewBag.FilteredCount = filteredCount;
+            ViewBag.IsHead = IsHead;
 
             return View(leads);
         }
 
-        // A lead belongs to my team when my team form brought it in, or one of my TeleSales holds it
-        private IQueryable<Models.Entities.Lead> TeamLeadsScope(List<Guid> teamIds) =>
-            _context.Leads.Where(l => l.TeamManagerId == CurrentUserId
-                                   || (l.AssignedSalesId != null && teamIds.Contains(l.AssignedSalesId.Value)));
+        // A lead belongs to my team when my team form brought it in, or one of my TeleSales holds it.
+        // For the head: any team form's lead, or any lead a TeleSales holds.
+        private IQueryable<Models.Entities.Lead> TeamLeadsScope(List<Guid> teamIds)
+        {
+            var me = CurrentUserId;
+            return IsHead
+                ? _context.Leads.Where(l => l.TeamManagerId != null
+                                         || (l.AssignedSalesId != null && teamIds.Contains(l.AssignedSalesId.Value)))
+                : _context.Leads.Where(l => l.TeamManagerId == me
+                                         || (l.AssignedSalesId != null && teamIds.Contains(l.AssignedSalesId.Value)));
+        }
 
         // ── POST /TeleSalesManager/AssignTeamLead ────────────────────────────
         // Assign a waiting lead, or move a lead between members of my team. The lead's WhatsApp
@@ -286,8 +304,7 @@ namespace RecruitmentSaaS.Controllers
             IActionResult Back() => Redirect("/TeleSalesManager/TeamFormLeads" +
                 (!string.IsNullOrEmpty(returnQuery) && returnQuery.StartsWith('?') ? returnQuery : ""));
 
-            var teamIds = await _context.Users
-                .Where(u => u.ManagerId == CurrentUserId && u.Role == 3)
+            var teamIds = await TeamMembersQuery()
                 .Select(u => u.Id)
                 .ToListAsync();
 
@@ -295,11 +312,8 @@ namespace RecruitmentSaaS.Controllers
                 .Include(l => l.AssignedSales)
                 .FirstOrDefaultAsync(l => l.Id == leadId);
 
-            var member = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == salesUserId
-                                       && u.ManagerId == CurrentUserId
-                                       && u.Role == 3
-                                       && u.IsActive);
+            var member = await TeamMembersQuery()
+                .FirstOrDefaultAsync(u => u.Id == salesUserId && u.IsActive);
 
             if (lead == null || member == null)
             {

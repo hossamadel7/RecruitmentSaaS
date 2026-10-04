@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
+using RecruitmentSaaS.Services;
 using System.Security.Claims;
 
 namespace RecruitmentSaaS.Hubs
@@ -25,7 +26,7 @@ namespace RecruitmentSaaS.Hubs
 
         private string? CurrentRole => Context.User!.FindFirstValue(ClaimTypes.Role);
 
-        private bool IsOrgWideRole => CurrentRole == "1" /* Admin */ || CurrentRole == "7" /* TeleSalesManager (Supervisor) */;
+        private bool IsOrgWideRole => WhatsAppAuthorization.IsOrgWide(CurrentRole); // Admin, team leaders, head TeleSales
 
         public override async Task OnConnectedAsync()
         {

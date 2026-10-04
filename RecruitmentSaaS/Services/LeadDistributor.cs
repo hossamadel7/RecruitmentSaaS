@@ -28,7 +28,7 @@ namespace RecruitmentSaaS.Services
         public static async Task<List<RotationSlot>> RotationAsync(RecruitmentCrmContext db, IQueryable<User> candidates, string configScope, CancellationToken ct = default)
         {
             var users = await candidates
-                .Where(u => u.Role == 3 && u.IsActive)
+                .Where(u => (u.Role == 3 || u.Role == 8) && u.IsActive)   // 8 = head TeleSales, also takes leads
                 .Select(u => new { u.Id, Name = u.FullNameAr != null && u.FullNameAr != "" ? u.FullNameAr : u.FullName })
                 .ToListAsync(ct);
             var ids = users.Select(u => u.Id).ToList();
@@ -129,7 +129,7 @@ namespace RecruitmentSaaS.Services
 
             var sheetUsers = db.Users.Where(u => db.SalesGoogleSheetUsers.Any(su =>
                 su.SheetId == sheetId && su.SalesUserId == u.Id && su.IsActive));
-            return await sheetUsers.AnyAsync(u => u.Role == 3 && u.IsActive, ct)
+            return await sheetUsers.AnyAsync(u => (u.Role == 3 || u.Role == 8) && u.IsActive, ct)
                 ? (sheetUsers, "sheet:" + sheetId.Value.ToString("N"))
                 : (db.Users, AllScope);
         }

@@ -76,7 +76,7 @@ namespace RecruitmentSaaS.Controllers.Api
 
             var agents = await _context.Users
                 .AsNoTracking()
-                .Where(u => u.IsActive && (u.Role == 6 || u.Role == 3))
+                .Where(u => u.IsActive && (u.Role == 6 || u.Role == 3 || u.Role == 8))
                 .OrderBy(u => u.FullName)
                 .Select(u => new
                 {

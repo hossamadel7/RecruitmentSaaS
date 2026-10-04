@@ -1162,6 +1162,38 @@
                 </div>
             }
 
+            @* ── HEAD TELE SALES (Role 8): own leads like a TeleSales + every team ── *@
+            @if (role == "8")
+            {
+                <div class="sidebar-section">شغلي</div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="TeleSales"&&currentAction=="Index"?"active":"")" href="/TeleSales/Index">
+                        <span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span> لوحتي
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="TeleSales"&&currentAction=="Leads"?"active":"")" href="/TeleSales/Leads">
+                        <span class="nav-icon"><i class="bi bi-person-lines-fill"></i></span> عملائي
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Inbox"?"active":"")" href="/Inbox/Index">
+                        <span class="nav-icon"><i class="bi bi-whatsapp"></i></span> واتساب
+                    </a>
+                </div>
+                <div class="sidebar-section">كل الفرق</div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="TeleSalesManager"&&currentAction=="Index"?"active":"")" href="/TeleSalesManager/Index">
+                        <span class="nav-icon"><i class="bi bi-bar-chart-fill"></i></span> لوحة الأداء
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="TeleSalesManager"&&currentAction=="TeamFormLeads"?"active":"")" href="/TeleSalesManager/TeamFormLeads">
+                        <span class="nav-icon"><i class="bi bi-people-fill"></i></span> ليدز كل الفرق
+                    </a>
+                </div>
+            }
+
             @* ── TELE SALES (Role 3) ── *@
             @if (role == "3")
             {
@@ -1319,7 +1351,7 @@
                 <div style="flex:1;min-width:0">
                     <div class="user-name">@User.Identity?.Name</div>
                     <div class="user-role">
-                        @(role switch { "1" => "مدير", "2" => "استقبال", "3" => "تيلي سيلز", "4" => "محاسب", "5" => "عمليات", "6" => "مبيعات مكتبية", "7" => "مدير تيلي سيلز", _ => "مستخدم" })
+                        @(role switch { "1" => "مدير", "2" => "استقبال", "3" => "تيلي سيلز", "4" => "محاسب", "5" => "عمليات", "6" => "مبيعات مكتبية", "7" => "مدير فريق", "8" => "مدير التيلي سيلز", _ => "مستخدم" })
                     </div>
                 </div>
                 <form asp-controller="Auth" asp-action="Logout" method="post" class="d-inline">

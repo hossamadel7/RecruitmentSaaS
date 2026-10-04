@@ -170,6 +170,7 @@
 
         var html = '<option value="">كل المندوبين</option>';
         if (USER.role === '7' && teams[USER.id]) html += '<option value="team:' + esc(USER.id) + '">👥 فريقي</option>';
+        if (USER.role === '8') html += '<option value="agent:' + esc(USER.id) + '">💬 محادثاتي أنا</option>'; // the head's own chats
         order.forEach(function (mgrId) {
             var t = teams[mgrId];
             html += '<optgroup label="فريق ' + esc(t.name) + '">' +

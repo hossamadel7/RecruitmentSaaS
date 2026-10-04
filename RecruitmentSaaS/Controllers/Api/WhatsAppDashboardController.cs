@@ -77,7 +77,7 @@ namespace RecruitmentSaaS.Controllers.Api
             if (isOrgWide)
             {
                 perAgent = await _context.Users.AsNoTracking()
-                    .Where(u => u.IsActive && (u.Role == 6 || u.Role == 3))
+                    .Where(u => u.IsActive && (u.Role == 6 || u.Role == 3 || u.Role == 8))
                     .Select(u => new
                     {
                         u.Id,

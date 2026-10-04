@@ -197,6 +197,8 @@ namespace RecruitmentSaaS.Controllers
             return View(users);
         }
 
+        public const int MaxRole = 8;
+
         // ── POST /Admin/CreateUser ──────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -205,6 +207,11 @@ namespace RecruitmentSaaS.Controllers
             if (await _context.Users.AnyAsync(u => u.Email == email))
             {
                 TempData["Error"] = "البريد الإلكتروني مستخدم بالفعل";
+                return RedirectToAction("Users");
+            }
+            if (role < 1 || role > MaxRole)
+            {
+                TempData["Error"] = "الدور غير صحيح";
                 return RedirectToAction("Users");
             }
 
@@ -286,13 +293,33 @@ namespace RecruitmentSaaS.Controllers
         // ── POST /Admin/UpdateUser — change a user's name / login email ─────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateUser(Guid userId, string fullName, string email, string? fullNameAr)
+        public async Task<IActionResult> UpdateUser(Guid userId, string fullName, string email, string? fullNameAr, int? role)
         {
             var user = await _context.Users.FindAsync(userId);
             if (user == null)
             {
                 TempData["Error"] = "المستخدم غير موجود";
                 return RedirectToAction("Users");
+            }
+
+            if (role.HasValue && role.Value != user.Role)
+            {
+                if (role.Value < 1 || role.Value > MaxRole)
+                {
+                    TempData["Error"] = "الدور غير صحيح";
+                    return RedirectToAction("Users");
+                }
+                if (user.Id == CurrentUserId)
+                {
+                    TempData["Error"] = "مينفعش تغيّر دورك إنت";
+                    return RedirectToAction("Users");
+                }
+                // A team leader with members would leave them without a team
+                if (user.Role == 7 && await _context.Users.AnyAsync(u => u.ManagerId == user.Id))
+                {
+                    TempData["Error"] = $"{user.FullName} عنده موظفين في فريقه — انقلهم لفريق تاني الأول من \"إدارة الفريق\"";
+                    return RedirectToAction("Users");
+                }
             }
 
             fullName = (fullName ?? "").Trim();
@@ -321,7 +348,16 @@ namespace RecruitmentSaaS.Controllers
             fullNameAr = fullNameAr?.Trim();
             user.FullNameAr = string.IsNullOrEmpty(fullNameAr) ? null : fullNameAr[..Math.Min(fullNameAr.Length, 200)];
             user.Email = email;
+            var roleChanged = role.HasValue && role.Value != user.Role;
+            if (roleChanged)
+            {
+                user.Role = (byte)role!.Value;
+                if (user.Role != 3) user.ManagerId = null; // only TeleSales belong to a team
+            }
             await _context.SaveChangesAsync();
+            if (roleChanged)
+                RecruitmentSaaS.Services.UserSessionValidator.Forget( // sign them in again with the new role
+                    HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), user.Id);
 
             TempData["Success"] = emailChanged
                 ? $"تم تحديث بيانات {fullName} — تسجيل الدخول من الآن بالبريد {email}"
@@ -387,7 +423,7 @@ namespace RecruitmentSaaS.Controllers
                 .Where(l => l.CreatedAt >= monthStart
                           && l.CreatedAt < monthEnd
                           && l.AssignedSalesId != null
-                          && l.AssignedSales!.Role == 3)
+                          && (l.AssignedSales!.Role == 3 || l.AssignedSales!.Role == 8))
                 .GroupBy(l => new { l.AssignedSalesId, l.AssignedSales!.FullName })
                 .Select(g => new
                 {
@@ -441,7 +477,7 @@ namespace RecruitmentSaaS.Controllers
                 .ToListAsync();
 
             var teleSalesList = await _context.Users
-                .Where(u => u.Role == 3 && u.IsActive)
+                .Where(u => (u.Role == 3 || u.Role == 8) && u.IsActive)
                 .OrderBy(u => u.FullName)
                 .Select(u => new { u.Id, u.FullName })
                 .ToListAsync();
@@ -1682,7 +1718,7 @@ namespace RecruitmentSaaS.Controllers
                 .ToListAsync();
             ViewBag.BaseUrl = $"{Request.Scheme}://{Request.Host}";
             ViewBag.MissingArabicNames = await _context.Users.AsNoTracking()
-                .Where(u => u.IsActive && (u.Role == 3 || u.Role == 6) && (u.FullNameAr == null || u.FullNameAr == ""))
+                .Where(u => u.IsActive && (u.Role == 3 || u.Role == 6 || u.Role == 8) && (u.FullNameAr == null || u.FullNameAr == ""))
                 .OrderBy(u => u.FullName)
                 .Select(u => u.FullName)
                 .ToListAsync();
@@ -2493,7 +2529,7 @@ namespace RecruitmentSaaS.Controllers
                 .ToListAsync();
 
             ViewBag.Agents = await _context.Users
-                .Where(u => u.IsActive && (u.Role == 6 || u.Role == 3))
+                .Where(u => u.IsActive && (u.Role == 6 || u.Role == 3 || u.Role == 8))
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 

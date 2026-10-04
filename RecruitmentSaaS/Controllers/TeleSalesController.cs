@@ -9,7 +9,7 @@ using System.Security.Claims;
 
 namespace RecruitmentSaaS.Controllers
 {
-    [Authorize(Roles = "3")]
+    [Authorize(Roles = "3,8")] // 8 = head TeleSales: their own leads, same as any TeleSales
     public class TeleSalesController : Controller
     {
         private readonly RecruitmentCrmContext _context;

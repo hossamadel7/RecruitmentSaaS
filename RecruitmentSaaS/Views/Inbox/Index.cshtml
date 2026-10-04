@@ -25,7 +25,7 @@
                     <i class="bi bi-search"></i>
                     <input type="text" id="conv-search" placeholder="بحث بالاسم أو الهاتف أو كود العميل..." />
                 </div>
-                @if (currentRole == "1" || currentRole == "7")
+                @if (currentRole == "1" || currentRole == "7" || currentRole == "8")
                 {
                     @* Admin / TeleSales Manager: chats of one salesperson or one team *@
                     <div class="inbox-agent-filter">
@@ -132,8 +132,8 @@
             id: @Html.Raw(Json.Serialize(currentUserId)),
             name: @Html.Raw(Json.Serialize(currentUserName)),
             role: @Html.Raw(Json.Serialize(currentRole)),
-            isOrgWide: @Html.Raw((currentRole == "1" || currentRole == "7") ? "true" : "false"),
-            canAssign: @Html.Raw((currentRole == "1" || currentRole == "7") ? "true" : "false")
+            isOrgWide: @Html.Raw((currentRole == "1" || currentRole == "7" || currentRole == "8") ? "true" : "false"),
+            canAssign: @Html.Raw((currentRole == "1" || currentRole == "7" || currentRole == "8") ? "true" : "false")
         };
         // Let the inbox use the full page body instead of the default padded layout.
         document.querySelector('.page-body')?.classList.add('inbox-page-body');
