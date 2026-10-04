@@ -1146,9 +1146,93 @@
         bindEvents();
         initAgentFilter();
         connectSignalR();
+
+        var linked = new URLSearchParams(location.search).get('c');
+        if (linked) selectConversation(linked);
     }
 
     document.addEventListener('DOMContentLoaded', init);
 
-    window.Inbox = { showScreen: showScreen };
+    // ── Transfer a chat to another salesperson (admin / team leaders / head) ──
+    async function openTransfer() {
+        var c = state.selectedConversation;
+        if (!c || !USER.canAssign) return;
+        var agents = await getAgents();
+
+        document.getElementById('transfer-current').innerHTML = 'المسؤول دلوقتي: <strong>' +
+            esc(c.assignedSalesAgentName || 'غير مخصص') + '</strong>';
+        var search = document.getElementById('transfer-search');
+        search.value = '';
+
+        // Group by team, the current holder left out
+        var groups = {}, order = [];
+        agents.forEach(function (a) {
+            if (a.id === c.assignedSalesAgentId) return;
+            var key = a.managerName ? 'فريق ' + a.managerName : 'بدون فريق';
+            if (!groups[key]) { groups[key] = []; order.push(key); }
+            groups[key].push(a);
+        });
+        order.sort(function (x, y) { return x === 'بدون فريق' ? 1 : y === 'بدون فريق' ? -1 : x.localeCompare(y, 'ar'); });
+
+        var list = document.getElementById('transfer-list');
+        list.innerHTML = order.map(function (key) {
+            return '<div class="transfer-group">' + esc(key) + '</div>' + groups[key].map(function (a) {
+                return '<button type="button" class="transfer-item" data-id="' + esc(a.id) + '" data-name="' + esc(a.fullName) + '">' +
+                    '<span class="conv-avatar">' + initials(a.fullName) + '</span><span class="transfer-name">' + esc(a.fullName) + '</span>' +
+                    '<i class="bi bi-chevron-left"></i></button>';
+            }).join('');
+        }).join('') || '<div class="text-muted text-center py-3">مفيش موظفين تانيين</div>';
+
+        search.oninput = function () {
+            var q = search.value.trim().toLowerCase();
+            list.querySelectorAll('.transfer-item').forEach(function (b) {
+                b.style.display = !q || b.dataset.name.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+            });
+        };
+        list.onclick = async function (e) {
+            var item = e.target.closest('.transfer-item');
+            if (!item || item.disabled) return;
+            if (!confirm('تحويل محادثة ' + (c.contactName || '') + ' إلى ' + item.dataset.name + '؟')) return;
+            item.disabled = true;
+            try {
+                var res = await api('/api/conversations/' + c.id + '/assign', { method: 'POST', body: JSON.stringify({ agentId: item.dataset.id }) });
+                modal.hide();
+                if (state.selectedConversationId === c.id) {
+                    var detail = await api('/api/conversations/' + c.id);
+                    state.selectedConversation = detail;
+                    state.panelDirty = false;
+                    renderChatHeader(detail);
+                    renderCustomerPanel(detail);
+                }
+                loadConversations();
+                showToast('تم تحويل المحادثة لـ ' + item.dataset.name + (res && res.leadMoved ? ' (ومعها ملف العميل)' : ''));
+            } catch (err) {
+                item.disabled = false;
+                alert('تعذر التحويل' + (err.body && err.body.error ? ': ' + err.body.error : ''));
+            }
+        };
+
+        // Lift the popup out of the inbox layout so its full-screen mobile container can't clip or cover it
+        var modalEl = document.getElementById('transferModal');
+        if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+        if (!IS_MOBILE) setTimeout(function () { search.focus(); }, 300);
+    }
+
+    function showToast(text) {
+        var t = document.getElementById('inbox-toast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'inbox-toast';
+            t.className = 'inbox-toast';
+            document.body.appendChild(t);
+        }
+        t.textContent = text;
+        t.classList.add('show');
+        clearTimeout(t._timer);
+        t._timer = setTimeout(function () { t.classList.remove('show'); }, 3500);
+    }
+
+    window.Inbox = { showScreen: showScreen, openTransfer: openTransfer };
 })();

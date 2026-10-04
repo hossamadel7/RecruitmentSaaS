@@ -68,6 +68,13 @@
                         <div class="chat-header-sub" id="chat-header-sub">—</div>
                     </div>
                     <span class="conv-account-pill" id="chat-header-account">—</span>
+                    @if (currentRole == "1" || currentRole == "7" || currentRole == "8")
+                    {
+                        <button type="button" class="chat-transfer-btn" id="chat-transfer-btn" title="تحويل المحادثة لموظف تاني"
+                                onclick="event.stopPropagation();Inbox.openTransfer()">
+                            <i class="bi bi-arrow-left-right"></i><span>تحويل</span>
+                        </button>
+                    }
                 </div>
 
                 <div class="chat-messages" id="chat-messages"></div>
@@ -110,6 +117,27 @@
                 </div>
             </div>
         </section>
+
+        @if (currentRole == "1" || currentRole == "7" || currentRole == "8")
+        {
+            @* Transfer a chat to another salesperson *@
+            <div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-arrow-left-right me-2"></i>تحويل المحادثة</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="transfer-current" id="transfer-current"></div>
+                            <input type="search" class="form-control mb-2" id="transfer-search" placeholder="ابحث باسم الموظف..." />
+                            <div id="transfer-list"></div>
+                            <div class="transfer-note"><i class="bi bi-info-circle"></i> ملف العميل بيتنقل مع المحادثة، والموظف الجديد بيوصله إشعار.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
 
         <!-- ══════════ SCREEN 3 (mobile) / COLUMN 3 (desktop) — Customer / Lead panel ══════════ -->
         <aside class="inbox-col inbox-col-customer" id="col-customer">

@@ -21,17 +21,20 @@ namespace RecruitmentSaaS.Controllers.Api
         private readonly IWhatsAppCloudApiService _cloudApi;
         private readonly IInboxRealtimeNotifier _notifier;
         private readonly WhatsAppMediaCache _mediaCache;
+        private readonly INotificationService _notifications;
 
         public ConversationsController(
             RecruitmentCrmContext context,
             IWhatsAppCloudApiService cloudApi,
             IInboxRealtimeNotifier notifier,
             IWebHostEnvironment env,
-            IConfiguration config)
+            IConfiguration config,
+            INotificationService notifications)
         {
             _context = context;
             _cloudApi = cloudApi;
             _notifier = notifier;
+            _notifications = notifications;
             _mediaCache = WhatsAppMediaCache.For(env, config);
         }
 
@@ -476,22 +479,58 @@ namespace RecruitmentSaaS.Controllers.Api
         [HttpPost("{id:guid}/assign")]
         public async Task<IActionResult> Assign(Guid id, [FromBody] AssignConversationDto dto)
         {
+            // Only admin, team leaders and the head move chats (a salesperson can't grab one by id)
+            if (!WhatsAppAuthorization.CanAssignOrTransfer(CurrentRole))
+                return Forbid();
+
             var conversation = await _context.WhatsAppConversations.FirstOrDefaultAsync(c => c.Id == id);
             if (conversation == null) return NotFound();
 
-            var isTakeOver = dto.AgentId == CurrentUserId;
-            if (!WhatsAppAuthorization.CanAssignOrTransfer(CurrentRole) && !isTakeOver)
-                return Forbid();
-
+            User? agent = null;
             if (dto.AgentId.HasValue)
             {
-                var agentExists = await _context.Users.AnyAsync(u => u.Id == dto.AgentId.Value && u.IsActive);
-                if (!agentExists) return BadRequest(new { error = "Agent not found or inactive." });
+                // Someone who works chats: TeleSales, office Sales or the head TeleSales
+                agent = await _context.Users.FirstOrDefaultAsync(u => u.Id == dto.AgentId.Value && u.IsActive
+                                                                  && (u.Role == 3 || u.Role == 6 || u.Role == 8));
+                if (agent == null) return BadRequest(new { error = "الموظف ده غير متاح لاستلام المحادثات" });
             }
 
             var previousAgentId = conversation.AssignedSalesAgentId;
+            if (previousAgentId == dto.AgentId) return Ok(new { success = true, leadMoved = false });
+
             conversation.AssignedSalesAgentId = dto.AgentId;
             conversation.UpdatedAt = DateTime.UtcNow;
+
+            // The customer's lead follows the chat, so the new person can open and work it
+            // (unless the lead is deliberately held by someone else)
+            var leadMoved = false;
+            Lead? lead = null;
+            if (agent != null && conversation.LeadId != null)
+            {
+                lead = await _context.Leads.FirstOrDefaultAsync(l => l.Id == conversation.LeadId);
+                if (lead != null && !lead.IsConverted && lead.AssignedSalesId != agent.Id
+                    && (lead.AssignedSalesId == null || lead.AssignedSalesId == previousAgentId))
+                {
+                    var previousName = previousAgentId == null ? null
+                        : await _context.Users.Where(u => u.Id == previousAgentId).Select(u => u.FullName).FirstOrDefaultAsync();
+                    lead.AssignedSalesId = agent.Id;
+                    lead.UpdatedAt = DateTime.UtcNow;
+                    _context.LeadActivities.Add(new LeadActivity
+                    {
+                        Id = Guid.NewGuid(),
+                        LeadId = lead.Id,
+                        ActivityType = 8,
+                        Description = previousName == null
+                            ? $"تم تعيين العميل ومحادثة الواتساب لـ {agent.FullName} بواسطة {CurrentUserName}"
+                            : $"تم تحويل العميل ومحادثة الواتساب من {previousName} إلى {agent.FullName} بواسطة {CurrentUserName}",
+                        CreatedById = CurrentUserId,
+                        CreatedByName = CurrentUserName,
+                        ActorType = 1,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    leadMoved = true;
+                }
+            }
             await _context.SaveChangesAsync();
 
             _context.AuditLogs.Add(new AuditLog
@@ -510,7 +549,20 @@ namespace RecruitmentSaaS.Controllers.Api
 
             await _notifier.ConversationAssignedAsync(conversation.Id, conversation.WhatsAppAccountId, previousAgentId, dto.AgentId);
 
-            return Ok(new { success = true });
+            if (agent != null && agent.Id != CurrentUserId)
+            {
+                try
+                {
+                    var customer = await _context.WhatsAppContacts.AsNoTracking()
+                        .Where(c => c.Id == conversation.ContactId)
+                        .Select(c => c.Name ?? c.WhatsAppPhoneNumber).FirstOrDefaultAsync();
+                    await _notifications.SendAsync(agent.Id, "تم تحويل محادثة واتساب لك",
+                        $"{customer} — بواسطة {CurrentUserName}", link: $"/Inbox/Index?c={conversation.Id}");
+                }
+                catch { /* the transfer is saved; a failed notification must not undo it */ }
+            }
+
+            return Ok(new { success = true, leadMoved });
         }
 
         // ── PATCH /api/conversations/{id}/status ──────────────────────────────

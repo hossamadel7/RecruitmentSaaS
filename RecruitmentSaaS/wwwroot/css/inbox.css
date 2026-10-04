@@ -1220,3 +1220,35 @@
 
     .chat-bubble.has-text .bubble-meta { bottom: 3px; inset-inline-end: 8px; }
 }
+
+
+/* ── Transfer chat (admin / team leaders / head) ── */
+.chat-transfer-btn {
+    display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+    border: 1px solid var(--border); background: #fff; color: var(--primary);
+    border-radius: 20px; padding: 5px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.chat-transfer-btn:hover { background: var(--primary-light); }
+.transfer-current { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
+.transfer-group { font-size: 12px; font-weight: 700; color: var(--text-muted); margin: 12px 2px 6px; }
+.transfer-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: start;
+    border: 1px solid var(--border); background: #fff; border-radius: 10px; padding: 8px 10px; margin-bottom: 6px;
+}
+.transfer-item:hover { border-color: var(--primary); background: var(--primary-light); }
+.transfer-item:disabled { opacity: .5; }
+.transfer-item .conv-avatar { width: 34px; height: 34px; font-size: 13px; flex-shrink: 0; }
+.transfer-name { flex: 1; font-weight: 600; font-size: 14px; }
+.transfer-item .bi-chevron-left { color: var(--text-muted); }
+.transfer-note { font-size: 12px; color: var(--text-muted); margin-top: 12px; }
+.inbox-toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+    background: #111b21; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13.5px; z-index: 2000;
+    transition: opacity .2s, transform .2s; max-width: calc(100vw - 32px);
+}
+.inbox-toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (max-width: 991px) {
+    .chat-transfer-btn span { display: none; }
+    .chat-transfer-btn { padding: 7px 10px; font-size: 15px; }
+    .inbox-col-chat .chat-header .conv-account-pill { display: none; }
+}
