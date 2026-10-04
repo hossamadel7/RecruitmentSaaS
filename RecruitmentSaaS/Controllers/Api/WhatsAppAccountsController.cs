@@ -30,9 +30,8 @@ namespace RecruitmentSaaS.Controllers.Api
         public async Task<IActionResult> List()
         {
             var isAdmin = WhatsAppAuthorization.IsAdmin(CurrentRole);
-            var visible = await WhatsAppScope.VisibleAgentIdsAsync(_context, CurrentRole, CurrentUserId);
-            var seeAll = visible == null;
-            visible ??= new List<Guid>();
+            var visibleChats = _context.WhatsAppConversations
+                .ApplyVisibility(await WhatsAppScope.ForUserAsync(_context, CurrentRole, CurrentUserId));
 
             var accountsQuery = _context.WhatsAppAccounts.AsNoTracking();
             if (!isAdmin)
@@ -56,10 +55,9 @@ namespace RecruitmentSaaS.Controllers.Api
                     LastMessageAt = _context.WhatsAppConversations
                         .Where(c => c.WhatsAppAccountId == a.Id)
                         .Max(c => (DateTime?)c.LastMessageAt),
-                    UnreadCount = _context.WhatsAppConversations.Count(c =>
+                    UnreadCount = visibleChats.Count(c =>
                         c.WhatsAppAccountId == a.Id &&
-                        c.UnreadCount > 0 &&
-                        (seeAll || (c.AssignedSalesAgentId != null && visible.Contains(c.AssignedSalesAgentId.Value))))
+                        c.UnreadCount > 0)
                 })
                 .ToListAsync();
 

@@ -27,6 +27,18 @@ public partial class RecruitmentCrmContext
                 .HasConstraintName("FK_demorecruitment_LRM_User");
         });
 
+        // Chats left without a salesperson when one is deactivated, waiting with their team
+        modelBuilder.Entity<WhatsAppConversation>(entity =>
+        {
+            entity.HasIndex(e => e.PendingTeamManagerId, "IX_demorecruitment_WA_Cnv_PendTeam")
+                .HasFilter("(\"PendingTeamManagerId\" IS NOT NULL)");
+
+            entity.HasOne<User>().WithMany()
+                .HasForeignKey(e => e.PendingTeamManagerId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_demorecruitment_WA_Cnv_PendTeam");
+        });
+
         modelBuilder.Entity<LeadRotationState>(entity =>
         {
             entity.HasKey(e => e.ScopeKey).HasName("PK_demorecruitment_LRS");

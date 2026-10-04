@@ -222,7 +222,7 @@
                                         <input type="hidden" name="userId" value="@u.Id" />
                                         <button type="submit" class="btn btn-outline-secondary btn-sm"
                                                 title="@(u.IsActive ? "تعطيل" : "تفعيل")"
-                                                onclick="return confirm('هل أنت متأكد؟')">
+                                                onclick="return confirm('@(u.IsActive ? "تعطيل المستخدم؟ محادثاته وعملاؤه هيتشالوا منه ويستنوا مدير الفريق يختار مين ياخدهم." : "هل أنت متأكد؟")')">
                                             <i class="bi @(u.IsActive ? "bi-person-slash" : "bi-person-check")"></i>
                                         </button>
                                     </form>

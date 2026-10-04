@@ -61,10 +61,11 @@ namespace RecruitmentSaaS.Hubs
         {
             if (IsOrgWideRole) return true;
 
-            var visible = await WhatsAppScope.VisibleAgentIdsAsync(_context, CurrentRole, CurrentUserId) ?? new();
+            var visibility = await WhatsAppScope.ForUserAsync(_context, CurrentRole, CurrentUserId);
             return await _context.WhatsAppConversations
                 .AsNoTracking()
-                .AnyAsync(c => c.Id == conversationId && c.AssignedSalesAgentId != null && visible.Contains(c.AssignedSalesAgentId.Value));
+                .ApplyVisibility(visibility)
+                .AnyAsync(c => c.Id == conversationId);
         }
     }
 }

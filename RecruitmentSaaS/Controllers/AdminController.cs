@@ -299,8 +299,87 @@ namespace RecruitmentSaaS.Controllers
             RecruitmentSaaS.Services.UserSessionValidator.Forget(
                 HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), user.Id);
 
-            TempData["Success"] = user.IsActive ? $"تم تفعيل {user.FullName}" : $"تم تعطيل {user.FullName} — تم تسجيل خروجه من النظام";
+            if (user.IsActive)
+            {
+                TempData["Success"] = $"تم تفعيل {user.FullName}";
+                return RedirectToAction("Users");
+            }
+
+            var (chats, leads) = await ReleaseWorkOfAsync(user);
+            TempData["Success"] = $"تم تعطيل {user.FullName} — تم تسجيل خروجه من النظام"
+                + (chats + leads > 0 ? $". اتشال منه {chats} محادثة و {leads} عميل وفي انتظار التعيين من مدير الفريق" : "");
             return RedirectToAction("Users");
+        }
+
+        /// <summary>
+        /// A deactivated salesperson's chats and open leads are taken off them and wait with their team:
+        /// visible to admin, team leaders and the team's TeleSales manager until one of them assigns
+        /// each chat. Leads of someone with no team go back to the general rotation.
+        /// </summary>
+        private async Task<(int Chats, int Leads)> ReleaseWorkOfAsync(User user)
+        {
+            var now = DateTime.UtcNow;
+            var team = user.ManagerId;
+
+            var chats = await _context.WhatsAppConversations.Where(c => c.AssignedSalesAgentId == user.Id).ToListAsync();
+            foreach (var chat in chats)
+            {
+                chat.AssignedSalesAgentId = null;
+                chat.PendingTeamManagerId = team;
+                chat.UpdatedAt = now;
+            }
+
+            // New chats on a number must not keep going to them
+            var accounts = await _context.WhatsAppAccounts.Where(a => a.AssignedSalesAgentId == user.Id).ToListAsync();
+            foreach (var account in accounts) account.AssignedSalesAgentId = null;
+
+            var leads = new List<Lead>();
+            if (user.Role == 3 || user.Role == 8)
+            {
+                leads = await _context.Leads.Where(l => l.AssignedSalesId == user.Id && !l.IsConverted).ToListAsync();
+                foreach (var lead in leads)
+                {
+                    lead.AssignedSalesId = null;
+                    lead.TeamManagerId ??= team;   // waits on the team's "ليدز الفريق" page
+                    lead.UpdatedAt = now;
+                    _context.LeadActivities.Add(new LeadActivity
+                    {
+                        Id = Guid.NewGuid(),
+                        LeadId = lead.Id,
+                        ActivityType = 8,
+                        Description = $"تم إلغاء تعيين العميل بعد تعطيل {user.FullName} — في انتظار التعيين",
+                        CreatedById = CurrentUserId,
+                        CreatedByName = User.FindFirstValue(ClaimTypes.Name),
+                        ActorType = 1,
+                        CreatedAt = now
+                    });
+                }
+            }
+            await _context.SaveChangesAsync();
+
+            var notifier = HttpContext.RequestServices.GetRequiredService<RecruitmentSaaS.Services.IInboxRealtimeNotifier>();
+            foreach (var chat in chats)
+                await notifier.ConversationAssignedAsync(chat.Id, chat.WhatsAppAccountId, user.Id, null);
+
+            if (team != null && chats.Count + leads.Count > 0)
+            {
+                // The team leader and the team's TeleSales manager decide who takes them
+                var deciders = await _context.Users
+                    .Where(u => u.IsActive && u.Id != user.Id && (u.Id == team || (u.Role == 8 && u.ManagerId == team)))
+                    .Select(u => u.Id).ToListAsync();
+                var link = chats.Count > 0 ? "/Inbox/Index?f=pending" : "/TeleSalesManager/TeamFormLeads?member=unassigned";
+                foreach (var id in deciders)
+                {
+                    try
+                    {
+                        await _notifications.SendAsync(id, $"تم تعطيل {user.FullName}",
+                            $"{chats.Count} محادثة و {leads.Count} عميل في انتظار تعيينك لموظف تاني", link: link);
+                    }
+                    catch { /* the release is saved; a failed notification must not undo it */ }
+                }
+            }
+
+            return (chats.Count, leads.Count);
         }
 
         // ── POST /Admin/UpdateUser — change a user's name / login email ─────

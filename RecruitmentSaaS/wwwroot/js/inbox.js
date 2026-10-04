@@ -139,7 +139,8 @@
             case 'closed': params.set('status', '5'); break;
         }
 
-        if (state.agentFilter.indexOf('agent:') === 0) params.set('assigned', state.agentFilter.slice(6));
+        if (state.agentFilter === 'unassigned') params.set('assigned', 'unassigned');
+        else if (state.agentFilter.indexOf('agent:') === 0) params.set('assigned', state.agentFilter.slice(6));
         else if (state.agentFilter.indexOf('team:') === 0) params.set('team', state.agentFilter.slice(5));
         return params.toString();
     }
@@ -168,7 +169,8 @@
         });
         order.sort(function (x, y) { return teams[x].name.localeCompare(teams[y].name, 'ar'); });
 
-        var html = '<option value="">كل المندوبين</option>';
+        var html = '<option value="">كل المندوبين</option>' +
+            '<option value="unassigned" id="pending-option">⏳ في انتظار التعيين</option>';
         if (USER.role === '7' && teams[USER.id]) html += '<option value="team:' + esc(USER.id) + '">👥 فريقي</option>';
         if (USER.role === '8') html += '<option value="agent:' + esc(USER.id) + '">💬 محادثاتي أنا</option>'; // the head's own chats
         order.forEach(function (mgrId) {
@@ -184,6 +186,8 @@
             html += '</optgroup>';
         }
         select.innerHTML = html;
+        select.value = state.agentFilter || '';
+        refreshPendingCount();
 
         select.addEventListener('change', function () {
             state.agentFilter = select.value;
@@ -1141,6 +1145,8 @@
 
     function init() {
         if (!USER.isOrgWide) document.getElementById('inbox-app').classList.add('is-agent');
+        // From the "deactivated — chats waiting" notification
+        if (USER.canAssign && new URLSearchParams(location.search).get('f') === 'pending') state.agentFilter = 'unassigned';
         loadAccounts();
         loadConversations();
         bindEvents();
@@ -1205,6 +1211,7 @@
                     renderCustomerPanel(detail);
                 }
                 loadConversations();
+                refreshPendingCount();
                 showToast('تم تحويل المحادثة لـ ' + item.dataset.name + (res && res.leadMoved ? ' (ومعها ملف العميل)' : ''));
             } catch (err) {
                 item.disabled = false;
@@ -1218,6 +1225,16 @@
         var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
         modal.show();
         if (!IS_MOBILE) setTimeout(function () { search.focus(); }, 300);
+    }
+
+    // How many chats wait for someone to be assigned (after a salesperson was deactivated)
+    async function refreshPendingCount() {
+        var opt = document.getElementById('pending-option');
+        if (!opt) return;
+        try {
+            var data = await api('/api/conversations?assigned=unassigned');
+            opt.textContent = '⏳ في انتظار التعيين' + (data.totalCount ? ' (' + data.totalCount + ')' : '');
+        } catch (e) { /* keep the plain label */ }
     }
 
     function showToast(text) {
