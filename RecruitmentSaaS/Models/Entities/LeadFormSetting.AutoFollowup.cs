@@ -4,7 +4,7 @@ namespace RecruitmentSaaS.Models.Entities;
 
 public partial class LeadFormSetting
 {
-    public const int DefaultAutoFollowupDelayMinutes = 2;
+    public const int DefaultAutoFollowupDelayMinutes = 5;
 
     /// <summary>
     /// Send the approved opening template automatically to website leads at/above the age threshold
