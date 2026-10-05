@@ -588,11 +588,9 @@ namespace RecruitmentSaaS.Controllers.Api
         }
 
         // ── POST /api/conversations/start-for-lead/{leadId} ──────────────────
-        // Opens the lead's WhatsApp chat. If the customer wrote in the last 24 hours the chat just
-        // opens; otherwise the approved template (Admin can change it in config) is sent first —
-        // WhatsApp only lets a business write first with a template.
+        // Opens the lead's WhatsApp chat, sending the approved opening template if needed
         [HttpPost("start-for-lead/{leadId:guid}")]
-        public async Task<IActionResult> StartForLead(Guid leadId)
+        public async Task<IActionResult> StartForLead(Guid leadId, [FromServices] LeadChatStarter starter)
         {
             var lead = await _context.Leads.FirstOrDefaultAsync(l => l.Id == leadId);
             if (lead == null) return NotFound(new { error = "العميل غير موجود" });
@@ -601,125 +599,10 @@ namespace RecruitmentSaaS.Controllers.Api
             if (lead.AssignedSalesId != CurrentUserId && !await CanSeeAgentAsync(lead.AssignedSalesId.Value))
                 return Forbid();
 
-            var agent = await _context.Users.AsNoTracking().FirstAsync(u => u.Id == lead.AssignedSalesId);
-            var waId = PhoneNumbers.ToWhatsAppId(PhoneNumbers.Normalize(lead.Phone));
-            if (!PhoneNumbers.IsValid(waId))
-                return BadRequest(new { error = "رقم العميل غير صحيح" });
-
-            // The team's number (team form), else the general sales number, else any active number
-            var teamLeaderId = lead.TeamManagerId ?? agent.ManagerId;
-            var teamNumber = teamLeaderId == null ? null
-                : await _context.TeamLeadForms.Where(f => f.ManagerId == teamLeaderId).Select(f => f.WhatsAppNumber).FirstOrDefaultAsync();
-            var generalNumber = await _context.LeadFormSettings.Select(s => s.SalesWhatsAppNumber).FirstOrDefaultAsync();
-            var accounts = await _context.WhatsAppAccounts.Where(a => a.IsActive).ToListAsync();
-            string Digits(string? v) => new string((v ?? "").Where(char.IsDigit).ToArray());
-            var account = accounts.FirstOrDefault(a => Digits(teamNumber) != "" && Digits(a.DisplayPhoneNumber) == Digits(teamNumber))
-                       ?? accounts.FirstOrDefault(a => Digits(generalNumber) != "" && Digits(a.DisplayPhoneNumber) == Digits(generalNumber))
-                       ?? accounts.FirstOrDefault();
-            if (account == null) return BadRequest(new { error = "مفيش رقم واتساب متصل" });
-
-            var now = DateTime.UtcNow;
-            var contact = await _context.WhatsAppContacts.FirstOrDefaultAsync(c => c.WhatsAppPhoneNumber == waId);
-            if (contact == null)
-            {
-                contact = new WhatsAppContact
-                {
-                    Id = Guid.NewGuid(),
-                    WhatsAppPhoneNumber = waId,
-                    WhatsAppUserId = waId,
-                    Name = lead.FullName,
-                    CreatedAt = now
-                };
-                _context.WhatsAppContacts.Add(contact);
-            }
-
-            var conversation = await _context.WhatsAppConversations
-                .FirstOrDefaultAsync(c => c.ContactId == contact.Id && c.WhatsAppAccountId == account.Id);
-            if (conversation == null)
-            {
-                conversation = new WhatsAppConversation
-                {
-                    Id = Guid.NewGuid(),
-                    ContactId = contact.Id,
-                    WhatsAppAccountId = account.Id,
-                    AssignedSalesAgentId = agent.Id,
-                    LeadId = lead.Id,
-                    Status = (byte)ConversationStatus.New,
-                    LeadStage = (byte)LeadStage.New,
-                    UnreadCount = 0,
-                    OpenedAt = now,
-                    CreatedAt = now
-                };
-                _context.WhatsAppConversations.Add(conversation);
-            }
-            else
-            {
-                conversation.LeadId ??= lead.Id;
-                if (conversation.AssignedSalesAgentId == null)
-                {
-                    conversation.AssignedSalesAgentId = agent.Id;
-                    conversation.PendingTeamManagerId = null;
-                }
-            }
-            await _context.SaveChangesAsync();
-
-            // Customer wrote within 24h → normal messages are allowed, just open the chat
-            var lastIncoming = await _context.WhatsAppMessages
-                .Where(m => m.ConversationId == conversation.Id && m.Direction == (byte)MessageDirection.Incoming)
-                .MaxAsync(m => (DateTime?)m.WhatsAppTimestamp);
-            if (lastIncoming != null && lastIncoming > now.AddHours(-24))
-                return Ok(new { conversationId = conversation.Id, templateSent = false });
-
-            var templateName = _config["WhatsApp:StartTemplateName"] ?? "lead_followup";
-            var templateLanguage = _config["WhatsApp:StartTemplateLanguage"] ?? "ar_EG";
-            var templateText = _config["WhatsApp:StartTemplateText"]
-                ?? "أهلاً أ/ {{1}}\n\nبخصوص طلب التسجيل اللي قدمته على موقع *الفهد العربي لإلحاق العمالة بالخارج* (ترخيص رقم 492)، معاك أ/ {{2}} المسؤولة عن متابعة طلبك.\n\nمحتاجين نكمل بيانات طلبك عشان نحدد الفرصة المناسبة ليك حسب السن والمهنة والخبرة.";
-            var customerName = string.IsNullOrWhiteSpace(lead.FullName) ? "حضرتك" : lead.FullName.Trim();
-            var parameters = new[] { customerName, agent.DisplayNameAr };
-
-            var message = new WhatsAppMessage
-            {
-                Id = Guid.NewGuid(),
-                ConversationId = conversation.Id,
-                WhatsAppAccountId = account.Id,
-                Direction = (byte)MessageDirection.Outgoing,
-                MessageType = (byte)WhatsAppMessageType.Text,
-                MessageSource = (byte)MessageSource.CloudApi,
-                TextBody = templateText.Replace("\\n", "\n").Replace("{{1}}", parameters[0]).Replace("{{2}}", parameters[1]),
-                SenderUserId = CurrentUserId,
-                Status = (byte)MessageStatus.Queued,
-                WhatsAppTimestamp = now,
-                CreatedAt = now
-            };
-            _context.WhatsAppMessages.Add(message);
-            conversation.LastMessageAt = now;
-            conversation.UpdatedAt = now;
-            conversation.Status = (byte)ConversationStatus.WaitingForCustomer;
-            await _context.SaveChangesAsync();
-
-            var result = await _cloudApi.SendTemplateMessageAsync(account.PhoneNumberId, waId, templateName, templateLanguage, parameters);
-            message.Status = result.Success ? (byte)MessageStatus.Sent : (byte)MessageStatus.Failed;
-            message.WhatsAppMessageId = result.WhatsAppMessageId;
-            message.ErrorCode = result.ErrorCode;
-            message.ErrorMessage = result.ErrorMessage;
-            if (result.Success) lead.LastContactedAt = now;
-            _context.AuditLogs.Add(new AuditLog
-            {
-                Id = Guid.NewGuid(),
-                ActorId = CurrentUserId,
-                ActorType = 1,
-                EventType = "ChatStartedWithTemplate",
-                EntityType = "WhatsAppConversation",
-                EntityId = conversation.Id,
-                CreatedAt = now
-            });
-            await _context.SaveChangesAsync();
-
-            await _notifier.NewMessageAsync(message, conversation.AssignedSalesAgentId, CurrentUserName);
-            if (!result.Success)
-                return BadRequest(new { error = "تعذر إرسال رسالة البداية: " + (result.ErrorMessage ?? ""), conversationId = conversation.Id });
-
-            return Ok(new { conversationId = conversation.Id, templateSent = true });
+            var result = await starter.StartAsync(lead, CurrentUserId, CurrentUserName);
+            return result.Success
+                ? Ok(new { conversationId = result.ConversationId, templateSent = result.TemplateSent })
+                : BadRequest(new { error = result.Error, conversationId = result.ConversationId });
         }
 
         // ── PATCH /api/conversations/{id}/status ──────────────────────────────

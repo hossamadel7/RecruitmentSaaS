@@ -35,6 +35,7 @@ public partial class RecruitmentCrmContext
         {
             entity.Property(e => e.WelcomeMessageEnabled).HasDefaultValue(false);
             entity.Property(e => e.WelcomeMessage).HasMaxLength(4000);
+            entity.Property(e => e.AutoFollowupEnabledAt).HasPrecision(0);
         });
 
         modelBuilder.Entity<TeamLeadForm>(entity =>

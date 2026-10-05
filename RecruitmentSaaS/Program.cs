@@ -62,6 +62,8 @@ builder.Services.AddHostedService<RecruitmentSaaS.Services.AppointmentReminderSe
 // WhatsApp Shared Inbox
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IWhatsAppCloudApiService, WhatsAppCloudApiService>();
+builder.Services.AddScoped<LeadChatStarter>();
+builder.Services.AddHostedService<LeadAutoFollowupService>();   // opening template for 45+ leads who never wrote
 builder.Services.AddScoped<IWhatsAppWebhookProcessor, WhatsAppWebhookProcessor>();
 builder.Services.AddScoped<IInboxRealtimeNotifier, InboxRealtimeNotifier>();
 builder.Services.AddScoped<IMetaCredentialStore, MetaCredentialStore>();

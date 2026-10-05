@@ -1863,6 +1863,36 @@ namespace RecruitmentSaaS.Controllers
             return RedirectToAction("LeadFormSettings");
         }
 
+        // ── POST /Admin/UpdateAutoFollowup ──────────────────────────────────
+        // Automatic opening message for 45+ website leads who didn't start the WhatsApp chat
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateAutoFollowup(bool enabled, int delayMinutes)
+        {
+            if (delayMinutes < 5 || delayMinutes > 24 * 60)
+            {
+                TempData["Error"] = "وقت الانتظار لازم يكون بين 5 دقايق و 24 ساعة";
+                return RedirectToAction("LeadFormSettings");
+            }
+
+            var settings = await _context.LeadFormSettings.FirstOrDefaultAsync();
+            if (settings == null)
+            {
+                settings = new LeadFormSetting { Id = Guid.NewGuid(), SeniorAgeThreshold = HomeController.DefaultSeniorAgeThreshold };
+                _context.LeadFormSettings.Add(settings);
+            }
+            if (enabled && !settings.AutoFollowupEnabled)
+                settings.AutoFollowupEnabledAt = DateTime.UtcNow;   // only leads from now on are chased
+            settings.AutoFollowupEnabled = enabled;
+            settings.AutoFollowupDelayMinutes = delayMinutes;
+            settings.UpdatedAt = DateTime.UtcNow;
+            settings.UpdatedById = CurrentUserId;
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = enabled ? "تم تفعيل رسالة المتابعة التلقائية ✅" : "تم إيقاف رسالة المتابعة التلقائية";
+            return RedirectToAction("LeadFormSettings");
+        }
+
         // ── POST /Admin/UpdateTeamLeadForm ──────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]

@@ -103,6 +103,40 @@
         </div>
     </div>
 
+    @* ── Automatic follow-up for leads who never wrote ── *@
+    <div class="card mt-4">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2" style="margin-bottom:4px">
+                <div style="font-weight:700;font-size:15px"><i class="bi bi-send-check" style="color:#16a34a"></i> رسالة متابعة تلقائية</div>
+                <span class="badge @(Model.AutoFollowupEnabled ? "bg-success" : "bg-secondary")">@(Model.AutoFollowupEnabled ? "مفعّلة" : "غير مفعّلة")</span>
+            </div>
+            <div style="font-size:12.5px;color:#64748B;line-height:1.8;margin-bottom:14px">
+                لو حد سجّل من الموقع وسنه @Model.SeniorAgeThreshold أو أكثر واتحوّل لواتساب لكن ما بعتش رسالة،
+                بعد الوقت اللي تحدده هنا بتتبعتله رسالة البداية المعتمدة من Meta (<code>lead_followup</code>) باسم التيلي سيلز المسؤول عنه،
+                والمحادثة بتظهر عند التيلي سيلز في الواتساب. بتتبعت مرة واحدة بس لكل عميل، ومش بتتبعت لعملاء أقدم من 24 ساعة
+                أو اتسجلوا قبل التفعيل. <strong>كل رسالة منهم مدفوعة من Meta.</strong>
+            </div>
+            <form asp-action="UpdateAutoFollowup" method="post" class="d-flex flex-wrap align-items-end gap-3">
+                @Html.AntiForgeryToken()
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="autoFollowupEnabled" name="enabled" value="true" @(Model.AutoFollowupEnabled ? "checked" : "") />
+                    <label class="form-check-label fw-semibold" for="autoFollowupEnabled" style="font-size:13px">تفعيل</label>
+                </div>
+                <div>
+                    <label class="form-label fw-semibold" style="font-size:13px">ابعت بعد</label>
+                    @{ var delay = Model.AutoFollowupDelayMinutes > 0 ? Model.AutoFollowupDelayMinutes : RecruitmentSaaS.Models.Entities.LeadFormSetting.DefaultAutoFollowupDelayMinutes; }
+                    <select name="delayMinutes" class="form-select" style="min-width:160px">
+                        @foreach (var (m, label) in new[] { (15, "15 دقيقة"), (30, "30 دقيقة"), (60, "ساعة"), (120, "ساعتين"), (240, "4 ساعات"), (720, "12 ساعة") })
+                        {
+                            <option value="@m" selected="@(m == delay)">@label</option>
+                        }
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> حفظ</button>
+            </form>
+        </div>
+    </div>
+
     @* ── Per-team forms ── *@
     <div class="card mt-4">
         <div class="card-body p-4">

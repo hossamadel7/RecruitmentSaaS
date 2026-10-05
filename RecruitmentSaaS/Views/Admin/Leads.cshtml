@@ -132,7 +132,7 @@
                 <input name="q" value="@q" class="form-control form-control-sm" placeholder="اسم، هاتف..." />
             </div>
 
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label form-label-sm">الحالة</label>
                 <select name="status" class="form-select form-select-sm">
                     <option value="">كل الحالات</option>
@@ -150,7 +150,7 @@
                 </select>
             </div>
 
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label form-label-sm">الحملة</label>
                 <select name="campaignId" class="form-select form-select-sm">
                     <option value="">كل الحملات</option>
@@ -168,7 +168,7 @@
                 </select>
             </div>
 
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label form-label-sm">التيلي سيلز</label>
                 <select name="teleSalesId" class="form-select form-select-sm">
                     <option value="">الكل</option>
@@ -189,7 +189,7 @@
                 </select>
             </div>
 
-            <div class="col-md-1">
+            <div class="col-6 col-md-2">
                 <label class="form-label form-label-sm">الشهر</label>
                 <select name="month" class="form-select form-select-sm">
                     @for (int m = 1; m <= 12; m++)
@@ -207,7 +207,7 @@
                 </select>
             </div>
 
-            <div class="col-md-1">
+            <div class="col-6 col-md-2">
                 <label class="form-label form-label-sm">السنة</label>
                 <select name="year" class="form-select form-select-sm">
                     @for (int y = DateTime.UtcNow.Year; y >= DateTime.UtcNow.Year - 3; y--)
@@ -224,28 +224,36 @@
                 </select>
             </div>
 
-            <div class="col-md-1">
+            <div class="col-6 col-md-2">
                 <label class="form-label form-label-sm">من سن</label>
                 <input type="number" name="minAge" value="@minAge" min="18" max="65" class="form-control form-control-sm" placeholder="18" inputmode="numeric" />
             </div>
-            <div class="col-md-1">
+            <div class="col-6 col-md-2">
                 <label class="form-label form-label-sm">إلى سن</label>
                 <input type="number" name="maxAge" value="@maxAge" min="18" max="65" class="form-control form-control-sm" placeholder="65" inputmode="numeric" />
             </div>
 
-            <div class="col-md-1">
-                <button type="submit" class="btn btn-primary btn-sm w-100">بحث</button>
-            </div>
-
-            @if (!string.IsNullOrWhiteSpace(q) || status.HasValue || campId.HasValue || teleSalesId.HasValue
-            || minAge.HasValue || maxAge.HasValue
-            || selMonth != DateTime.UtcNow.Month || selYear != DateTime.UtcNow.Year)
-            {
-                <div class="col-md-1">
-                    <a href="/Admin/Leads" class="btn btn-ghost btn-sm w-100">مسح</a>
-                </div>
+            @{
+                bool anyLeadFilter = !string.IsNullOrWhiteSpace(q) || status.HasValue || campId.HasValue || teleSalesId.HasValue
+                    || minAge.HasValue || maxAge.HasValue
+                    || selMonth != DateTime.UtcNow.Month || selYear != DateTime.UtcNow.Year;
             }
+            <div class="col-12 col-md-4 d-flex align-items-center gap-2">
+                <button type="submit" class="btn btn-primary btn-sm" style="min-width:90px">بحث</button>
+                @if (anyLeadFilter)
+                {
+                    <a href="/Admin/Leads" class="btn btn-ghost btn-sm" style="min-width:70px">مسح</a>
+                }
+                <span class="leads-result-count">
+                    <i class="bi bi-funnel-fill"></i>
+                    <strong>@total.ToString("N0")</strong> @(anyLeadFilter ? "عميل مطابق للفلتر" : "عميل")
+                </span>
+            </div>
         </form>
+        <style>
+            .leads-result-count { margin-inline-start: auto; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 99px; padding: 4px 14px; font-size: .82rem; white-space: nowrap; }
+            .leads-result-count strong { font-size: .95rem; }
+        </style>
     </div>
 </div>
 
