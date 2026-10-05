@@ -39,6 +39,7 @@ namespace RecruitmentSaaS.Controllers
                 .ThenBy(j => j.JobTitle)
                 .ToListAsync();
 
+            await SetDirectWhatsAppAsync(null);
             return View();
         }
 
@@ -48,16 +49,34 @@ namespace RecruitmentSaaS.Controllers
         [HttpGet("/Home/Register")]
         public async Task<IActionResult> Register(string? team, [FromQuery(Name = "ref")] string? salesRef)
         {
+            TeamLeadForm? teamForm = null;
             if (!string.IsNullOrWhiteSpace(team))
             {
                 // Unknown/disabled team links 404 so a broken link gets noticed instead of silently losing the team
-                if (await FindTeamFormAsync(team) == null)
+                teamForm = await FindTeamFormAsync(team);
+                if (teamForm == null)
                     return NotFound();
                 ViewBag.TeamSlug = team.Trim().ToLowerInvariant();
             }
 
             RememberSalesRef(salesRef);
+            await SetDirectWhatsAppAsync(teamForm);
             return View();
+        }
+
+        /// <summary>Marks a chat that came from the page's WhatsApp button (see WhatsAppWebhookProcessor).</summary>
+        public const string DirectWhatsAppTag = "من صفحة التسجيل";
+
+        // "كلمنا على واتساب مباشرة" — for visitors who'd rather chat than fill the form. The tag in the
+        // message lets the chat be assigned by the team's rotation when it arrives.
+        private async Task SetDirectWhatsAppAsync(TeamLeadForm? teamForm)
+        {
+            var settings = await _context.LeadFormSettings.AsNoTracking().FirstOrDefaultAsync();
+            var number = SalesWhatsAppNumber(settings, teamForm);
+            if (string.IsNullOrEmpty(number)) return;
+            var text = "السلام عليكم، عايز أعرف تفاصيل فرص العمل بالخارج (" + DirectWhatsAppTag
+                       + (teamForm != null ? " - " + teamForm.Slug : "") + ")";
+            ViewData["WaDirectUrl"] = $"https://wa.me/{number}?text={Uri.EscapeDataString(text)}";
         }
 
         private Task<TeamLeadForm?> FindTeamFormAsync(string slug)

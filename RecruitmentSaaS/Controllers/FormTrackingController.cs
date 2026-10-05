@@ -35,6 +35,8 @@ namespace RecruitmentSaaS.Controllers
             public string? Ref { get; set; }       // document.referrer
             public string? UtmSource { get; set; }
             public string? UtmCampaign { get; set; }
+            public int? Secs { get; set; }
+            public int? Scroll { get; set; }
         }
 
         [HttpPost]
@@ -78,6 +80,16 @@ namespace RecruitmentSaaS.Controllers
                 visit.FieldsTouched = string.Join(',', touched);
                 visit.LastField = e.Field;
                 visit.LastSeenAt = now;
+            }
+            else if (e.Ev == "wa" && visit != null)
+            {
+                visit.WhatsAppClicked = true;
+                visit.LastSeenAt = now;
+            }
+            else if (e.Ev == "leave" && visit != null)
+            {
+                visit.SecondsOnPage = Math.Max(visit.SecondsOnPage, Math.Clamp(e.Secs ?? 0, 0, 3600));
+                visit.MaxScrollPercent = Math.Max(visit.MaxScrollPercent, Math.Clamp(e.Scroll ?? 0, 0, 100));
             }
             else return NoContent();
 

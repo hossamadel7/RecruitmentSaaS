@@ -49,4 +49,13 @@ public class FormVisit
 
     /// <summary>Sent on to WhatsApp after submitting (45+).</summary>
     public bool WhatsAppRedirect { get; set; }
+
+    /// <summary>Tapped "كلمنا على واتساب مباشرة" instead of filling the form.</summary>
+    public bool WhatsAppClicked { get; set; }
+
+    /// <summary>How long the page was open (seconds) — tells quick bounces from people who read and left.</summary>
+    public int SecondsOnPage { get; set; }
+
+    /// <summary>How far down the page they scrolled (0–100).</summary>
+    public int MaxScrollPercent { get; set; }
 }

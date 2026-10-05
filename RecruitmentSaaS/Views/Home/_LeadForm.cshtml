@@ -4,7 +4,8 @@
     var returnTo = ViewData["ReturnTo"] as string ?? "home";
     var teamSlug = ViewData["TeamSlug"] as string;
     var formError = TempData["FormError"]?.ToString() ?? "";
-    var logoPath = "/uploads/images/logo fahd.png";
+    var logoPath = "/images/logo-fahd.webp";
+    var waDirectUrl = ViewData["WaDirectUrl"] as string;
 }
 <div class="form-split reveal-scale">
 
@@ -64,6 +65,15 @@
             <p>جميع الحقول المُعلّمة بـ * مطلوبة — التسجيل مجاني تماماً</p>
         </div>
 
+        @if (!string.IsNullOrEmpty(waDirectUrl))
+        {
+            <a href="@waDirectUrl" class="wa-direct-btn" id="waDirectBtn" target="_blank" rel="noopener">
+                <i class="bi bi-whatsapp"></i>
+                <span>كلمنا على واتساب مباشرة</span>
+            </a>
+            <div class="wa-direct-or"><span>أو سيب بياناتك ونكلمك إحنا</span></div>
+        }
+
         @if (!string.IsNullOrEmpty(formError))
         {
             <div class="error-banner">
@@ -101,15 +111,25 @@
                         <option value="@HomeController.MaxAge">@HomeController.MaxAge أو أكثر</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-6">
-                    <label class="field-label">الوظيفة المطلوبة</label>
-                    <input name="InterestedJobTitle" type="text" class="form-control"
-                           maxlength="200" placeholder="مثال: سائق، فني كهرباء..." />
-                </div>
+                @* Optional fields stay folded so the form looks short: name, phone, age *@
                 <div class="col-12">
-                    <label class="field-label">ملاحظات</label>
-                    <textarea name="Notes" id="notesField" class="form-control"
-                              placeholder="أي معلومات إضافية تريد إضافتها..."></textarea>
+                    <button type="button" class="more-fields-toggle" id="moreFieldsToggle" aria-expanded="false" aria-controls="moreFields">
+                        <i class="bi bi-plus-circle"></i> إضافة تفاصيل (اختياري)
+                    </button>
+                </div>
+                <div class="col-12" id="moreFields" hidden>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="field-label">الوظيفة المطلوبة</label>
+                            <input name="InterestedJobTitle" type="text" class="form-control"
+                                   maxlength="200" placeholder="مثال: سائق، فني كهرباء..." />
+                        </div>
+                        <div class="col-12">
+                            <label class="field-label">ملاحظات</label>
+                            <textarea name="Notes" id="notesField" class="form-control"
+                                      placeholder="أي معلومات إضافية تريد إضافتها..."></textarea>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-12" style="margin-top:4px">
                     <button type="submit" class="btn-submit" id="submitBtn">
@@ -166,6 +186,23 @@
             }, { threshold: 0.3 }).observe(form);
         } else markSeen();
 
+        // Direct WhatsApp instead of the form
+        var waBtn = document.getElementById('waDirectBtn');
+        if (waBtn) waBtn.addEventListener('click', function () { markSeen(); send({ ev: 'wa' }); });
+
+        // Time on page + how far they scrolled — sent when they leave or switch apps
+        var t0 = Date.now(), maxScroll = 0;
+        function trackScroll() {
+            var h = document.documentElement.scrollHeight - window.innerHeight;
+            var pct = h > 0 ? Math.round(window.scrollY * 100 / h) : 100;
+            if (pct > maxScroll) maxScroll = Math.min(100, pct);
+        }
+        window.addEventListener('scroll', trackScroll, { passive: true });
+        trackScroll();
+        function sendLeave() { if (seen) send({ ev: 'leave', secs: Math.round((Date.now() - t0) / 1000), scroll: maxScroll }); }
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') sendLeave(); });
+        window.addEventListener('pagehide', sendLeave);
+
         var FIELD_KEYS = { FullName: 'name', Phone: 'phone', Age: 'age', InterestedJobTitle: 'job', Notes: 'notes' };
         var touched = {};
         form.addEventListener('focusin', function (e) {
@@ -174,6 +211,16 @@
             touched[k] = true;
             markSeen();
             send({ ev: 'field', field: k });
+        });
+    })();
+
+    (function () {
+        /* ── Optional fields toggle ── */
+        var toggle = document.getElementById('moreFieldsToggle'), more = document.getElementById('moreFields');
+        if (toggle && more) toggle.addEventListener('click', function () {
+            more.hidden = !more.hidden;
+            toggle.setAttribute('aria-expanded', String(!more.hidden));
+            toggle.innerHTML = more.hidden ? '<i class="bi bi-plus-circle"></i> إضافة تفاصيل (اختياري)' : '<i class="bi bi-dash-circle"></i> إخفاء التفاصيل';
         });
     })();
 
@@ -190,3 +237,13 @@
         }
     })();
 </script>
+
+<style>
+    .wa-direct-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; background: #25D366; color: #fff; font-weight: 800; font-size: 17px; border-radius: 12px; padding: 14px 16px; text-decoration: none; box-shadow: 0 4px 14px rgba(37,211,102,.35); margin-bottom: 14px; }
+    .wa-direct-btn i { font-size: 24px; }
+    .wa-direct-btn:hover { background: #1ebe5b; color: #fff; }
+    .wa-direct-or { display: flex; align-items: center; gap: 10px; color: #64748B; font-size: 13px; margin: 0 0 14px; }
+    .wa-direct-or::before, .wa-direct-or::after { content: ""; flex: 1; height: 1px; background: #E2E8F0; }
+    .more-fields-toggle { background: none; border: 0; color: #1E3055; font-weight: 700; font-size: 14px; padding: 2px 0; }
+    .more-fields-toggle i { margin-inline-end: 4px; }
+</style>

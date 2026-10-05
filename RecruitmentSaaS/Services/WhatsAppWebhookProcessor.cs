@@ -173,6 +173,7 @@ namespace RecruitmentSaaS.Services
             conversation.UpdatedAt = now;
 
             await TryConnectHandoffAsync(conversation, account, fromWaId, textBody, now, ct);
+            await TryAssignDirectChatAsync(conversation, textBody, ct);
 
             await _context.SaveChangesAsync(ct);
 
@@ -194,6 +195,42 @@ namespace RecruitmentSaaS.Services
             await _notifier.UnreadCountUpdatedAsync(conversation.Id, account.Id, conversation.UnreadCount, conversation.AssignedSalesAgentId);
 
             await TrySendWelcomeAsync(conversation, account, ct);
+        }
+
+        // A chat started from the registration page's "كلمنا على واتساب مباشرة" button carries
+        // "(من صفحة التسجيل - <team>)" in its first message: give it to the next salesperson in that
+        // team's rotation (or the general one), so it doesn't sit unassigned.
+        private async Task TryAssignDirectChatAsync(WhatsAppConversation conversation, string? textBody, CancellationToken ct)
+        {
+            try
+            {
+                if (conversation.AssignedSalesAgentId != null || conversation.LeadId != null || string.IsNullOrEmpty(textBody)) return;
+                var at = textBody.IndexOf(RecruitmentSaaS.Controllers.HomeController.DirectWhatsAppTag, StringComparison.Ordinal);
+                if (at < 0) return;
+
+                var tail = textBody[(at + RecruitmentSaaS.Controllers.HomeController.DirectWhatsAppTag.Length)..];
+                var match = System.Text.RegularExpressions.Regex.Match(tail, @"^\s*-\s*([a-z0-9-]+)");
+                Guid? teamLeaderId = null;
+                if (match.Success)
+                {
+                    var slug = match.Groups[1].Value;
+                    teamLeaderId = await _context.TeamLeadForms.Where(f => f.Slug == slug).Select(f => (Guid?)f.ManagerId).FirstOrDefaultAsync(ct);
+                }
+
+                var agentId = teamLeaderId != null
+                    ? await LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => u.ManagerId == teamLeaderId), LeadDistributor.TeamScope(teamLeaderId.Value), ct)
+                    : await LeadDistributor.NextTeleSalesAsync(_context, _context.Users, LeadDistributor.AllScope, ct);
+                if (agentId == null) return;
+
+                conversation.AssignedSalesAgentId = agentId;
+                conversation.PendingTeamManagerId = null;
+                await _notifications.SendAsync(agentId.Value, "محادثة واتساب جديدة من صفحة التسجيل",
+                    "عميل كلمنا على واتساب مباشرة من الصفحة — اتعينت لك", link: $"/Inbox/Index?c={conversation.Id}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not assign a direct-WhatsApp chat {ConversationId}", conversation.Id);
+            }
         }
 
         // Conversations already welcomed by this server process — the customer often sends several
