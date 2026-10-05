@@ -198,7 +198,7 @@ namespace RecruitmentSaaS.Controllers
         }
 
         // ── GET /TeleSales/Leads ──────────────────────────────────────────────
-        public async Task<IActionResult> Leads(byte? status, int? minAge, int? maxAge, int page = 1)
+        public async Task<IActionResult> Leads(byte? status, int? minAge, int? maxAge, bool needCall = false, int page = 1)
         {
             var userId = CurrentUserId;
             const int pageSize = 20;
@@ -213,6 +213,15 @@ namespace RecruitmentSaaS.Controllers
                 query = query.Where(l => l.Age != null && l.Age >= minAge.Value);
             if (maxAge.HasValue)
                 query = query.Where(l => l.Age != null && l.Age <= maxAge.Value);
+
+            // Leads that can't be reached on WhatsApp — the TeleSales must call them
+            var noWa = PhoneNumbers.NotOnWhatsAppErrorCode;
+            var notOnWhatsApp = query.Where(l => _context.WhatsAppConversations.Any(c => c.LeadId == l.Id
+                    && c.WhatsAppMessages.Any(m => m.ErrorCode == noWa)
+                    && !c.WhatsAppMessages.Any(m => m.Direction == (byte)MessageDirection.Incoming)));
+            ViewBag.NeedCallCount = await notOnWhatsApp.CountAsync(l => !l.IsConverted && l.Status != 8);
+            if (needCall)
+                query = notOnWhatsApp;
 
             var totalCount = await query.CountAsync();
 
@@ -236,10 +245,14 @@ namespace RecruitmentSaaS.Controllers
                         .Where(c => c.LeadId == l.Id && c.AssignedSalesAgentId == userId)
                         .OrderByDescending(c => c.LastMessageAt)
                         .Select(c => (Guid?)c.Id)
-                        .FirstOrDefault()
+                        .FirstOrDefault(),
+                    NotOnWhatsApp = _context.WhatsAppConversations.Any(c => c.LeadId == l.Id
+                        && c.WhatsAppMessages.Any(m => m.ErrorCode == noWa)
+                        && !c.WhatsAppMessages.Any(m => m.Direction == (byte)MessageDirection.Incoming))
                 })
                 .ToListAsync();
 
+            ViewBag.NeedCall = needCall;
             ViewBag.CurrentStatus = status;
             ViewBag.MinAge = minAge;
             ViewBag.MaxAge = maxAge;

@@ -78,6 +78,8 @@ namespace RecruitmentSaaS.Models.DTOs
         public byte? Age { get; set; }
         /// <summary>The lead's WhatsApp chat in the inbox, if the customer has written to us.</summary>
         public Guid? ConversationId { get; set; }
+        /// <summary>Our WhatsApp message to them was undeliverable and they never wrote — call them.</summary>
+        public bool NotOnWhatsApp { get; set; }
         public string? InterestedJobTitle { get; set; }
         public string? InterestedCountry { get; set; }
         public bool IsConverted { get; set; }

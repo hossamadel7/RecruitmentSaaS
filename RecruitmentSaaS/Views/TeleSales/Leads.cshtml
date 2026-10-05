@@ -6,10 +6,13 @@
     var totalCount = (int)(ViewBag.TotalCount ?? 0);
     int? minAge = ViewBag.MinAge as int?;
     int? maxAge = ViewBag.MaxAge as int?;
+    bool needCall = ViewBag.NeedCall == true;
+    int needCallCount = ViewBag.NeedCallCount ?? 0;
     // Keep the age range when switching status / page
-    string Link(byte? st, int? p = null)
+    string Link(byte? st, int? p = null, bool? call = null)
     {
         var parts = new List<string>();
+        if (call ?? needCall) parts.Add("needCall=true");
         if (st.HasValue) parts.Add("status=" + st.Value);
         if (minAge.HasValue) parts.Add("minAge=" + minAge.Value);
         if (maxAge.HasValue) parts.Add("maxAge=" + maxAge.Value);
@@ -29,13 +32,20 @@
 <div class="card mb-3">
     <div class="card-body py-3">
         <div class="filter-bar">
-            <a href="@Link(null)" class="filter-btn @(currentStatus == null ? "active" : "")">الكل</a>
+            <a href="@Link(null, call: false)" class="filter-btn @(currentStatus == null && !needCall ? "active" : "")">الكل</a>
             <a href="@Link(1)" class="filter-btn @(currentStatus == 1 ? "active" : "")">جديد</a>
             <a href="@Link(2)" class="filter-btn @(currentStatus == 2 ? "active" : "")">تم التواصل</a>
             <a href="@Link(3)" class="filter-btn @(currentStatus == 3 ? "active" : "")">استجاب</a>
             <a href="@Link(4)" class="filter-btn @(currentStatus == 4 ? "active" : "")">مهتم</a>
             <a href="@Link(5)" class="filter-btn @(currentStatus == 5 ? "active" : "")">موعد مجدول</a>
             <a href="@Link(8)" class="filter-btn @(currentStatus == 8 ? "active" : "")">خسارة</a>
+            @if (needCallCount > 0 || needCall)
+            {
+                <a href="@Link(null, call: !needCall)" class="filter-btn need-call-chip @(needCall ? "active" : "")"
+                   title="عملاء رقمهم مش على واتساب — لازم تكلمهم تليفون">
+                    <i class="bi bi-telephone-fill"></i> محتاج اتصال <span class="need-call-count">@needCallCount</span>
+                </a>
+            }
         </div>
         <form method="get" action="/TeleSales/Leads" class="d-flex flex-wrap align-items-end gap-2 mt-3">
             @if (currentStatus.HasValue) { <input type="hidden" name="status" value="@currentStatus" /> }
@@ -100,7 +110,13 @@
                                     @lead.LeadCode
                                 </span>
                             </td>
-                            <td style="font-weight:600">@lead.FullName</td>
+                            <td style="font-weight:600">
+                                @lead.FullName
+                                @if (lead.NotOnWhatsApp)
+                                {
+                                    <div class="no-wa-badge"><i class="bi bi-exclamation-triangle-fill"></i> مش على واتساب — كلّمه تليفون</div>
+                                }
+                            </td>
                             <td style="color:var(--text-muted);font-size:13px;direction:ltr;text-align:right">@lead.Phone</td>
                             <td>@(lead.Age?.ToString() ?? "—")</td>
                             <td><span class="badge @stClass">@stName</span></td>
@@ -109,7 +125,13 @@
                             </td>
                             <td style="color:var(--text-muted);font-size:12.5px">@lead.CreatedAt.ToString("dd/MM/yyyy")</td>
                             <td>
-                                @if (lead.ConversationId.HasValue)
+                                @if (lead.NotOnWhatsApp)
+                                {
+                                    <a href="tel:@lead.Phone" class="call-btn" title="اتصال بالعميل">
+                                        <i class="bi bi-telephone-fill"></i> اتصال
+                                    </a>
+                                }
+                                else if (lead.ConversationId.HasValue)
                                 {
                                     <a href="/Inbox/Index?c=@lead.ConversationId" title="فتح محادثة الواتساب"
                                        style="font-size:14px;color:#16a34a;text-decoration:none;padding:4px 10px;border:1px solid #86efac;border-radius:6px;margin-inline-end:4px">
@@ -153,6 +175,13 @@
 </div>
 
 <style>
+    .no-wa-badge { font-size: 11.5px; font-weight: 700; color: #b91c1c; margin-top: 3px; }
+    .call-btn { font-size: 12px; font-weight: 700; color: #fff; background: #dc2626; border: 1px solid #dc2626; border-radius: 6px; padding: 5px 10px; margin-inline-end: 4px; text-decoration: none; display: inline-block; }
+    .call-btn:hover { background: #b91c1c; color: #fff; }
+    .need-call-chip { color: #b91c1c !important; border-color: #fecaca !important; }
+    .need-call-chip.active { background: #dc2626 !important; color: #fff !important; border-color: #dc2626 !important; }
+    .need-call-count { background: #dc2626; color: #fff; border-radius: 99px; padding: 0 7px; font-size: 11px; margin-inline-start: 3px; }
+    .need-call-chip.active .need-call-count { background: #fff; color: #dc2626; }
     .start-chat-btn { font-size: 12px; font-weight: 600; color: #15803d; background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 5px 10px; margin-inline-end: 4px; cursor: pointer; }
     .start-chat-btn:hover { background: #dcfce7; }
     .start-chat-btn:disabled { opacity: .6; cursor: wait; }

@@ -26,12 +26,16 @@ namespace RecruitmentSaaS.Services
 
         private readonly IWhatsAppCloudApiService _cloudApi;
 
+        private readonly INotificationService _notifications;
+
         public WhatsAppWebhookProcessor(
             RecruitmentCrmContext context,
             IInboxRealtimeNotifier notifier,
             ILogger<WhatsAppWebhookProcessor> logger,
-            IWhatsAppCloudApiService cloudApi)
+            IWhatsAppCloudApiService cloudApi,
+            INotificationService notifications)
         {
+            _notifications = notifications;
             _context = context;
             _notifier = notifier;
             _logger = logger;
@@ -613,6 +617,29 @@ namespace RecruitmentSaaS.Services
             await _context.SaveChangesAsync(ct);
 
             await _notifier.MessageStatusUpdatedAsync(message.Id, message.ConversationId, message.Status, message.ErrorMessage);
+
+            if (newStatus == MessageStatus.Failed && message.ErrorCode == PhoneNumbers.NotOnWhatsAppErrorCode)
+                await NotifyNotOnWhatsAppAsync(message.ConversationId, ct);
+        }
+
+        // The customer's number can't get WhatsApp messages — tell their salesperson to call instead
+        private async Task NotifyNotOnWhatsAppAsync(Guid conversationId, CancellationToken ct)
+        {
+            try
+            {
+                var info = await _context.WhatsAppConversations.AsNoTracking()
+                    .Where(c => c.Id == conversationId && c.Lead != null)
+                    .Select(c => new { c.Lead!.Id, c.Lead.FullName, c.Lead.Phone, Agent = c.Lead.AssignedSalesId ?? c.AssignedSalesAgentId })
+                    .FirstOrDefaultAsync(ct);
+                if (info?.Agent == null) return;
+
+                await _notifications.SendAsync(info.Agent.Value, "عميل مش على واتساب — كلّمه تليفون",
+                    $"{info.FullName} — {info.Phone}", link: $"/TeleSales/LeadDetail/{info.Id}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not send the not-on-WhatsApp notification for conversation {ConversationId}", conversationId);
+            }
         }
 
         private static (WhatsAppMessageType type, string? textBody, string? mediaId) ExtractContent(JToken messageJ)

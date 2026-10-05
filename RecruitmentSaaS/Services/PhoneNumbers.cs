@@ -7,6 +7,9 @@ namespace RecruitmentSaaS.Services
     /// </summary>
     public static class PhoneNumbers
     {
+        /// <summary>Meta's "message undeliverable" — almost always: this number has no WhatsApp.</summary>
+        public const string NotOnWhatsAppErrorCode = "131026";
+
         public static string Normalize(string? raw)
         {
             if (string.IsNullOrWhiteSpace(raw)) return "";
