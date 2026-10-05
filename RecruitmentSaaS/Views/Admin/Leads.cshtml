@@ -255,6 +255,7 @@
                         <tr>
                             <th>الاسم</th>
                             <th>الهاتف</th>
+                            <th>السن</th>
                             <th>الحملة</th>
                             <th>المسؤول (تيلي)</th>
                             <th>مسؤول المكتب</th>
@@ -275,6 +276,7 @@
                             <tr>
                                 <td><div style="font-weight:600;">@lead.FullName</div></td>
                                 <td style="font-family:monospace;font-size:.83rem;">@lead.Phone</td>
+                                <td>@(lead.Age?.ToString() ?? "—")</td>
                                 <td style="font-size:.8rem;color:var(--text-muted);">@(lead.Campaign?.Name ?? "—")</td>
                                 <td style="font-size:.8rem;">@(lead.AssignedSales?.FullName ?? "—")</td>
                                 <td style="font-size:.8rem;">@(lead.AssignedOfficeSales?.FullName ?? "—")</td>
