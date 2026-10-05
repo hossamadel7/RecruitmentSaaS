@@ -976,10 +976,8 @@ namespace RecruitmentSaaS.Controllers
 
 
         // ── GET /Admin/CreatePackage ─────────────────────────────────────────
-        public IActionResult CreatePackage()
-        {
-            return View();
-        }
+        // Packages are created from the popup on the Packages page; there is no separate page
+        public IActionResult CreatePackage() => RedirectToAction("Packages");
 
         // ── POST /Admin/CreatePackage ────────────────────────────────────────
         [HttpPost]

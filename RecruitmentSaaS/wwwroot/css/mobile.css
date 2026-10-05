@@ -1,0 +1,107 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Phone layer for every page that uses _Layout (paired with mobile.js).
+   Desktop is untouched: everything here is inside max-width media queries.
+   ══════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 767.98px) {
+
+    /* ── Page frame ───────────────────────────────────────────────────── */
+    /* Bootstrap rows' negative gutters stick out past the page padding on phones */
+    .page-body .row { --bs-gutter-x: 1rem; }
+    .page-body .row.g-4, .page-body .row.g-5, .page-body .row.gx-4, .page-body .row.gx-5 { --bs-gutter-x: 1rem; }
+    .page-body .row.g-4, .page-body .row.g-5 { --bs-gutter-y: 1rem; }
+    .page-body { overflow-wrap: anywhere; }
+    .page-body img, .page-body video, .page-body iframe, .page-body canvas { max-width: 100%; height: auto; }
+    .page-body input, .page-body select, .page-body textarea { max-width: 100%; }
+
+    .page-header { align-items: flex-start; margin-bottom: 16px; }
+    .page-header > .btn, .page-header > a.btn, .page-header > form, .page-header > div:not(.page-header-left) { flex: 1 1 100%; }
+    .page-header > div:not(.page-header-left) { display: flex; flex-wrap: wrap; gap: 8px; }
+    .page-header > div:not(.page-header-left) > .btn { flex: 1 1 auto; }
+    .page-header .btn { justify-content: center; }
+
+    /* Rows of buttons / chips wrap instead of running off the screen */
+    .btn-group, .btn-toolbar { flex-wrap: wrap; }
+    .nav-tabs, .nav-pills { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    .nav-tabs::-webkit-scrollbar, .nav-pills::-webkit-scrollbar { display: none; }
+    .nav-tabs .nav-link, .nav-pills .nav-link { white-space: nowrap; }
+
+    /* Filter bars (GET forms): two fields per row, the first (usually search) full width */
+    form[method="get" i] > .row > [class*="col-md"]:not([class*="col-sm"]):not([class*="col-6"]):not([class*="col-12"]),
+    form[method="get" i].row > [class*="col-md"]:not([class*="col-sm"]):not([class*="col-6"]):not([class*="col-12"]) { flex: 0 0 50%; max-width: 50%; }
+    form[method="get" i] > .row > [class*="col-md"]:first-child,
+    form[method="get" i].row > [class*="col-md"]:first-child { flex: 0 0 100%; max-width: 100%; }
+
+    /* Bigger tap targets for small buttons */
+    .page-body .btn-sm { min-height: 34px; }
+
+    /* Forms: inputs never push the page wider */
+    .page-body .form-control, .page-body .form-select { min-width: 0; }
+    .page-body .input-group { flex-wrap: nowrap; }
+
+    /* Charts keep a readable height */
+    .page-body canvas { max-height: 260px; }
+
+    /* Popups use the whole screen (full height, scrolling body) */
+    .modal-dialog { margin: 0; max-width: none; min-height: 100%; }
+    .modal-content { border: 0; border-radius: 0; min-height: 100vh; min-height: 100dvh; }
+    .modal-footer { position: sticky; bottom: 0; background: inherit; z-index: 1; }
+    .modal-footer .btn { flex: 1 1 auto; }
+
+    /* ── Tables → cards (mobile.js adds .m-stack and a data-label per cell) ── */
+    .m-stack { display: block; width: 100%; border: 0; background: transparent; }
+    .m-stack thead { display: none; }
+    .m-stack tbody, .m-stack tfoot { display: block; width: 100%; }
+    .card-body.p-0 > .m-stack, .card-body.p-0 > div > .m-stack { padding: 10px; }
+    .m-stack tr {
+        display: block; width: 100%;
+        background: #fff; border: 1px solid var(--border, #e2e8f0); border-radius: 12px;
+        padding: 10px 12px; margin: 0 0 10px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+    .m-stack tr:last-child { margin-bottom: 0; }
+    .m-stack td, .m-stack th {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        width: 100% !important; min-width: 0 !important; max-width: none !important;
+        padding: 6px 0 !important; border: 0 !important; background: transparent !important;
+        text-align: end; white-space: normal !important;
+    }
+    .m-stack td::before, .m-stack th::before {
+        content: attr(data-label);
+        flex: 0 0 auto; max-width: 42%;
+        font-family: 'Cairo', sans-serif; letter-spacing: 0; direction: rtl;
+        font-size: .74rem; font-weight: 600; color: var(--text-muted, #64748b); text-align: start;
+    }
+    .m-stack td > *, .m-stack th > * { min-width: 0; }
+    /* First column is the row's title */
+    .m-stack td:first-child {
+        display: block; text-align: start; font-weight: 600;
+        padding-bottom: 8px !important; margin-bottom: 4px;
+        border-bottom: 1px solid var(--border, #e2e8f0) !important;
+    }
+    .m-stack td:first-child::before { display: none; }
+    /* Cells without a header (actions, notes, empty-state rows) span the card */
+    .m-stack td[data-label=""], .m-stack td.m-full { display: block; text-align: start; }
+    .m-stack td[data-label=""]::before, .m-stack td.m-full::before { display: none; }
+    .m-stack tr.m-empty { border-style: dashed; text-align: center; }
+    .m-stack tr.m-empty td { text-align: center; justify-content: center; border: 0 !important; }
+    /* Action buttons in a card: a full-width row */
+    .m-stack td.m-actions { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px; padding-top: 10px !important; }
+    .m-stack td.m-actions::before { display: none; }
+    .m-stack td.m-actions .btn { flex: 1 1 auto; min-height: 38px; }
+    .m-stack td.m-actions form { flex: 1 1 auto; display: flex; }
+    .m-stack td.m-actions form .btn { width: 100%; }
+    .m-stack td.m-actions > .d-flex, .m-stack td.m-actions > div { flex: 1 1 100%; flex-wrap: wrap; gap: 6px; }
+    .m-stack td.m-actions > .d-flex > *, .m-stack td.m-actions > div > * { flex: 1 1 auto; }
+    .m-stack .checkbox-cell, .m-stack td.m-check { display: block; }
+
+    /* Tables too complex to restack (merged cells, several header rows) scroll sideways */
+    .m-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .m-scroll > table { min-width: 560px; margin-bottom: 0; }
+    .m-scroll > table th, .m-scroll > table td { white-space: nowrap; }
+}
+
+@media (max-width: 380px) {
+    .m-stack td::before { max-width: 48%; }
+    .modal-body { padding: 14px; }
+}
