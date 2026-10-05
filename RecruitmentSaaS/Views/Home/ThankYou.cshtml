@@ -75,9 +75,27 @@
             box-shadow: 0 4px 16px rgba(37,211,102,.35);
         }
         .btn-wa:hover { color: #fff; filter: brightness(.95); }
+            body.wa-going .card { display: none; }
+        .wa-opening { display: none; }
+        body.wa-going .wa-opening { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+        .wa-opening-icon { width: 76px; height: 76px; border-radius: 50%; background: #25D366; color: #fff; font-size: 40px; display: flex; align-items: center; justify-content: center; animation: wa-pulse 1.2s ease-in-out infinite; }
+        .wa-opening-text { font-size: 18px; font-weight: 700; color: #0f172a; }
+        @@keyframes wa-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
     </style>
 </head>
-<body>
+<body class="@(string.IsNullOrEmpty(whatsAppUrl) ? "" : "wa-going")">
+    @if (!string.IsNullOrEmpty(whatsAppUrl))
+    {
+        @* Shown only while WhatsApp opens; the success card appears when they come back *@
+        <div class="wa-opening">
+            <div class="wa-opening-icon"><i class="bi bi-whatsapp"></i></div>
+            <div class="wa-opening-text">جاري فتح واتساب…</div>
+        </div>
+        <script>
+            // Straight to WhatsApp — no waiting on the success page first
+            window.location.href = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(whatsAppUrl));
+        </script>
+    }
     <div class="card">
         <div class="icon-wrap">✅</div>
         <h1>تم استلام طلبك!</h1>
@@ -120,8 +138,16 @@
     @if (!string.IsNullOrEmpty(whatsAppUrl))
     {
         <script>
-            // Open the sales chat automatically; the button stays as a fallback
-            setTimeout(function () { window.location.href = document.getElementById('waBtn').href; }, 1200);
+            // Show the success card once they come back from WhatsApp (or if it didn't open)
+            (function () {
+                function done() { document.body.classList.remove('wa-going'); }
+                var left = false;
+                document.addEventListener('visibilitychange', function () {
+                    if (document.hidden) left = true; else if (left) done();
+                });
+                window.addEventListener('pageshow', function (e) { if (e.persisted) done(); });
+                setTimeout(done, 3000);
+            })();
         </script>
     }
 </body>
