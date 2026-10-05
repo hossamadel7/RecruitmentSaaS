@@ -39,7 +39,6 @@ namespace RecruitmentSaaS.Controllers
                 .ThenBy(j => j.JobTitle)
                 .ToListAsync();
 
-            await SetDirectWhatsAppAsync(null);
             return View();
         }
 
@@ -60,24 +59,13 @@ namespace RecruitmentSaaS.Controllers
             }
 
             RememberSalesRef(salesRef);
-            await SetDirectWhatsAppAsync(teamForm);
             return View();
         }
 
         /// <summary>Marks a chat that came from the page's WhatsApp button (see WhatsAppWebhookProcessor).</summary>
         public const string DirectWhatsAppTag = "من صفحة التسجيل";
 
-        // "كلمنا على واتساب مباشرة" — for visitors who'd rather chat than fill the form. The tag in the
-        // message lets the chat be assigned by the team's rotation when it arrives.
-        private async Task SetDirectWhatsAppAsync(TeamLeadForm? teamForm)
-        {
-            var settings = await _context.LeadFormSettings.AsNoTracking().FirstOrDefaultAsync();
-            var number = SalesWhatsAppNumber(settings, teamForm);
-            if (string.IsNullOrEmpty(number)) return;
-            var text = "السلام عليكم، عايز أعرف تفاصيل فرص العمل بالخارج (" + DirectWhatsAppTag
-                       + (teamForm != null ? " - " + teamForm.Slug : "") + ")";
-            ViewData["WaDirectUrl"] = $"https://wa.me/{number}?text={Uri.EscapeDataString(text)}";
-        }
+
 
         private Task<TeamLeadForm?> FindTeamFormAsync(string slug)
         {
