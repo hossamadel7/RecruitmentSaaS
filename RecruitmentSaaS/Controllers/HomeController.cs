@@ -170,8 +170,11 @@ namespace RecruitmentSaaS.Controllers
                 TempData["FormError"] = "رقم الهاتف غير صحيح";
                 return BackToForm();
             }
+            // Cut to the database limits so an over-long field can never fail the whole registration
             fullName = fullName?.Trim() ?? "";
+            if (fullName.Length > 200) fullName = fullName[..200];
             interestedJobTitle = interestedJobTitle?.Trim();
+            if (interestedJobTitle?.Length > 200) interestedJobTitle = interestedJobTitle[..200];
             var phoneVariants = PhoneNumbers.StoredVariants(phone);
             if (await _context.Leads.AnyAsync(l => phoneVariants.Contains(l.Phone)))
             {
@@ -239,7 +242,8 @@ namespace RecruitmentSaaS.Controllers
                         WhatsAppAccountId = account.Id,
                         AssignedSalesAgentId = assignedSalesId!.Value,
                         ReferenceCode = referenceCode,
-                        GeneratedWhatsAppUrl = whatsAppUrl,
+                        // Never let a long link block the registration (the customer still gets the full link)
+                        GeneratedWhatsAppUrl = whatsAppUrl.Length > 2000 ? whatsAppUrl[..2000] : whatsAppUrl,
                         Status = (byte)HandoffStatus.Sent,
                         CreatedAt = now,
                         SentAt = now

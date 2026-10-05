@@ -176,7 +176,7 @@ public partial class RecruitmentCrmContext
 
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(e => e.ReferenceCode).HasMaxLength(20);
-            entity.Property(e => e.GeneratedWhatsAppUrl).HasMaxLength(500);
+            entity.Property(e => e.GeneratedWhatsAppUrl).HasMaxLength(2000);   // Arabic pre-filled text is long once URL-encoded
             entity.Property(e => e.Status).HasDefaultValue((byte)HandoffStatus.Generated);
             entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
             entity.Property(e => e.SentAt).HasPrecision(0);
