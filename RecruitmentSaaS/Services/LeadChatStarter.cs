@@ -172,6 +172,7 @@ namespace RecruitmentSaaS.Services
         private readonly ILogger<LeadAutoFollowupService> _logger;
         // Leads that failed before a chat could be created (e.g. a bad phone) — don't retry every minute
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, byte> Tried = new();
+        private const string PaymentErrorCode = "131042";
 
         public LeadAutoFollowupService(IServiceScopeFactory scopeFactory, ILogger<LeadAutoFollowupService> logger)
         {
@@ -214,7 +215,12 @@ namespace RecruitmentSaaS.Services
                          && l.AssignedSalesId != null
                          && !l.IsConverted && !l.IsDuplicate
                          && l.CreatedAt <= due && l.CreatedAt >= oldest && l.CreatedAt >= since
-                         && !db.WhatsAppConversations.Any(c => c.LeadId == l.Id)
+                         // no chat yet — or only our opening message, which Meta refused for billing
+                         // (131042: no payment method); that gets one retry once billing is fixed
+                         && !db.WhatsAppConversations.Any(c => c.LeadId == l.Id
+                                && (c.WhatsAppMessages.Any(m => m.Direction == (byte)MessageDirection.Incoming)
+                                    || c.WhatsAppMessages.Any(m => m.Direction == (byte)MessageDirection.Outgoing && m.ErrorCode != PaymentErrorCode)
+                                    || c.WhatsAppMessages.Count(m => m.ErrorCode == PaymentErrorCode) >= 2))
                          && !db.WhatsAppHandoffs.Any(h => h.LeadId == l.Id && h.ConversationId != null))
                 .OrderBy(l => l.CreatedAt)
                 .Take(20)
