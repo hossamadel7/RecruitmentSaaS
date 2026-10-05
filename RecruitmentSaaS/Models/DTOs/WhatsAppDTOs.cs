@@ -37,6 +37,10 @@ namespace RecruitmentSaaS.Models.DTOs
         public int UnreadCount { get; set; }
         public string? LastMessagePreview { get; set; }
         public byte? LastMessageDirection { get; set; }
+        /// <summary>Ticks for our last message (sent / delivered / read / failed).</summary>
+        public byte? LastMessageStatus { get; set; }
+        /// <summary>Photo / voice note / video / file icon in the list preview.</summary>
+        public byte? LastMessageType { get; set; }
         public DateTime? LastMessageAt { get; set; }
         public string? LeadCode { get; set; }
     }

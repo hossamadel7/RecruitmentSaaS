@@ -1283,3 +1283,65 @@
 .window-call-btn:hover { background: #15803d; color: #fff; }
 .window-closed-text { font-size: 13px; font-weight: 600; color: #9a3412; text-align: center; line-height: 1.6; }
 .chat-composer.is-locked { opacity: .45; pointer-events: none; }
+
+/* ══════════════════════════════════════════════════════════
+   Chat list — WhatsApp look on every screen size
+   ══════════════════════════════════════════════════════════ */
+.inbox-app {
+    --wa-green: #00a884;
+    --wa-badge: #25d366;
+    --wa-text: #111b21;
+    --wa-meta: #667781;
+    --wa-read: #53bdeb;
+    --wa-bar: #f0f2f5;
+}
+.inbox-col-list { background: #fff; }
+.conversation-row {
+    position: relative; display: flex; gap: 12px; align-items: center;
+    padding: 10px 14px 0; border-bottom: none; cursor: pointer;
+}
+.conversation-row .conv-avatar { width: 49px; height: 49px; font-size: 18px; align-self: flex-start; margin-bottom: 10px; flex-shrink: 0; }
+.conv-body { flex: 1; min-width: 0; padding-bottom: 11px; border-bottom: 1px solid #e9edef; }
+.conv-top-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.conv-name { font-size: 16px; font-weight: 500; color: var(--wa-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-row.unread .conv-name { font-weight: 700; }
+.conv-time { font-size: 12px; color: var(--wa-meta); white-space: nowrap; flex-shrink: 0; }
+.conversation-row.unread .conv-time { color: var(--wa-badge); font-weight: 700; }
+.conv-bottom-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.conv-preview {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 3px;
+    font-size: 14px; color: var(--wa-meta); padding: 0; margin: 0;
+    white-space: nowrap; overflow: hidden;
+}
+.conv-preview > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-row.unread .conv-preview { color: var(--wa-text); font-weight: 500; }
+.conv-tick { font-size: 17px; line-height: 1; color: var(--wa-meta); flex-shrink: 0; }
+.conv-tick.read { color: var(--wa-read); }
+.conv-tick.failed { color: #dc2626; font-size: 14px; }
+.conv-media-icon { font-size: 14px; color: var(--wa-meta); flex-shrink: 0; }
+.conv-unread-badge {
+    position: static; flex-shrink: 0;
+    background: var(--wa-badge); color: #fff; border-radius: 99px;
+    min-width: 20px; height: 20px; padding: 0 6px; font-size: 11.5px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.conv-meta-row { margin-top: 5px; }
+.inbox-app.is-agent .conv-meta-row { display: none; }
+
+/* Search + filter chips like WhatsApp */
+.inbox-search-box { background: var(--wa-bar); border: none; border-radius: 8px; }
+.inbox-search-box input { background: transparent; }
+.inbox-filter-chip { background: var(--wa-bar); color: #54656f; border: none; border-radius: 99px; font-weight: 600; }
+.inbox-filter-chip:hover { background: #e9edef; color: #54656f; }
+.inbox-filter-chip.active { background: #d9fdd3; color: #008069; }
+
+@media (min-width: 992px) {
+    .conversation-row:hover { background: #f5f6f6; }
+    .conversation-row.selected { background: #f0f2f5; }
+}
+@media (max-width: 991px) {
+    .conversation-row:active { background: #f5f6f6; }
+    .conversation-row.selected { background: transparent; }
+    .conversation-row .conv-avatar { width: 50px; height: 50px; }
+}
+.conversation-row .conv-avatar { background: #dfe5e7; color: #54656f; font-weight: 700; }

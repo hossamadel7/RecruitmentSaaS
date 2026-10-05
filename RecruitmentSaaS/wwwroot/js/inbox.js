@@ -222,27 +222,54 @@
         }
 
         listEl.innerHTML = state.conversations.map(function (c) {
-            var preview = c.lastMessagePreview ? esc(c.lastMessagePreview) : (c.lastMessageDirection === 2 ? 'أنت: —' : '—');
             var agent = c.assignedSalesAgentName ? esc(c.assignedSalesAgentName) : 'غير مخصص';
+            var name = (c.contactName && c.contactName.replace(/[.\s]/g, '')) ? c.contactName : c.contactPhone;
             return '' +
                 '<div class="conversation-row' + (c.unreadCount > 0 ? ' unread' : '') + (c.id === state.selectedConversationId ? ' selected' : '') + '" data-id="' + c.id + '">' +
-                '  <div class="conv-avatar">' + initials(c.contactName) + '</div>' +
+                '  <div class="conv-avatar">' + initials(name) + '</div>' +
                 '  <div class="conv-body">' +
-                '    <div class="conv-top-row"><span class="conv-name">' + esc(c.contactName) + '</span><span class="conv-time">' + listTime(c.lastMessageAt) + '</span></div>' +
-                '    <div class="conv-preview">' + (c.lastMessageDirection === 2 ? 'أنت: ' : '') + preview + '</div>' +
+                '    <div class="conv-top-row"><span class="conv-name">' + esc(name) + '</span><span class="conv-time">' + listTime(c.lastMessageAt) + '</span></div>' +
+                '    <div class="conv-bottom-row">' +
+                '      <div class="conv-preview">' + listPreview(c) + '</div>' +
+                (c.unreadCount > 0 ? '<span class="conv-unread-badge">' + c.unreadCount + '</span>' : '') +
+                '    </div>' +
                 '    <div class="conv-meta-row">' +
                 '      <span class="conv-account-pill">' + esc(c.whatsAppAccountName) + '</span>' +
                 '      <span class="conv-agent-pill"><i class="bi bi-person"></i> ' + agent + '</span>' +
                 (c.leadCode ? '<span class="conv-agent-pill">' + esc(c.leadCode) + '</span>' : '') +
                 '    </div>' +
                 '  </div>' +
-                (c.unreadCount > 0 ? '<span class="conv-unread-badge">' + c.unreadCount + '</span>' : '') +
                 '</div>';
         }).join('');
 
         listEl.querySelectorAll('.conversation-row').forEach(function (row) {
             row.addEventListener('click', function () { selectConversation(row.dataset.id); });
         });
+    }
+
+    // WhatsApp-style last line: ticks for our own message, an icon + label for media
+    var LIST_MEDIA = {
+        2: ['bi-camera-fill', 'صورة'], 3: ['bi-camera-video-fill', 'فيديو'], 4: ['bi-mic-fill', 'رسالة صوتية'],
+        5: ['bi-file-earmark-fill', 'ملف'], 6: ['bi-sticky-fill', 'ملصق'], 7: ['bi-geo-alt-fill', 'موقع'], 8: ['bi-person-fill', 'جهة اتصال']
+    };
+    function listPreview(c) {
+        var out = '';
+        if (c.lastMessageDirection === 2) {
+            var st = c.lastMessageStatus;
+            out += st === 6 ? '<i class="bi bi-exclamation-circle-fill conv-tick failed"></i>'
+                 : st === 5 ? '<i class="bi bi-check2-all conv-tick read"></i>'
+                 : st === 4 ? '<i class="bi bi-check2-all conv-tick"></i>'
+                 : st === 3 ? '<i class="bi bi-check2 conv-tick"></i>'
+                 : '<i class="bi bi-clock conv-tick"></i>';
+        }
+        var media = LIST_MEDIA[c.lastMessageType];
+        if (media) {
+            out += '<i class="bi ' + media[0] + ' conv-media-icon"></i>';
+            out += '<span>' + esc(c.lastMessagePreview || media[1]) + '</span>';
+        } else {
+            out += '<span>' + (c.lastMessagePreview ? esc(c.lastMessagePreview) : '—') + '</span>';
+        }
+        return out;
     }
 
     function patchListRow(conversationId, patch) {

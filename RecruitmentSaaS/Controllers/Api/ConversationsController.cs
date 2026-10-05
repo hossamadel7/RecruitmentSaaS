@@ -137,6 +137,16 @@ namespace RecruitmentSaaS.Controllers.Api
                         .Where(m => m.ConversationId == c.Id)
                         .OrderByDescending(m => m.CreatedAt)
                         .Select(m => (byte?)m.Direction)
+                        .FirstOrDefault(),
+                    LastMessageStatus = _context.WhatsAppMessages
+                        .Where(m => m.ConversationId == c.Id)
+                        .OrderByDescending(m => m.CreatedAt)
+                        .Select(m => (byte?)m.Status)
+                        .FirstOrDefault(),
+                    LastMessageType = _context.WhatsAppMessages
+                        .Where(m => m.ConversationId == c.Id)
+                        .OrderByDescending(m => m.CreatedAt)
+                        .Select(m => (byte?)m.MessageType)
                         .FirstOrDefault()
                 })
                 .ToListAsync();
