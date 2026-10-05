@@ -1195,11 +1195,31 @@
                 b.style.display = !q || b.dataset.name.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
             });
         };
-        list.onclick = async function (e) {
+        // Two views in the popup: pick a person, then confirm
+        var confirmBox = document.getElementById('transfer-confirm');
+        var pickParts = [list, search, document.getElementById('transfer-current'), document.querySelector('#transferModal .transfer-note')];
+        function showPick() { confirmBox.hidden = true; pickParts.forEach(function (el) { if (el) el.hidden = false; }); }
+        showPick();
+
+        list.onclick = function (e) {
             var item = e.target.closest('.transfer-item');
             if (!item || item.disabled) return;
-            if (!confirm('تحويل محادثة ' + (c.contactName || '') + ' إلى ' + item.dataset.name + '؟')) return;
-            item.disabled = true;
+            var customer = (c.contactName && c.contactName.replace(/[.\s]/g, '')) ? c.contactName : c.contactPhone;
+            document.getElementById('tc-from').textContent = initials(c.assignedSalesAgentName || '؟');
+            document.getElementById('tc-to').textContent = initials(item.dataset.name);
+            document.getElementById('tc-text').innerHTML = 'تحويل محادثة <strong>' + esc(customer) + '</strong><br>من <strong>' +
+                esc(c.assignedSalesAgentName || 'غير مخصص') + '</strong> إلى <strong>' + esc(item.dataset.name) + '</strong>؟';
+            document.getElementById('tc-error').hidden = true;
+            pickParts.forEach(function (el) { if (el) el.hidden = true; });
+            confirmBox.hidden = false;
+            document.getElementById('tc-back').onclick = showPick;
+            document.getElementById('tc-ok').onclick = function () { doTransfer(item); };
+        };
+
+        async function doTransfer(item) {
+            var okBtn = document.getElementById('tc-ok');
+            okBtn.disabled = true;
+            okBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جارٍ التحويل...';
             try {
                 var res = await api('/api/conversations/' + c.id + '/assign', { method: 'POST', body: JSON.stringify({ agentId: item.dataset.id }) });
                 modal.hide();
@@ -1214,10 +1234,14 @@
                 refreshPendingCount();
                 showToast('تم تحويل المحادثة لـ ' + item.dataset.name + (res && res.leadMoved ? ' (ومعها ملف العميل)' : ''));
             } catch (err) {
-                item.disabled = false;
-                alert('تعذر التحويل' + (err.body && err.body.error ? ': ' + err.body.error : ''));
+                var box = document.getElementById('tc-error');
+                box.textContent = 'تعذر التحويل' + (err.body && err.body.error ? ': ' + err.body.error : '');
+                box.hidden = false;
+            } finally {
+                okBtn.disabled = false;
+                okBtn.innerHTML = '<i class="bi bi-check-lg"></i> تأكيد التحويل';
             }
-        };
+        }
 
         // Lift the popup out of the inbox layout so its full-screen mobile container can't clip or cover it
         var modalEl = document.getElementById('transferModal');

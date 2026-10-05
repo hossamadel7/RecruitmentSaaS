@@ -132,6 +132,20 @@
                             <div class="transfer-current" id="transfer-current"></div>
                             <input type="search" class="form-control mb-2" id="transfer-search" placeholder="ابحث باسم الموظف..." />
                             <div id="transfer-list"></div>
+                            @* Confirmation step, in the same popup instead of the browser's dialog *@
+                            <div id="transfer-confirm" class="transfer-confirm" hidden>
+                                <div class="transfer-confirm-avatars">
+                                    <span class="conv-avatar" id="tc-from"></span>
+                                    <i class="bi bi-arrow-left"></i>
+                                    <span class="conv-avatar" id="tc-to"></span>
+                                </div>
+                                <div class="transfer-confirm-text" id="tc-text"></div>
+                                <div class="transfer-confirm-error" id="tc-error" hidden></div>
+                                <div class="transfer-confirm-actions">
+                                    <button type="button" class="btn btn-primary" id="tc-ok"><i class="bi bi-check-lg"></i> تأكيد التحويل</button>
+                                    <button type="button" class="btn btn-outline-secondary" id="tc-back">رجوع</button>
+                                </div>
+                            </div>
                             <div class="transfer-note"><i class="bi bi-info-circle"></i> ملف العميل بيتنقل مع المحادثة، والموظف الجديد بيوصله إشعار.</div>
                         </div>
                     </div>

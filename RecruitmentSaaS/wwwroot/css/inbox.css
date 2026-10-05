@@ -1252,3 +1252,12 @@
     .chat-transfer-btn { padding: 7px 10px; font-size: 15px; }
     .inbox-col-chat .chat-header .conv-account-pill { display: none; }
 }
+
+/* Transfer confirmation step (inside the popup) */
+.transfer-confirm { text-align: center; padding: 18px 4px 6px; }
+.transfer-confirm-avatars { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 14px; color: var(--text-muted); font-size: 20px; }
+.transfer-confirm-avatars .conv-avatar { width: 48px; height: 48px; font-size: 18px; }
+.transfer-confirm-text { font-size: 15px; line-height: 1.9; margin-bottom: 16px; }
+.transfer-confirm-error { background: #fef2f2; color: #b91c1c; border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 12px; }
+.transfer-confirm-actions { display: flex; gap: 8px; }
+.transfer-confirm-actions .btn { flex: 1; }
