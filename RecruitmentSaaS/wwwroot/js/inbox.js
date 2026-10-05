@@ -422,6 +422,17 @@
         return m && /[A-Za-z\u00C0-\u024F]/.test(m[0]) ? 'ltr' : 'rtl';
     }
 
+    // Meta's error titles in plain Arabic for the team
+    var KNOWN_FAILURES = {
+        'message undeliverable': 'الرقم ده مش عليه واتساب — كلّم العميل تليفون',
+        're-engagement message': 'لم تُرسل: العميل لسه ما ردش (واتساب بيسمح بالرسائل العادية بس خلال 24 ساعة من آخر رسالة منه)',
+        'business eligibility payment issue': 'لم تُرسل: مشكلة في الدفع على حساب Meta'
+    };
+    function failureText(error) {
+        var known = error && KNOWN_FAILURES[String(error).trim().toLowerCase()];
+        return known ? esc(known) : 'لم تُرسل' + (error ? ': ' + esc(error) : '');
+    }
+
     function renderBubble(m) {
         var isOut = m.direction === 2;
         var type = m.messageType || 1;
@@ -436,7 +447,7 @@
             : (type === 5 ? '' : (m.textBody || ''));
 
         var failure = isOut && m.status === 6
-            ? '<div class="bubble-error"><i class="bi bi-exclamation-triangle-fill"></i> لم تُرسل' + (m.errorMessage ? ': ' + esc(m.errorMessage) : '') + '</div>'
+            ? '<div class="bubble-error"><i class="bi bi-exclamation-triangle-fill"></i> ' + failureText(m.errorMessage) + '</div>'
             : '';
         // Who on our side sent it — several agents/managers can write in the same chat
         var sender = isOut && m.senderUserName
@@ -520,6 +531,10 @@
         var iconEl = row.querySelector('.bubble-status-icon');
         if (!iconEl) { iconEl = document.createElement('i'); iconEl.className = 'bubble-status-icon'; row.appendChild(iconEl); }
         iconEl.className = 'bi ' + icon + (payload.status === 6 ? ' bubble-status-failed' : '') + (payload.status === 5 ? ' bubble-status-read' : '') + ' bubble-status-icon';
+        // Failed after it was sent (Meta reports it a moment later): say why, right away
+        var bubble = row.closest('.chat-bubble');
+        if (payload.status === 6 && bubble && !bubble.querySelector('.bubble-error'))
+            bubble.insertAdjacentHTML('beforeend', '<div class="bubble-error"><i class="bi bi-exclamation-triangle-fill"></i> ' + failureText(payload.errorMessage) + '</div>');
     }
 
     async function markRead(id) {
