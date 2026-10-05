@@ -4,6 +4,18 @@
     var currentStatus = ViewBag.CurrentStatus as byte?;
     var currentPage = (int)(ViewBag.CurrentPage ?? 1);
     var totalCount = (int)(ViewBag.TotalCount ?? 0);
+    int? minAge = ViewBag.MinAge as int?;
+    int? maxAge = ViewBag.MaxAge as int?;
+    // Keep the age range when switching status / page
+    string Link(byte? st, int? p = null)
+    {
+        var parts = new List<string>();
+        if (st.HasValue) parts.Add("status=" + st.Value);
+        if (minAge.HasValue) parts.Add("minAge=" + minAge.Value);
+        if (maxAge.HasValue) parts.Add("maxAge=" + maxAge.Value);
+        if (p.HasValue && p.Value > 1) parts.Add("page=" + p.Value);
+        return "/TeleSales/Leads" + (parts.Count == 0 ? "" : "?" + string.Join("&", parts));
+    }
 }
 
 <div class="page-header">
@@ -17,14 +29,30 @@
 <div class="card mb-3">
     <div class="card-body py-3">
         <div class="filter-bar">
-            <a href="/TeleSales/Leads" class="filter-btn @(currentStatus == null ? "active" : "")">الكل</a>
-            <a href="/TeleSales/Leads?status=1" class="filter-btn @(currentStatus == 1 ? "active" : "")">جديد</a>
-            <a href="/TeleSales/Leads?status=2" class="filter-btn @(currentStatus == 2 ? "active" : "")">تم التواصل</a>
-            <a href="/TeleSales/Leads?status=3" class="filter-btn @(currentStatus == 3 ? "active" : "")">استجاب</a>
-            <a href="/TeleSales/Leads?status=4" class="filter-btn @(currentStatus == 4 ? "active" : "")">مهتم</a>
-            <a href="/TeleSales/Leads?status=5" class="filter-btn @(currentStatus == 5 ? "active" : "")">موعد مجدول</a>
-            <a href="/TeleSales/Leads?status=8" class="filter-btn @(currentStatus == 8 ? "active" : "")">خسارة</a>
+            <a href="@Link(null)" class="filter-btn @(currentStatus == null ? "active" : "")">الكل</a>
+            <a href="@Link(1)" class="filter-btn @(currentStatus == 1 ? "active" : "")">جديد</a>
+            <a href="@Link(2)" class="filter-btn @(currentStatus == 2 ? "active" : "")">تم التواصل</a>
+            <a href="@Link(3)" class="filter-btn @(currentStatus == 3 ? "active" : "")">استجاب</a>
+            <a href="@Link(4)" class="filter-btn @(currentStatus == 4 ? "active" : "")">مهتم</a>
+            <a href="@Link(5)" class="filter-btn @(currentStatus == 5 ? "active" : "")">موعد مجدول</a>
+            <a href="@Link(8)" class="filter-btn @(currentStatus == 8 ? "active" : "")">خسارة</a>
         </div>
+        <form method="get" action="/TeleSales/Leads" class="d-flex flex-wrap align-items-end gap-2 mt-3">
+            @if (currentStatus.HasValue) { <input type="hidden" name="status" value="@currentStatus" /> }
+            <div style="width:110px">
+                <label class="form-label form-label-sm mb-1">من سن</label>
+                <input type="number" name="minAge" value="@minAge" min="18" max="65" class="form-control form-control-sm" placeholder="18" inputmode="numeric" />
+            </div>
+            <div style="width:110px">
+                <label class="form-label form-label-sm mb-1">إلى سن</label>
+                <input type="number" name="maxAge" value="@maxAge" min="18" max="65" class="form-control form-control-sm" placeholder="65" inputmode="numeric" />
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">تطبيق</button>
+            @if (minAge.HasValue || maxAge.HasValue)
+            {
+                <a href="/TeleSales/Leads@(currentStatus.HasValue ? "?status=" + currentStatus : "")" class="btn btn-outline-secondary btn-sm">مسح السن</a>
+            }
+        </form>
     </div>
 </div>
 
@@ -111,13 +139,13 @@
             <div class="d-flex justify-content-center gap-2 p-3">
                 @if (currentPage > 1)
                 {
-                    <a href="/TeleSales/Leads?page=@(currentPage-1)@(currentStatus.HasValue ? $"&status={currentStatus}" : "")"
+                    <a href="@Link(currentStatus, currentPage - 1)"
                        class="btn btn-sm" style="border:1px solid var(--border)">السابق</a>
                 }
                 <span class="btn btn-sm btn-primary">@currentPage</span>
                 @if (Model.Count == 20)
                 {
-                    <a href="/TeleSales/Leads?page=@(currentPage+1)@(currentStatus.HasValue ? $"&status={currentStatus}" : "")"
+                    <a href="@Link(currentStatus, currentPage + 1)"
                        class="btn btn-sm" style="border:1px solid var(--border)">التالي</a>
                 }
             </div>

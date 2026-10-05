@@ -222,7 +222,7 @@ namespace RecruitmentSaaS.Controllers
         // ── GET /TeleSalesManager/TeamFormLeads ──────────────────────────────
         // All of my team's leads: everything assigned to my TeleSales (any source) plus my team
         // form's leads still waiting for me. member = <userId> | "unassigned"; status; q; page.
-        public async Task<IActionResult> TeamFormLeads(string? member, byte? status, string? q, int page = 1)
+        public async Task<IActionResult> TeamFormLeads(string? member, byte? status, string? q, int? minAge, int? maxAge, int page = 1)
         {
             const int pageSize = 50;
             var leaderId = TeamLeaderId();
@@ -259,6 +259,12 @@ namespace RecruitmentSaaS.Controllers
             if (status.HasValue)
                 query = query.Where(l => l.Status == status.Value);
 
+            // Age range (leads without an age are left out once a range is set)
+            if (minAge.HasValue)
+                query = query.Where(l => l.Age != null && l.Age >= minAge.Value);
+            if (maxAge.HasValue)
+                query = query.Where(l => l.Age != null && l.Age <= maxAge.Value);
+
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var term = q.Trim();
@@ -284,6 +290,8 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.Member = member;
             ViewBag.Status = status;
             ViewBag.Q = q;
+            ViewBag.MinAge = minAge;
+            ViewBag.MaxAge = maxAge;
             ViewBag.Page = page;
             ViewBag.PageCount = (int)Math.Ceiling(filteredCount / (double)pageSize);
             ViewBag.FilteredCount = filteredCount;

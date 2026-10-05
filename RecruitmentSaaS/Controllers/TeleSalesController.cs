@@ -198,7 +198,7 @@ namespace RecruitmentSaaS.Controllers
         }
 
         // ── GET /TeleSales/Leads ──────────────────────────────────────────────
-        public async Task<IActionResult> Leads(byte? status, int page = 1)
+        public async Task<IActionResult> Leads(byte? status, int? minAge, int? maxAge, int page = 1)
         {
             var userId = CurrentUserId;
             const int pageSize = 20;
@@ -207,6 +207,12 @@ namespace RecruitmentSaaS.Controllers
 
             if (status.HasValue)
                 query = query.Where(l => l.Status == status.Value);
+
+            // Age range (leads without an age are left out once a range is set)
+            if (minAge.HasValue)
+                query = query.Where(l => l.Age != null && l.Age >= minAge.Value);
+            if (maxAge.HasValue)
+                query = query.Where(l => l.Age != null && l.Age <= maxAge.Value);
 
             var totalCount = await query.CountAsync();
 
@@ -235,6 +241,8 @@ namespace RecruitmentSaaS.Controllers
                 .ToListAsync();
 
             ViewBag.CurrentStatus = status;
+            ViewBag.MinAge = minAge;
+            ViewBag.MaxAge = maxAge;
             ViewBag.CurrentPage = page;
             ViewBag.TotalCount = totalCount;
 

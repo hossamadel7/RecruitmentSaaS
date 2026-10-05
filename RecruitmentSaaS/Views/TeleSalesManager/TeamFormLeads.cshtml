@@ -28,6 +28,8 @@
         : l.LeadSource switch { 1 => "فيسبوك", 2 => "الموقع", 3 => "زيارة الفرع", _ => "—" };
 
     // Keep the current filters in links and after assigning
+    int? minAge = ViewBag.MinAge as int?;
+    int? maxAge = ViewBag.MaxAge as int?;
     string Query(string? m = null, byte? st = null, int? p = null, bool keepMember = true, bool keepStatus = true)
     {
         var parts = new List<string>();
@@ -36,6 +38,8 @@
         if (!string.IsNullOrEmpty(mm)) parts.Add("member=" + Uri.EscapeDataString(mm));
         if (ss.HasValue) parts.Add("status=" + ss.Value);
         if (!string.IsNullOrWhiteSpace(q)) parts.Add("q=" + Uri.EscapeDataString(q));
+        if (minAge.HasValue) parts.Add("minAge=" + minAge.Value);
+        if (maxAge.HasValue) parts.Add("maxAge=" + maxAge.Value);
         if (p.HasValue && p.Value > 1) parts.Add("page=" + p.Value);
         return parts.Count == 0 ? "" : "?" + string.Join("&", parts);
     }
@@ -125,9 +129,17 @@
                     }
                 </select>
             </div>
+            <div style="flex:0 0 90px;min-width:90px">
+                <label>من سن</label>
+                <input type="number" name="minAge" value="@minAge" min="18" max="65" class="form-control form-control-sm" placeholder="18" inputmode="numeric" />
+            </div>
+            <div style="flex:0 0 90px;min-width:90px">
+                <label>إلى سن</label>
+                <input type="number" name="maxAge" value="@maxAge" min="18" max="65" class="form-control form-control-sm" placeholder="65" inputmode="numeric" />
+            </div>
             <div style="flex:0 0 auto;min-width:0" class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary btn-sm">بحث</button>
-                @if (!string.IsNullOrEmpty(member) || status.HasValue || !string.IsNullOrWhiteSpace(q))
+                @if (!string.IsNullOrEmpty(member) || status.HasValue || !string.IsNullOrWhiteSpace(q) || minAge.HasValue || maxAge.HasValue)
                 {
                     <a href="/TeleSalesManager/TeamFormLeads" class="btn btn-outline-secondary btn-sm">مسح</a>
                 }

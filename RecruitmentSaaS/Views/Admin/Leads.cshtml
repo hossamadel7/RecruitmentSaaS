@@ -8,6 +8,8 @@
     int? status = ViewBag.Status;
     Guid? campId = ViewBag.CampaignId;
     Guid? teleSalesId = ViewBag.TeleSalesId as Guid?;
+    int? minAge = ViewBag.MinAge as int?;
+    int? maxAge = ViewBag.MaxAge as int?;
     int page = ViewBag.Page;
     int total = ViewBag.Total;
     int totalPages = ViewBag.TotalPages;
@@ -223,10 +225,20 @@
             </div>
 
             <div class="col-md-1">
+                <label class="form-label form-label-sm">من سن</label>
+                <input type="number" name="minAge" value="@minAge" min="18" max="65" class="form-control form-control-sm" placeholder="18" inputmode="numeric" />
+            </div>
+            <div class="col-md-1">
+                <label class="form-label form-label-sm">إلى سن</label>
+                <input type="number" name="maxAge" value="@maxAge" min="18" max="65" class="form-control form-control-sm" placeholder="65" inputmode="numeric" />
+            </div>
+
+            <div class="col-md-1">
                 <button type="submit" class="btn btn-primary btn-sm w-100">بحث</button>
             </div>
 
             @if (!string.IsNullOrWhiteSpace(q) || status.HasValue || campId.HasValue || teleSalesId.HasValue
+            || minAge.HasValue || maxAge.HasValue
             || selMonth != DateTime.UtcNow.Month || selYear != DateTime.UtcNow.Year)
             {
                 <div class="col-md-1">
@@ -307,7 +319,7 @@
                             @if (page > 1)
                             {
                                 <li class="page-item">
-                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&teleSalesId=@teleSalesId&month=@selMonth&year=@selYear&page=@(page-1)">
+                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&teleSalesId=@teleSalesId&month=@selMonth&year=@selYear&minAge=@minAge&maxAge=@maxAge&page=@(page-1)">
                                         <i class="bi bi-chevron-right"></i>
                                     </a>
                                 </li>
@@ -315,13 +327,13 @@
                             @for (int p = Math.Max(1, page - 2); p <= Math.Min(totalPages, page + 2); p++)
                             {
                                 <li class="page-item @(p == page ? "active" : "")">
-                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&teleSalesId=@teleSalesId&month=@selMonth&year=@selYear&page=@p">@p</a>
+                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&teleSalesId=@teleSalesId&month=@selMonth&year=@selYear&minAge=@minAge&maxAge=@maxAge&page=@p">@p</a>
                                 </li>
                             }
                             @if (page < totalPages)
                             {
                                 <li class="page-item">
-                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&teleSalesId=@teleSalesId&month=@selMonth&year=@selYear&page=@(page+1)">
+                                    <a class="page-link" href="?q=@q&status=@status&campaignId=@campId&teleSalesId=@teleSalesId&month=@selMonth&year=@selYear&minAge=@minAge&maxAge=@maxAge&page=@(page+1)">
                                         <i class="bi bi-chevron-left"></i>
                                     </a>
                                 </li>

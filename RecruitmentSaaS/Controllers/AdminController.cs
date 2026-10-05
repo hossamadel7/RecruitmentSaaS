@@ -484,7 +484,7 @@ namespace RecruitmentSaaS.Controllers
 
         // ── GET /Admin/Leads ────────────────────────────────────────────────
         public async Task<IActionResult> Leads(string? q, int? status, Guid? campaignId,
-                                               Guid? teleSalesId, int? month, int? year, int page = 1)
+                                               Guid? teleSalesId, int? month, int? year, int? minAge, int? maxAge, int page = 1)
         {
             const int pageSize = 25;
 
@@ -561,6 +561,12 @@ namespace RecruitmentSaaS.Controllers
             if (campaignId.HasValue)
                 query = query.Where(l => l.CampaignId == campaignId.Value);
 
+            // Age range (leads without an age are left out once a range is set)
+            if (minAge.HasValue)
+                query = query.Where(l => l.Age != null && l.Age >= minAge.Value);
+            if (maxAge.HasValue)
+                query = query.Where(l => l.Age != null && l.Age <= maxAge.Value);
+
             query = query.OrderByDescending(l => l.CreatedAt);
 
             var total = await query.CountAsync();
@@ -590,6 +596,8 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.Status       = status;
             ViewBag.CampaignId   = campaignId;
             ViewBag.TeleSalesId  = teleSalesId;
+            ViewBag.MinAge       = minAge;
+            ViewBag.MaxAge       = maxAge;
             ViewBag.SelectedMonth = selMonth;
             ViewBag.SelectedYear  = selYear;
             ViewBag.Page         = page;
