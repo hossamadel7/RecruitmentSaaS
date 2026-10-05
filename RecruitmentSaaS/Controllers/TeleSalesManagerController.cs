@@ -341,10 +341,12 @@ namespace RecruitmentSaaS.Controllers
             lead.AssignedSalesId = member.Id;
             lead.UpdatedAt = DateTime.UtcNow;
 
-            // The customer's WhatsApp chat follows the lead (unless someone else deliberately holds it)
+            // The customer's WhatsApp chat follows the lead (unless someone else deliberately holds it).
+            // previous is null for a lead that was waiting for assignment.
+            var previousId = previous?.Id;
             var chats = await _context.WhatsAppConversations
                 .Where(c => c.LeadId == lead.Id
-                         && (c.AssignedSalesAgentId == null || c.AssignedSalesAgentId == previous!.Id))
+                         && (c.AssignedSalesAgentId == null || c.AssignedSalesAgentId == previousId))
                 .ToListAsync();
             foreach (var chat in chats)
             {
