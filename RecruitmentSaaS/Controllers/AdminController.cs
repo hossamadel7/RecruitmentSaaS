@@ -1869,9 +1869,9 @@ namespace RecruitmentSaaS.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateAutoFollowup(bool enabled, int delayMinutes)
         {
-            if (delayMinutes < 5 || delayMinutes > 24 * 60)
+            if (delayMinutes < 2 || delayMinutes > 24 * 60)
             {
-                TempData["Error"] = "وقت الانتظار لازم يكون بين 5 دقايق و 24 ساعة";
+                TempData["Error"] = "وقت الانتظار لازم يكون بين دقيقتين و 24 ساعة";
                 return RedirectToAction("LeadFormSettings");
             }
 
