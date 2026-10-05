@@ -34,11 +34,17 @@ namespace RecruitmentSaaS.Hubs
 
             if (IsOrgWideRole)
                 await Groups.AddToGroupAsync(Context.ConnectionId, "org-all");
-            else if (CurrentRole == "8")
+
+            var visibility = await WhatsAppScope.ForUserAsync(_context, CurrentRole, CurrentUserId);
+            if (visibility.AllWaiting)
+                await Groups.AddToGroupAsync(Context.ConnectionId, "org-admin");          // every team's waiting chats
+            else if (visibility.TeamLeaderId != null)
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"team-waiting-{visibility.TeamLeaderId}");
+
+            if (CurrentRole == "8" && visibility.Agents != null)
             {
                 // Receive whatever each team member receives (their chats' messages and assignments)
-                var visible = await WhatsAppScope.VisibleAgentIdsAsync(_context, CurrentRole, CurrentUserId) ?? new();
-                foreach (var memberId in visible.Where(id => id != CurrentUserId))
+                foreach (var memberId in visibility.Agents.Where(id => id != CurrentUserId))
                     await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{memberId}");
             }
 
@@ -59,8 +65,6 @@ namespace RecruitmentSaaS.Hubs
 
         private async Task<bool> CanAccessConversationAsync(Guid conversationId)
         {
-            if (IsOrgWideRole) return true;
-
             var visibility = await WhatsAppScope.ForUserAsync(_context, CurrentRole, CurrentUserId);
             return await _context.WhatsAppConversations
                 .AsNoTracking()

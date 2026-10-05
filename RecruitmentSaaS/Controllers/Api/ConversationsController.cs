@@ -500,7 +500,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 return Forbid();
             if (dto.AgentId.HasValue && !await CanSeeAgentAsync(dto.AgentId.Value))
                 return BadRequest(new { error = "تقدر تحوّل بس لموظفين في فريقك" });
-            if (!dto.AgentId.HasValue && !(await VisibilityAsync()).SeesAll)
+            if (!dto.AgentId.HasValue && (await VisibilityAsync()).Agents != null)
                 return BadRequest(new { error = "اختار موظف تحوّل له المحادثة" });
 
             User? agent = null;

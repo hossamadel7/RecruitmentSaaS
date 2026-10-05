@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
 using RecruitmentSaaS.Hubs;
 using RecruitmentSaaS.Models.Entities;
@@ -24,10 +25,12 @@ namespace RecruitmentSaaS.Services
     public class InboxRealtimeNotifier : IInboxRealtimeNotifier
     {
         private readonly IHubContext<InboxHub> _hub;
+        private readonly RecruitmentSaaS.Data.RecruitmentCrmContext _context;
 
-        public InboxRealtimeNotifier(IHubContext<InboxHub> hub)
+        public InboxRealtimeNotifier(IHubContext<InboxHub> hub, RecruitmentSaaS.Data.RecruitmentCrmContext context)
         {
             _hub = hub;
+            _context = context;
         }
 
         public async Task NewMessageAsync(WhatsAppMessage message, Guid? assignedAgentId, string? senderUserName = null)
@@ -84,13 +87,30 @@ namespace RecruitmentSaaS.Services
             await BroadcastAsync("UnreadCountUpdated", conversationId, assignedAgentId, payload);
         }
 
+        // Groups (see InboxHub): "org-all" = admin + team leaders, "org-admin" = admin only,
+        // "team-waiting-{leaderId}" = that team's leader + TeleSales manager.
         private async Task BroadcastAsync(string eventName, Guid conversationId, Guid? assignedAgentId, object payload)
         {
-            await _hub.Clients.Group("org-all").SendAsync(eventName, payload);
             await _hub.Clients.Group($"wa-conversation-{conversationId}").SendAsync(eventName, payload);
 
             if (assignedAgentId.HasValue)
+            {
+                await _hub.Clients.Group("org-all").SendAsync(eventName, payload);
                 await _hub.Clients.Group($"user-{assignedAgentId}").SendAsync(eventName, payload);
+                return;
+            }
+
+            // Unassigned: a chat waiting with a team (its member was deactivated) goes only to admin and
+            // that team; other team leaders must not get it. A chat that never had anyone stays org-wide.
+            var waitingTeam = await _context.WhatsAppConversations.AsNoTracking()
+                .Where(c => c.Id == conversationId).Select(c => c.PendingTeamManagerId).FirstOrDefaultAsync();
+            if (waitingTeam == null)
+            {
+                await _hub.Clients.Group("org-all").SendAsync(eventName, payload);
+                return;
+            }
+            await _hub.Clients.Group("org-admin").SendAsync(eventName, payload);
+            await _hub.Clients.Group($"team-waiting-{waitingTeam}").SendAsync(eventName, payload);
         }
     }
 }
