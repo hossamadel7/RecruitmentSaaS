@@ -337,14 +337,20 @@
     }
 
     async function loadMessages(reset) {
-        if (state.loadingMessages || (!reset && !state.hasMoreMessages)) return;
+        // "Older messages" only after the first page is in (the list starts scrolled to the top,
+        // which used to fire this while the chat was still opening and leave the spinner behind)
+        if (!reset && (!state.hasMoreMessages || !state.oldestLoadedAt)) return;
+        if (state.loadingMessages) { if (reset) state.pendingReset = true; return; }
         state.loadingMessages = true;
+        state.pendingReset = false;
 
-        var url = '/api/conversations/' + state.selectedConversationId + '/messages';
+        var conversationId = state.selectedConversationId;
+        var url = '/api/conversations/' + conversationId + '/messages';
         if (!reset && state.oldestLoadedAt) url += '?before=' + encodeURIComponent(state.oldestLoadedAt);
 
         try {
             var data = await api(url);
+            if (conversationId !== state.selectedConversationId) throw 'stale';   // another chat was opened meanwhile
             state.hasMoreMessages = data.hasMore;
             if (data.messages.length) state.oldestLoadedAt = data.messages[0].whatsAppTimestamp;
 
@@ -365,6 +371,7 @@
         } catch (e) { /* leave what's already rendered */ }
 
         state.loadingMessages = false;
+        if (state.pendingReset) loadMessages(true);
     }
 
     function buildMessagesHtml(messages) {

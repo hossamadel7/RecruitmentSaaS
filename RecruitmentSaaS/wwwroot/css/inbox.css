@@ -1345,3 +1345,75 @@
     .conversation-row .conv-avatar { width: 50px; height: 50px; }
 }
 .conversation-row .conv-avatar { background: #dfe5e7; color: #54656f; font-weight: 700; }
+
+/* ══════════════════════════════════════════════════════════
+   Open chat — WhatsApp look on desktop too (phones already have it above)
+   ══════════════════════════════════════════════════════════ */
+.inbox-app { --wa-bg: #efeae2; --wa-out: #d9fdd3; --wa-in: #ffffff; }
+@media (min-width: 992px) {
+    .inbox-col-chat .chat-header {
+        background: var(--wa-bar);
+        border-bottom: 1px solid #e9edef;
+        padding: 10px 16px;
+    }
+    .inbox-col-chat .chat-header .conv-avatar { width: 40px; height: 40px; font-size: 15px; background: #dfe5e7; color: #54656f; }
+    .chat-header-name { font-size: 16px; color: var(--wa-text); }
+    .chat-header-sub { font-size: 13px; color: var(--wa-meta); }
+
+    .chat-messages {
+        padding: 14px 7%;
+        gap: 2px;
+        background-color: var(--wa-bg);
+        background-image: radial-gradient(rgba(0,0,0,.035) 1px, transparent 1px);
+        background-size: 14px 14px;
+    }
+    .chat-date-separator {
+        background: #fff; border: none; box-shadow: 0 1px .5px rgba(11,20,26,.13);
+        color: #54656f; font-size: 12.5px; font-weight: 500; border-radius: 8px; padding: 4px 12px; margin: 10px 0 8px;
+    }
+
+    .chat-bubble {
+        position: relative;
+        max-width: 65%;
+        padding: 6px 9px 4px;
+        border-radius: 8px;
+        font-size: 14.2px;
+        line-height: 1.45;
+        color: var(--wa-text);
+        box-shadow: 0 1px .5px rgba(11,20,26,.13);
+    }
+    .chat-bubble-row.incoming .chat-bubble { background: var(--wa-in); color: var(--wa-text); border-top-right-radius: 0; }
+    .chat-bubble-row.outgoing .chat-bubble { background: var(--wa-out); color: var(--wa-text); border-top-left-radius: 0; }
+
+    .chat-bubble-row.incoming .chat-bubble::before,
+    .chat-bubble-row.outgoing .chat-bubble::before { content: ""; position: absolute; top: 0; width: 8px; height: 13px; }
+    .chat-bubble-row.incoming .chat-bubble::before { right: -8px; background: var(--wa-in); clip-path: polygon(0 0, 100% 0, 0 100%); }
+    .chat-bubble-row.outgoing .chat-bubble::before { left: -8px; background: var(--wa-out); clip-path: polygon(0 0, 100% 0, 100% 100%); }
+    .chat-bubble-row.incoming + .chat-bubble-row.incoming .chat-bubble::before,
+    .chat-bubble-row.outgoing + .chat-bubble-row.outgoing .chat-bubble::before { display: none; }
+    .chat-bubble-row.incoming + .chat-bubble-row.incoming .chat-bubble { border-top-right-radius: 8px; }
+    .chat-bubble-row.outgoing + .chat-bubble-row.outgoing .chat-bubble { border-top-left-radius: 8px; }
+    .chat-bubble-row.incoming + .chat-bubble-row.outgoing,
+    .chat-bubble-row.outgoing + .chat-bubble-row.incoming { margin-top: 8px; }
+    .chat-bubble-row.incoming { padding-right: 8px; }
+    .chat-bubble-row.outgoing { padding-left: 8px; }
+
+    .bubble-meta { font-size: 11px; color: var(--wa-meta); opacity: 1; }
+    .bubble-status-icon { font-size: 15px; color: var(--wa-meta); }
+    .bubble-status-read { color: var(--wa-read); }
+    .bubble-status-failed { color: #ea0038; }
+    .bubble-sender { color: #1fa855; opacity: 1; font-size: 12px; }
+
+    .chat-bubble-row.outgoing .voice-note,
+    .chat-bubble-row.incoming .voice-note { color: #54656f; }
+    .chat-bubble-row .vn-play { color: #00a884; }
+
+    .chat-composer { background: var(--wa-bar); border-top: none; padding: 8px 14px; align-items: flex-end; gap: 8px; }
+    #composer-input { border: none; border-radius: 8px; padding: 10px 14px; background: #fff; box-shadow: none; }
+    #composer-input:focus { border: none; box-shadow: none; }
+    .composer-icon-btn, .composer-inline-btn { color: #54656f; }
+    .composer-send-btn { background: var(--wa-green); }
+    .composer-send-btn:not(:disabled):hover { background: #008f72; transform: none; }
+    .chat-recorder { background: var(--wa-bar); border-top: none; }
+    .chat-recorder .composer-send-btn { background: var(--wa-green); }
+}
