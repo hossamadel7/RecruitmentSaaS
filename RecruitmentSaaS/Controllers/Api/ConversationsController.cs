@@ -180,6 +180,9 @@ namespace RecruitmentSaaS.Controllers.Api
                 CreatedAt = conversation.CreatedAt,
                 OpenedAt = conversation.OpenedAt
             };
+            var windowCloses = await WindowClosesAtAsync(conversation.Id);
+            dto.CanSendFreeText = windowCloses != null;
+            dto.WindowClosesAt = windowCloses;
 
             return Ok(dto);
         }
@@ -298,6 +301,8 @@ namespace RecruitmentSaaS.Controllers.Api
             if (conversation == null) return NotFound();
             if (!await CanSeeAsync(conversation))
                 return Forbid();
+            if (await WindowClosesAtAsync(conversation.Id) == null)
+                return BadRequest(new { error = WindowClosedError });
 
             caption = string.IsNullOrWhiteSpace(caption) ? null : caption.Trim();
             var fileName = Path.GetFileName(file.FileName);
@@ -382,6 +387,20 @@ namespace RecruitmentSaaS.Controllers.Api
                 SenderUserName = CurrentUserName,
                 WhatsAppTimestamp = message.WhatsAppTimestamp
             });
+        }
+
+        private const string WindowClosedError = "العميل لسه ما ردش — واتساب مش هيسمح بالرسائل العادية لحد ما يرد";
+
+        // WhatsApp's customer-service window: free-form messages are allowed for 24 hours after the
+        // customer's last message. Returns when it closes, or null if it's closed (or never opened).
+        private async Task<DateTime?> WindowClosesAtAsync(Guid conversationId)
+        {
+            var lastIncoming = await _context.WhatsAppMessages
+                .Where(m => m.ConversationId == conversationId && m.Direction == (byte)MessageDirection.Incoming)
+                .MaxAsync(m => (DateTime?)m.WhatsAppTimestamp);
+            if (lastIncoming == null) return null;
+            var closes = lastIncoming.Value.AddHours(24);
+            return closes > DateTime.UtcNow ? closes : null;
         }
 
         // ── POST /api/conversations/{id}/forward ──────────────────────────────
@@ -511,6 +530,8 @@ namespace RecruitmentSaaS.Controllers.Api
             if (conversation == null) return NotFound();
             if (!await CanSeeAsync(conversation))
                 return Forbid();
+            if (await WindowClosesAtAsync(conversation.Id) == null)
+                return BadRequest(new { error = WindowClosedError });
 
             var now = DateTime.UtcNow;
 

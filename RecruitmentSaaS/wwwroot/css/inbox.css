@@ -1275,3 +1275,11 @@
 .forward-preview { background: #f0f2f5; border-radius: 10px; padding: 8px 10px; margin-bottom: 12px; max-height: 160px; overflow: hidden; font-size: 13px; }
 .forward-preview .bubble-meta, .forward-preview .bubble-sender, .forward-preview .bubble-error { display: none; }
 .forward-preview img, .forward-preview video { max-height: 120px; border-radius: 8px; }
+
+/* WhatsApp 24-hour window closed: call button + banner, composer locked */
+.chat-window-closed { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 14px; background: #fff7ed; border-top: 1px solid #fed7aa; }
+.chat-window-closed[hidden] { display: none; }
+.window-call-btn { display: inline-flex; align-items: center; gap: 8px; background: #16a34a; color: #fff; border-radius: 99px; padding: 7px 18px; font-weight: 700; font-size: 14px; text-decoration: none; }
+.window-call-btn:hover { background: #15803d; color: #fff; }
+.window-closed-text { font-size: 13px; font-weight: 600; color: #9a3412; text-align: center; line-height: 1.6; }
+.chat-composer.is-locked { opacity: .45; pointer-events: none; }

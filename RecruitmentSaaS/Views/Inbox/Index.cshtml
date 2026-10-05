@@ -79,6 +79,11 @@
 
                 <div class="chat-messages" id="chat-messages"></div>
 
+                @* WhatsApp's 24-hour rule: shown instead of a usable composer when the customer hasn't written *@
+                <div class="chat-window-closed" id="chat-window-closed" hidden>
+                    <a class="window-call-btn" id="window-call-btn" href="#"><i class="bi bi-telephone-fill"></i> اتصال <span dir="ltr" id="window-call-number"></span></a>
+                    <div class="window-closed-text"><i class="bi bi-lock-fill"></i> العميل لسه ما ردش — واتساب مش هيسمح بالرسائل العادية لحد ما يرد</div>
+                </div>
                 <div class="chat-composer" id="chat-composer">
                     <button type="button" class="composer-icon-btn" id="composer-attach-btn" title="إرفاق صورة أو ملف">
                         <i class="bi bi-plus-lg"></i>

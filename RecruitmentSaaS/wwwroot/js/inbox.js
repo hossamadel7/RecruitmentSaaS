@@ -272,11 +272,33 @@
             state.selectedConversation = detail;
             renderChatHeader(detail);
             renderCustomerPanel(detail);
+            applyWindowState(detail);
             await loadMessages(true);
             markRead(id);
             watchConversation(id);
         } catch (e) {
             document.getElementById('chat-messages').innerHTML = '<div class="inbox-empty-state"><i class="bi bi-exclamation-triangle"></i><div>تعذر تحميل المحادثة</div></div>';
+        }
+    }
+
+    // Lock the composer while WhatsApp's 24-hour window is closed; reopen it the moment the customer writes
+    function applyWindowState(c) {
+        var closed = !c.canSendFreeText;
+        var banner = document.getElementById('chat-window-closed');
+        var composer = document.getElementById('chat-composer');
+        if (!banner || !composer) return;
+        banner.hidden = !closed;
+        composer.classList.toggle('is-locked', closed);
+        composer.querySelectorAll('textarea, button, input').forEach(function (el) { el.disabled = closed; });
+        if (closed) {
+            var phone = String(c.contactPhone || '').replace(/[^0-9]/g, '');
+            document.getElementById('window-call-btn').href = 'tel:+' + phone;
+            document.getElementById('window-call-number').textContent = '+' + phone;
+        }
+        clearTimeout(state.windowTimer);
+        if (!closed && c.windowClosesAt) {   // lock again when the 24 hours run out while the chat is open
+            var ms = new Date(c.windowClosesAt).getTime() - Date.now();
+            if (ms > 0 && ms < 2147483647) state.windowTimer = setTimeout(function () { c.canSendFreeText = false; applyWindowState(c); }, ms);
         }
     }
 
@@ -1041,7 +1063,16 @@
             if (payload.conversationId === state.selectedConversationId) {
                 var container = document.getElementById('chat-messages');
                 if (container) appendBubble(container, payload);
-                if (payload.direction === 1) markRead(payload.conversationId);
+                if (payload.direction === 1) {
+                    markRead(payload.conversationId);
+                    // The customer just wrote — the 24-hour window is open again
+                    var sel = state.selectedConversation;
+                    if (sel && sel.id === payload.conversationId && !sel.canSendFreeText) {
+                        sel.canSendFreeText = true;
+                        sel.windowClosesAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+                        applyWindowState(sel);
+                    }
+                }
             }
             scheduleRefresh(true, true);
         });

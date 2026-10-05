@@ -48,6 +48,10 @@ namespace RecruitmentSaaS.Models.DTOs
         public string? LeadFullName { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime OpenedAt { get; set; }
+        /// <summary>The customer wrote within 24 hours, so normal (non-template) messages are allowed.</summary>
+        public bool CanSendFreeText { get; set; }
+        /// <summary>When that 24-hour window closes (UTC); null when it's closed.</summary>
+        public DateTime? WindowClosesAt { get; set; }
     }
 
     public class WhatsAppMessageDto
