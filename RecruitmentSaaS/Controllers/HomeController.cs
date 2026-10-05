@@ -93,13 +93,17 @@ namespace RecruitmentSaaS.Controllers
             string? interestedJobTitle,
             string? notes,
             string? returnTo,
-            string? team)
+            string? team,
+            Guid? formVisitId = null)
         {
-            // Errors go back to whichever page the form was on
-            IActionResult BackToForm() =>
-                !string.IsNullOrWhiteSpace(team) ? Redirect("/register/" + Uri.EscapeDataString(team))
-                : returnTo == "register" ? Redirect("/register")
-                : RedirectToAction("Index");
+            // Errors go back to whichever page the form was on (and are counted on the form visit)
+            IActionResult BackToForm()
+            {
+                RecordVisitError(formVisitId, TempData.Peek("FormError")?.ToString()); // Peek: the form still has to show it
+                return !string.IsNullOrWhiteSpace(team) ? Redirect("/register/" + Uri.EscapeDataString(team))
+                    : returnTo == "register" ? Redirect("/register")
+                    : RedirectToAction("Index");
+            }
 
             if (age is null or < MinAge or > MaxAge)
             {
@@ -151,9 +155,13 @@ namespace RecruitmentSaaS.Controllers
             interestedJobTitle = interestedJobTitle?.Trim();
             var phoneVariants = PhoneNumbers.StoredVariants(phone);
             if (await _context.Leads.AnyAsync(l => phoneVariants.Contains(l.Phone)))
-                return ThankYou(isSenior
+            {
+                var dupUrl = isSenior
                     ? BuildWhatsAppUrl(settings, teamForm, fullName, age.Value, interestedJobTitle, referenceCode: null)
-                    : null);
+                    : null;
+                await RecordVisitOutcomeAsync(formVisitId, 2, null, dupUrl != null);
+                return ThankYou(dupUrl);
+            }
 
             // 4. مين ياخد الـ Lead
             Guid? assignedSalesId = null;
@@ -254,7 +262,41 @@ namespace RecruitmentSaaS.Controllers
                 catch (Exception ex) { _logger.LogError(ex, "Failed to notify about lead {LeadId}", leadId); }
             }
 
+            await RecordVisitOutcomeAsync(formVisitId, 1, leadId, whatsAppUrl != null);
             return ThankYou(whatsAppUrl);
+        }
+
+        // ── Form visit tracking (anonymous; see FormTrackingController) ──────
+        private void RecordVisitError(Guid? visitId, string? error)
+        {
+            if (visitId == null) return;
+            try
+            {
+                var visit = _context.FormVisits.FirstOrDefault(v => v.Id == visitId);
+                if (visit == null) return;
+                visit.ErrorCount++;
+                visit.LastError = string.IsNullOrWhiteSpace(error) ? null : (error.Length > 200 ? error[..200] : error);
+                visit.LastSeenAt = DateTime.UtcNow;
+                _context.SaveChanges();
+            }
+            catch (Exception ex) { _logger.LogWarning(ex, "Could not record a form error for visit {VisitId}", visitId); }
+        }
+
+        private async Task RecordVisitOutcomeAsync(Guid? visitId, byte outcome, Guid? leadId, bool whatsApp)
+        {
+            if (visitId == null) return;
+            try
+            {
+                var visit = await _context.FormVisits.FirstOrDefaultAsync(v => v.Id == visitId);
+                if (visit == null) return;
+                visit.SubmittedAt = DateTime.UtcNow;
+                visit.LastSeenAt = visit.SubmittedAt.Value;
+                visit.Outcome = outcome;
+                visit.LeadId = leadId;
+                visit.WhatsAppRedirect = whatsApp;
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex) { _logger.LogWarning(ex, "Could not record the form outcome for visit {VisitId}", visitId); }
         }
 
         public const byte MinAge = 18;

@@ -1,0 +1,172 @@
+@using RecruitmentSaaS.Models.Entities
+@{
+    ViewData["Title"] = "إحصائيات الفورم";
+    ViewData["Subtitle"] = "مين بيفتح فورم التسجيل، وبيقف فين، وكام واحد بيكمّل";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    int days = ViewBag.Days;
+    string? link = ViewBag.Link;
+    var visits = ViewBag.Visits as List<FormVisit> ?? new();
+    int wrote = ViewBag.WroteOnWhatsApp;
+    var teams = ViewBag.Teams as List<(string Slug, string Name)> ?? new();
+
+    bool Touched(FormVisit v, string f) => (v.FieldsTouched ?? "").Split(',').Contains(f);
+    int seen = visits.Count;
+    int started = visits.Count(v => !string.IsNullOrEmpty(v.FieldsTouched));
+    int submitted = visits.Count(v => v.SubmittedAt != null);
+    int newLeads = visits.Count(v => v.Outcome == 1);
+    int dups = visits.Count(v => v.Outcome == 2);
+    int toWhatsApp = visits.Count(v => v.WhatsAppRedirect);
+    string Pct(int part, int whole) => whole == 0 ? "—" : Math.Round(part * 100.0 / whole) + "%";
+
+    var fieldNames = new Dictionary<string, string> { ["name"] = "الاسم", ["phone"] = "رقم الهاتف", ["age"] = "السن", ["job"] = "الوظيفة", ["notes"] = "الملاحظات" };
+    var sourceNames = new Dictionary<string, string> { ["facebook"] = "فيسبوك", ["instagram"] = "إنستجرام", ["google"] = "جوجل", ["tiktok"] = "تيك توك", ["whatsapp"] = "واتساب", ["direct"] = "مباشر / رابط", ["other"] = "أخرى" };
+    var deviceNames = new Dictionary<string, string> { ["mobile"] = "موبايل", ["desktop"] = "كمبيوتر", ["tablet"] = "تابلت" };
+    string PageName(FormVisit v) => v.Page == "team" ? "فورم فريق " + (teams.FirstOrDefault(t => t.Slug == v.TeamSlug).Name ?? v.TeamSlug) : v.Page == "register" ? "صفحة /register" : "الصفحة الرئيسية";
+
+    // Where people who started but didn't send stopped
+    var quitters = visits.Where(v => !string.IsNullOrEmpty(v.FieldsTouched) && v.SubmittedAt == null).ToList();
+    var stoppedAt = quitters.GroupBy(v => v.LastField ?? "?").Select(g => (Field: g.Key, Count: g.Count())).OrderByDescending(x => x.Count).ToList();
+    var errors = visits.Where(v => v.ErrorCount > 0).GroupBy(v => v.LastError ?? "خطأ").Select(g => (Error: g.Key, Count: g.Count())).OrderByDescending(x => x.Count).ToList();
+
+    List<(string Label, int Seen, int Started, int Sent)> Breakdown(Func<FormVisit, string> key) =>
+        visits.GroupBy(key).Select(g => (g.Key, g.Count(), g.Count(v => !string.IsNullOrEmpty(v.FieldsTouched)), g.Count(v => v.SubmittedAt != null)))
+              .OrderByDescending(x => x.Item2).ToList();
+    var bySource = Breakdown(v => sourceNames.TryGetValue(v.Source, out var n) ? n : v.Source);
+    var byDevice = Breakdown(v => deviceNames.TryGetValue(v.Device, out var n) ? n : v.Device);
+    var byPage = Breakdown(PageName);
+    var byDay = visits.GroupBy(v => v.CreatedAt.AddHours(3).Date).OrderByDescending(g => g.Key)
+                      .Select(g => (Day: g.Key, Seen: g.Count(), Sent: g.Count(v => v.SubmittedAt != null))).ToList();
+}
+
+<style>
+    .fs-wrap { padding: 24px; max-width: 1100px; }
+    .fs-funnel { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+    .fs-step { background: #fff; border: 1px solid var(--border, #e2e8f0); border-radius: 12px; padding: 14px; position: relative; }
+    .fs-step .n { font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
+    .fs-step .l { font-size: .8rem; color: var(--text-muted, #64748b); margin-top: 2px; }
+    .fs-step .p { font-size: .75rem; font-weight: 700; color: #16a34a; margin-top: 6px; }
+    .fs-step.loss .p { color: #dc2626; }
+    .fs-card { background: #fff; border: 1px solid var(--border, #e2e8f0); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .fs-card h3 { font-size: 15px; font-weight: 800; margin: 0 0 4px; }
+    .fs-card .hint { font-size: 12px; color: var(--text-muted, #64748b); margin-bottom: 12px; }
+    .fs-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+    .fs-bar-row .lbl { width: 120px; flex-shrink: 0; font-weight: 600; }
+    .fs-bar { flex: 1; height: 10px; background: #f1f5f9; border-radius: 99px; overflow: hidden; }
+    .fs-bar > span { display: block; height: 100%; background: #f97316; border-radius: 99px; }
+    .fs-bar-row .cnt { width: 70px; text-align: end; color: var(--text-muted, #64748b); }
+    .fs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .fs-table { width: 100%; font-size: 13px; }
+    .fs-table th { font-size: 12px; color: var(--text-muted, #64748b); font-weight: 600; padding: 6px 4px; border-bottom: 1px solid #e2e8f0; }
+    .fs-table td { padding: 7px 4px; border-bottom: 1px solid #f1f5f9; }
+    .fs-good { color: #16a34a; font-weight: 700; }
+</style>
+
+<div class="fs-wrap">
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-end mb-3">
+        <div>
+            <label class="form-label form-label-sm mb-1">الفترة</label>
+            <select name="days" class="form-select form-select-sm" onchange="this.form.submit()">
+                @foreach (var (d, label) in new[] { (1, "آخر 24 ساعة"), (7, "آخر 7 أيام"), (30, "آخر 30 يوم"), (90, "آخر 3 شهور") })
+                {
+                    <option value="@d" selected="@(d == days)">@label</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label form-label-sm mb-1">الفورم</label>
+            <select name="link" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">كل الفورمات</option>
+                <option value="home" selected="@(link == "home")">الصفحة الرئيسية</option>
+                <option value="register" selected="@(link == "register")">صفحة /register</option>
+                @foreach (var t in teams)
+                {
+                    <option value="@t.Slug" selected="@(link == t.Slug)">فورم فريق @t.Name</option>
+                }
+            </select>
+        </div>
+    </form>
+
+    @if (seen == 0)
+    {
+        <div class="fs-card text-center" style="color:var(--text-muted)">
+            لسه مفيش زيارات متسجلة في الفترة دي. التسجيل بيبدأ من وقت تشغيل الميزة — ارجع بعد شوية.
+        </div>
+    }
+    else
+    {
+        <div class="fs-funnel">
+            <div class="fs-step"><div class="n">@seen</div><div class="l">شافوا الفورم</div></div>
+            <div class="fs-step @(started < seen ? "loss" : "")"><div class="n">@started</div><div class="l">بدأوا يملوا</div><div class="p">@Pct(started, seen) من اللي شافوه</div></div>
+            <div class="fs-step @(submitted < started ? "loss" : "")"><div class="n">@submitted</div><div class="l">ضغطوا إرسال</div><div class="p">@Pct(submitted, started) من اللي بدأوا</div></div>
+            <div class="fs-step"><div class="n">@newLeads</div><div class="l">عميل جديد</div><div class="p">@(dups > 0 ? dups + " كانوا متسجلين قبل كده" : "")</div></div>
+            <div class="fs-step"><div class="n">@toWhatsApp</div><div class="l">اتحولوا لواتساب (السن المحدد+)</div></div>
+            <div class="fs-step @(wrote < toWhatsApp ? "loss" : "")"><div class="n">@wrote</div><div class="l">بعتوا رسالة على واتساب</div><div class="p">@Pct(wrote, toWhatsApp) من اللي اتحولوا</div></div>
+        </div>
+
+        <div class="fs-grid">
+            <div class="fs-card">
+                <h3><i class="bi bi-sign-stop text-danger"></i> وقفوا فين؟</h3>
+                <div class="hint">@quitters.Count شخص بدأ يملا الفورم ومشي من غير ما يبعت — آخر خانة وصلها كل واحد:</div>
+                @if (!stoppedAt.Any()) { <div class="hint">مفيش حد ساب الفورم في النص 👍</div> }
+                @foreach (var s in stoppedAt)
+                {
+                    <div class="fs-bar-row">
+                        <span class="lbl">@(fieldNames.TryGetValue(s.Field, out var fn) ? fn : s.Field)</span>
+                        <span class="fs-bar"><span style="width:@(s.Count * 100 / Math.Max(1, quitters.Count))%"></span></span>
+                        <span class="cnt">@s.Count (@Pct(s.Count, quitters.Count))</span>
+                    </div>
+                }
+                <div class="hint mt-2">@(seen - started) شخص شاف الفورم وما لمسش أي خانة.</div>
+            </div>
+
+            <div class="fs-card">
+                <h3><i class="bi bi-exclamation-triangle text-warning"></i> أخطاء ظهرت لهم</h3>
+                <div class="hint">الفورم رجّعلهم رسالة خطأ بعد الإرسال:</div>
+                @if (!errors.Any()) { <div class="hint">مفيش أخطاء 👍</div> }
+                @foreach (var e in errors)
+                {
+                    <div class="fs-bar-row">
+                        <span class="lbl" style="width:170px">@e.Error</span>
+                        <span class="fs-bar"><span style="width:@(e.Count * 100 / Math.Max(1, errors.Sum(x => x.Count)))%;background:#eab308"></span></span>
+                        <span class="cnt">@e.Count</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="fs-grid">
+            @foreach (var (title, icon, rows) in new[] { ("حسب المصدر", "bi-megaphone", bySource), ("حسب الجهاز", "bi-phone", byDevice), ("حسب الفورم", "bi-link-45deg", byPage) })
+            {
+                <div class="fs-card">
+                    <h3><i class="bi @icon"></i> @title</h3>
+                    <table class="fs-table no-stack">
+                        <thead><tr><th></th><th>شافوا</th><th>بدأوا</th><th>بعتوا</th><th>التحويل</th></tr></thead>
+                        <tbody>
+                            @foreach (var r in rows)
+                            {
+                                <tr><td style="font-weight:600">@r.Label</td><td>@r.Seen</td><td>@r.Started</td><td>@r.Sent</td><td class="fs-good">@Pct(r.Sent, r.Seen)</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            <div class="fs-card">
+                <h3><i class="bi bi-calendar3"></i> حسب اليوم</h3>
+                <table class="fs-table no-stack">
+                    <thead><tr><th>اليوم</th><th>شافوا</th><th>بعتوا</th><th>التحويل</th></tr></thead>
+                    <tbody>
+                        @foreach (var d in byDay)
+                        {
+                            <tr><td style="font-weight:600">@d.Day.ToString("dd/MM")</td><td>@d.Seen</td><td>@d.Sent</td><td class="fs-good">@Pct(d.Sent, d.Seen)</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="hint" style="font-size:12px;color:var(--text-muted)">
+            <i class="bi bi-shield-check"></i> الإحصائيات مجهّلة: مش بيتسجل اسم ولا رقم ولا IP لحد ما الشخص يضغط إرسال — بس الخانات اللي لمسها وهو بيملا.
+        </div>
+    }
+</div>

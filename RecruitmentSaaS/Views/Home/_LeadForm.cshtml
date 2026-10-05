@@ -74,6 +74,7 @@
         <form method="post" action="/Home/SubmitLead" novalidate id="leadForm">
             @Html.AntiForgeryToken()
             <input type="hidden" name="returnTo" value="@returnTo" />
+            <input type="hidden" name="formVisitId" id="formVisitId" />
             @if (!string.IsNullOrEmpty(teamSlug))
             {
                 <input type="hidden" name="team" value="@teamSlug" />
@@ -126,6 +127,56 @@
 </div><!-- /form-split -->
 
 <script>
+    /* ── Anonymous form analytics ("إحصائيات الفورم"): seen → fields touched → submitted.
+          No names or numbers are sent — only which field, never what was typed. ── */
+    (function () {
+        var form = document.getElementById('leadForm');
+        if (!form || !window.fetch) return;
+        var page = '@(string.IsNullOrEmpty(teamSlug) ? (returnTo == "register" ? "register" : "home") : "team")';
+        var team = '@(teamSlug ?? "")';
+
+        // Same visit across the redirect back after an error (30 minutes)
+        var key = 'fv:' + location.pathname, id = null;
+        try {
+            var saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+            if (saved && Date.now() - saved.t < 30 * 60 * 1000) id = saved.id;
+        } catch (e) { }
+        if (!id) id = (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+        }));
+        try { sessionStorage.setItem(key, JSON.stringify({ id: id, t: Date.now() })); } catch (e) { }
+        document.getElementById('formVisitId').value = id;
+
+        function send(data) {
+            data.id = id;
+            var body = JSON.stringify(data);
+            if (navigator.sendBeacon && navigator.sendBeacon('/track/form', new Blob([body], { type: 'text/plain' }))) return;
+            fetch('/track/form', { method: 'POST', body: body, keepalive: true, headers: { 'Content-Type': 'text/plain' } }).catch(function () { });
+        }
+
+        // "Seen" only once the form is actually on screen (on the home page it's further down)
+        var q = new URLSearchParams(location.search);
+        var utm = q.get('utm_source') || (q.get('fbclid') ? 'facebook' : q.get('gclid') ? 'google' : q.get('ttclid') ? 'tiktok' : '');
+        var viewData = { ev: 'view', page: page, team: team, ref: document.referrer || '', utmSource: utm, utmCampaign: q.get('utm_campaign') || '' };
+        var seen = false;
+        function markSeen() { if (!seen) { seen = true; send(viewData); } }
+        if ('IntersectionObserver' in window) {
+            new IntersectionObserver(function (entries, obs) {
+                if (entries.some(function (en) { return en.isIntersecting; })) { markSeen(); obs.disconnect(); }
+            }, { threshold: 0.3 }).observe(form);
+        } else markSeen();
+
+        var FIELD_KEYS = { FullName: 'name', Phone: 'phone', Age: 'age', InterestedJobTitle: 'job', Notes: 'notes' };
+        var touched = {};
+        form.addEventListener('focusin', function (e) {
+            var k = FIELD_KEYS[e.target.name];
+            if (!k || touched[k]) return;
+            touched[k] = true;
+            markSeen();
+            send({ ev: 'field', field: k });
+        });
+    })();
+
     (function () {
         /* ── Prevent double submit ── */
         var leadForm  = document.getElementById('leadForm');

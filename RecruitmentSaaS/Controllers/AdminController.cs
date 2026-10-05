@@ -1863,6 +1863,40 @@ namespace RecruitmentSaaS.Controllers
             return RedirectToAction("LeadFormSettings");
         }
 
+        // ── GET /Admin/FormStats ────────────────────────────────────────────
+        // Registration form funnel (anonymous): seen → started → submitted → WhatsApp → wrote to us,
+        // where people stop, the errors they hit, and how each source / device / team link converts.
+        public async Task<IActionResult> FormStats(int days = 7, string? link = null)
+        {
+            days = days is 1 or 7 or 30 or 90 ? days : 7;
+            var since = DateTime.UtcNow.AddDays(-days);
+
+            var query = _context.FormVisits.AsNoTracking().Where(v => v.CreatedAt >= since);
+            if (link == "home") query = query.Where(v => v.Page == "home");
+            else if (link == "register") query = query.Where(v => v.Page == "register");
+            else if (!string.IsNullOrEmpty(link)) query = query.Where(v => v.TeamSlug == link);
+            var visits = await query.ToListAsync();
+
+            // Leads from these visits whose customer actually wrote to us on WhatsApp
+            var leadIds = visits.Where(v => v.LeadId != null).Select(v => v.LeadId!.Value).ToList();
+            var wrote = await _context.WhatsAppConversations.AsNoTracking()
+                .Where(c => c.LeadId != null && leadIds.Contains(c.LeadId.Value)
+                         && c.WhatsAppMessages.Any(m => m.Direction == (byte)MessageDirection.Incoming))
+                .Select(c => c.LeadId!.Value).Distinct().ToListAsync();
+
+            ViewBag.Days = days;
+            ViewBag.Link = link;
+            ViewBag.Visits = visits;
+            ViewBag.WroteOnWhatsApp = wrote.Count;
+            var teams = await _context.TeamLeadForms.AsNoTracking()
+                .Where(f => f.Manager.IsActive)
+                .OrderBy(f => f.Manager.FullName)
+                .Select(f => new { f.Slug, f.Manager.FullName })
+                .ToListAsync();
+            ViewBag.Teams = teams.Select(x => (Slug: x.Slug, Name: x.FullName)).ToList();
+            return View();
+        }
+
         // ── POST /Admin/UpdateAutoFollowup ──────────────────────────────────
         // Automatic opening message for 45+ website leads who didn't start the WhatsApp chat
         [HttpPost]
