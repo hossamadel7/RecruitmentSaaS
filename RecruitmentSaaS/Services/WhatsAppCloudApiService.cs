@@ -40,6 +40,13 @@ namespace RecruitmentSaaS.Services
     {
         Task<WhatsAppSendResult> SendTextMessageAsync(string phoneNumberId, string toWaId, string text, CancellationToken ct = default);
 
+        /// <summary>
+        /// Sends a Meta-approved template — the only way a business may write first (outside the
+        /// customer's 24-hour window). <paramref name="bodyParams"/> fill {{1}}, {{2}}… in order.
+        /// </summary>
+        Task<WhatsAppSendResult> SendTemplateMessageAsync(string phoneNumberId, string toWaId, string templateName,
+                                                         string languageCode, IReadOnlyList<string> bodyParams, CancellationToken ct = default);
+
         /// <summary>Uploads a file to Meta for this number; on success <see cref="WhatsAppSendResult.MediaId"/> is set.</summary>
         Task<WhatsAppSendResult> UploadMediaAsync(string phoneNumberId, byte[] data, string mimeType, string fileName, CancellationToken ct = default);
 
@@ -84,6 +91,27 @@ namespace RecruitmentSaaS.Services
         {
             var payload = NewMessagePayload(toWaId, "text");
             payload["text"] = new JObject { ["preview_url"] = false, ["body"] = text };
+            return PostMessageAsync(phoneNumberId, payload, ct);
+        }
+
+        public Task<WhatsAppSendResult> SendTemplateMessageAsync(string phoneNumberId, string toWaId, string templateName,
+                                                                string languageCode, IReadOnlyList<string> bodyParams, CancellationToken ct = default)
+        {
+            var template = new JObject
+            {
+                ["name"] = templateName,
+                ["language"] = new JObject { ["code"] = languageCode }
+            };
+            if (bodyParams.Count > 0)
+            {
+                var parameters = new JArray();
+                foreach (var value in bodyParams)
+                    parameters.Add(new JObject { ["type"] = "text", ["text"] = value });
+                template["components"] = new JArray { new JObject { ["type"] = "body", ["parameters"] = parameters } };
+            }
+
+            var payload = NewMessagePayload(toWaId, "template");
+            payload["template"] = template;
             return PostMessageAsync(phoneNumberId, payload, ct);
         }
 

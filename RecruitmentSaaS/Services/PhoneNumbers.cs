@@ -44,6 +44,10 @@ namespace RecruitmentSaaS.Services
             return new[] { normalized, "+" + normalized, "00" + normalized };
         }
 
+        /// <summary>The number as WhatsApp wants it (international digits): 01xxxxxxxxx → 201xxxxxxxxx.</summary>
+        public static string ToWhatsAppId(string normalized) =>
+            normalized.Length == 11 && normalized.StartsWith("01") ? "20" + normalized[1..] : normalized;
+
         /// <summary>A usable phone number has at least 8 digits after normalizing.</summary>
         public static bool IsValid(string normalized) => normalized.Length is >= 8 and <= 15;
     }

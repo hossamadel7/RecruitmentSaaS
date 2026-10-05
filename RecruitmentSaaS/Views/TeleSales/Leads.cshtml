@@ -118,10 +118,9 @@
                                 }
                                 else
                                 {
-                                    <span title="العميل لسه ما راسلش على الواتساب — المحادثة هتظهر هنا أول ما يبعت"
-                                          style="font-size:14px;color:#cbd5e1;padding:4px 10px;border:1px solid #e2e8f0;border-radius:6px;margin-inline-end:4px;cursor:not-allowed">
-                                        <i class="bi bi-whatsapp"></i>
-                                    </span>
+                                    <button type="button" class="start-chat-btn" data-lead-id="@lead.Id" title="بدء محادثة واتساب (هيتبعت للعميل رسالة البداية المعتمدة)">
+                                        <i class="bi bi-whatsapp"></i> بدء محادثة
+                                    </button>
                                 }
                                 <a href="/TeleSales/LeadDetail/@lead.Id"
                                    style="font-size:12px;font-weight:600;color:var(--primary);text-decoration:none;padding:5px 12px;border:1px solid var(--primary);border-radius:6px">
@@ -152,3 +151,39 @@
         }
     }
 </div>
+
+<style>
+    .start-chat-btn { font-size: 12px; font-weight: 600; color: #15803d; background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 5px 10px; margin-inline-end: 4px; cursor: pointer; }
+    .start-chat-btn:hover { background: #dcfce7; }
+    .start-chat-btn:disabled { opacity: .6; cursor: wait; }
+    .start-chat-error { display: block; color: #b91c1c; font-size: 11.5px; margin-top: 4px; }
+</style>
+<script>
+    // Sends the approved opening message (if needed) and opens the chat in the WhatsApp section
+    document.addEventListener('click', async function (e) {
+        var btn = e.target.closest('.start-chat-btn');
+        if (!btn || btn.disabled) return;
+        var cell = btn.parentElement, old = cell.querySelector('.start-chat-error');
+        if (old) old.remove();
+        btn.disabled = true;
+        var label = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جارٍ الإرسال...';
+        try {
+            var res = await fetch('/api/conversations/start-for-lead/' + btn.dataset.leadId, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+            var data = {};
+            try { data = await res.json(); } catch (x) { }
+            if (res.ok) { location.href = '/Inbox/Index?c=' + data.conversationId; return; }
+            var err = document.createElement('span');
+            err.className = 'start-chat-error';
+            err.textContent = data.error || 'تعذر بدء المحادثة';
+            cell.appendChild(err);
+        } catch (x) {
+            var err2 = document.createElement('span');
+            err2.className = 'start-chat-error';
+            err2.textContent = 'تعذر الاتصال — حاول تاني';
+            cell.appendChild(err2);
+        }
+        btn.disabled = false;
+        btn.innerHTML = label;
+    });
+</script>
