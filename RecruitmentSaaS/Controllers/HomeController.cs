@@ -117,6 +117,16 @@ namespace RecruitmentSaaS.Controllers
                 TempData["FormError"] = "من فضلك اختر السن";
                 return BackToForm();
             }
+            if (string.IsNullOrWhiteSpace(fullName) || fullName.Trim().Length < 2)
+            {
+                TempData["FormError"] = "من فضلك اكتب اسمك";
+                return BackToForm();
+            }
+            if (string.IsNullOrWhiteSpace(interestedJobTitle) || interestedJobTitle.Trim().Length < 2)
+            {
+                TempData["FormError"] = "من فضلك اكتب الوظيفة المطلوبة";
+                return BackToForm();
+            }
 
             // 1. Find first active branch
             var activeBranches = await _context.Branches

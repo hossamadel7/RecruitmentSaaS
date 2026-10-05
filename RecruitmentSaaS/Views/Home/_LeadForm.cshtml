@@ -84,11 +84,13 @@
                     <label class="field-label">الاسم الكامل <span class="field-required">*</span></label>
                     <input name="FullName" id="fullName" type="text" class="form-control"
                            required maxlength="200" placeholder="مثال: محمد أحمد" />
+                    <div class="field-error" data-for="fullName"></div>
                 </div>
                 <div class="col-12 col-md-6">
                     <label class="field-label">رقم الهاتف <span class="field-required">*</span></label>
                     <input name="Phone" id="phone" type="tel" class="form-control"
-                           required maxlength="30" pattern="[0-9]{10,15}" placeholder="01xxxxxxxxx" />
+                           required maxlength="30" inputmode="tel" placeholder="01xxxxxxxxx" />
+                    <div class="field-error" data-for="phone"></div>
                 </div>
                 <div class="col-12 col-md-6">
                     <label class="field-label">السن <span class="field-required">*</span></label>
@@ -100,11 +102,13 @@
                         }
                         <option value="@HomeController.MaxAge">@HomeController.MaxAge أو أكثر</option>
                     </select>
+                    <div class="field-error" data-for="age"></div>
                 </div>
                 <div class="col-12 col-md-6">
-                    <label class="field-label">الوظيفة المطلوبة</label>
-                    <input name="InterestedJobTitle" type="text" class="form-control"
-                           maxlength="200" placeholder="مثال: سائق، فني كهرباء..." />
+                    <label class="field-label">الوظيفة المطلوبة <span class="field-required">*</span></label>
+                    <input name="InterestedJobTitle" id="jobTitle" type="text" class="form-control"
+                           required maxlength="200" placeholder="مثال: سائق، فني كهرباء..." />
+                    <div class="field-error" data-for="jobTitle"></div>
                 </div>
                 @* Notes stay folded so the form looks short *@
                 <div class="col-12">
@@ -122,8 +126,8 @@
                     </div>
                 </div>
                 <div class="col-12" style="margin-top:4px">
-                    <button type="submit" class="btn-submit" id="submitBtn">
-                        <i class="bi bi-send-fill"></i> أرسل طلبك وهنكلمك حالاً
+                    <button type="submit" class="btn-submit btn-submit-wa" id="submitBtn">
+                        <i class="bi bi-whatsapp"></i> كلمنا على الواتساب
                     </button>
                 </div>
             </div>
@@ -157,6 +161,7 @@
         try { sessionStorage.setItem(key, JSON.stringify({ id: id, t: Date.now() })); } catch (e) { }
         document.getElementById('formVisitId').value = id;
 
+        window.__formTrack = function (data) { send(data); };
         function send(data) {
             data.id = id;
             var body = JSON.stringify(data);
@@ -211,20 +216,63 @@
     })();
 
     (function () {
-        /* ── Prevent double submit ── */
+        /* ── Required fields: the button does nothing until name, phone, age and job are valid ── */
         var leadForm  = document.getElementById('leadForm');
         var submitBtn = document.getElementById('submitBtn');
-        if (leadForm && submitBtn) {
-            leadForm.addEventListener('submit', function () {
-                if (!leadForm.checkValidity()) return;
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>جارٍ الإرسال...';
-            });
+        if (!leadForm || !submitBtn) return;
+
+        function digits(v) {
+            return String(v || '').replace(/[٠-٩]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); })
+                                  .replace(/[۰-۹]/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); })
+                                  .replace(/\D/g, '');
         }
+        var RULES = [
+            ['fullName', function (v) { return v.trim().length >= 2; }, 'من فضلك اكتب اسمك'],
+            ['phone', function (v) { var d = digits(v); return d.length >= 10 && d.length <= 15; }, 'اكتب رقم موبايل صحيح (مثال 01012345678)'],
+            ['age', function (v) { return !!v; }, 'اختار السن'],
+            ['jobTitle', function (v) { return v.trim().length >= 2; }, 'اكتب الوظيفة اللي عايزها']
+        ];
+        function check(id) {
+            var rule = RULES.filter(function (r) { return r[0] === id; })[0];
+            var el = document.getElementById(id), box = leadForm.querySelector('.field-error[data-for="' + id + '"]');
+            var ok = rule[1](el.value);
+            el.classList.toggle('is-invalid', !ok);
+            if (box) box.textContent = ok ? '' : rule[2];
+            return ok;
+        }
+        // Clear the message as soon as the field is fixed
+        RULES.forEach(function (r) {
+            var el = document.getElementById(r[0]);
+            el.addEventListener(r[0] === 'age' ? 'change' : 'input', function () { if (el.classList.contains('is-invalid')) check(r[0]); });
+        });
+
+        leadForm.addEventListener('submit', function (e) {
+            var firstBad = null;
+            RULES.forEach(function (r) { if (!check(r[0]) && !firstBad) firstBad = r[0]; });
+            if (firstBad) {
+                e.preventDefault();
+                var el = document.getElementById(firstBad);
+                el.focus({ preventScroll: true });
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (window.__formTrack) window.__formTrack({ ev: 'verr', field: { fullName: 'name', phone: 'phone', age: 'age', jobTitle: 'job' }[firstBad] });
+                return;
+            }
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>جارٍ الإرسال...';
+        });
     })();
 </script>
 
 <style>
     .more-fields-toggle { background: none; border: 0; color: #1E3055; font-weight: 700; font-size: 14px; padding: 2px 0; }
     .more-fields-toggle i { margin-inline-end: 4px; }
+</style>
+<style>
+    .btn-submit.btn-submit-wa { background: #25D366; box-shadow: 0 4px 14px rgba(37,211,102,.35); font-size: 1.05rem; }
+    .btn-submit.btn-submit-wa::after { display: none; }
+    .btn-submit.btn-submit-wa:hover { background: #1ebe5b; box-shadow: 0 8px 24px rgba(37,211,102,.4); }
+    .btn-submit.btn-submit-wa i { font-size: 1.35rem; }
+    .field-error { color: #dc2626; font-size: 12.5px; font-weight: 600; margin-top: 4px; min-height: 0; }
+    .field-error:empty { display: none; }
+    #leadForm .form-control.is-invalid, #leadForm .form-select.is-invalid { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220,38,38,.12); background-image: none; }
 </style>

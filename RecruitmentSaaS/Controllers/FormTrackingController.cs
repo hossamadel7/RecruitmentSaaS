@@ -81,6 +81,20 @@ namespace RecruitmentSaaS.Controllers
                 visit.LastField = e.Field;
                 visit.LastSeenAt = now;
             }
+            else if (e.Ev == "verr" && visit != null && Fields.Contains(e.Field ?? ""))
+            {
+                // Pressed the button with a missing / wrong field
+                visit.ErrorCount++;
+                visit.LastError = e.Field switch
+                {
+                    "name" => "الاسم ناقص",
+                    "phone" => "رقم الموبايل ناقص أو غلط",
+                    "age" => "السن مش مختار",
+                    "job" => "الوظيفة ناقصة",
+                    _ => "خانة ناقصة"
+                };
+                visit.LastSeenAt = now;
+            }
             else if (e.Ev == "wa" && visit != null)
             {
                 visit.WhatsAppClicked = true;
