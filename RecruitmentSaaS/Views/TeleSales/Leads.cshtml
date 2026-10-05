@@ -45,6 +45,7 @@
                         <th>الكود</th>
                         <th>الاسم</th>
                         <th>الهاتف</th>
+                        <th>السن</th>
                         <th>الحالة</th>
                         <th>آخر تواصل</th>
                         <th>تاريخ الإضافة</th>
@@ -73,12 +74,27 @@
                             </td>
                             <td style="font-weight:600">@lead.FullName</td>
                             <td style="color:var(--text-muted);font-size:13px;direction:ltr;text-align:right">@lead.Phone</td>
+                            <td>@(lead.Age?.ToString() ?? "—")</td>
                             <td><span class="badge @stClass">@stName</span></td>
                             <td style="color:var(--text-muted);font-size:12.5px">
                                 @(lead.LastContactedAt.HasValue ? lead.LastContactedAt.Value.ToString("dd/MM/yyyy") : "—")
                             </td>
                             <td style="color:var(--text-muted);font-size:12.5px">@lead.CreatedAt.ToString("dd/MM/yyyy")</td>
                             <td>
+                                @if (lead.ConversationId.HasValue)
+                                {
+                                    <a href="/Inbox/Index?c=@lead.ConversationId" title="فتح محادثة الواتساب"
+                                       style="font-size:14px;color:#16a34a;text-decoration:none;padding:4px 10px;border:1px solid #86efac;border-radius:6px;margin-inline-end:4px">
+                                        <i class="bi bi-whatsapp"></i>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <span title="العميل لسه ما راسلش على الواتساب — المحادثة هتظهر هنا أول ما يبعت"
+                                          style="font-size:14px;color:#cbd5e1;padding:4px 10px;border:1px solid #e2e8f0;border-radius:6px;margin-inline-end:4px;cursor:not-allowed">
+                                        <i class="bi bi-whatsapp"></i>
+                                    </span>
+                                }
                                 <a href="/TeleSales/LeadDetail/@lead.Id"
                                    style="font-size:12px;font-weight:600;color:var(--primary);text-decoration:none;padding:5px 12px;border:1px solid var(--primary);border-radius:6px">
                                     <i class="bi bi-eye"></i> تفاصيل

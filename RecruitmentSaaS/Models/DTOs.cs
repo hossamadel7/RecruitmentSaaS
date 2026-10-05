@@ -75,6 +75,9 @@ namespace RecruitmentSaaS.Models.DTOs
         public string? CampaignName { get; set; }
         public string? AssignedSalesName { get; set; }
         public string? AssignedOfficeSalesName { get; set; }  // ADD THIS
+        public byte? Age { get; set; }
+        /// <summary>The lead's WhatsApp chat in the inbox, if the customer has written to us.</summary>
+        public Guid? ConversationId { get; set; }
         public string? InterestedJobTitle { get; set; }
         public string? InterestedCountry { get; set; }
         public bool IsConverted { get; set; }

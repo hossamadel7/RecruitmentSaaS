@@ -224,7 +224,13 @@ namespace RecruitmentSaaS.Controllers
                     Status = l.Status,
                     IsConverted = l.IsConverted,
                     CreatedAt = l.CreatedAt,
-                    LastContactedAt = l.LastContactedAt
+                    LastContactedAt = l.LastContactedAt,
+                    Age = l.Age,
+                    ConversationId = _context.WhatsAppConversations
+                        .Where(c => c.LeadId == l.Id && c.AssignedSalesAgentId == userId)
+                        .OrderByDescending(c => c.LastMessageAt)
+                        .Select(c => (Guid?)c.Id)
+                        .FirstOrDefault()
                 })
                 .ToListAsync();
 
