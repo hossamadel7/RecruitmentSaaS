@@ -118,6 +118,32 @@
             </div>
         </section>
 
+        @* Forward a message into another chat (anyone who can see both chats) *@
+        <div class="modal fade" id="forwardModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-forward-fill me-2"></i>تحويل رسالة</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="forward-preview" id="forward-preview"></div>
+                        <input type="search" class="form-control mb-2" id="forward-search" placeholder="ابحث باسم العميل أو رقمه..." />
+                        <div id="forward-list"></div>
+                        <div id="forward-confirm" class="transfer-confirm" hidden>
+                            <div class="transfer-confirm-text" id="fc-text"></div>
+                            <div class="transfer-confirm-error" id="fc-error" hidden></div>
+                            <div class="transfer-confirm-actions">
+                                <button type="button" class="btn btn-primary" id="fc-ok"><i class="bi bi-forward-fill"></i> تحويل</button>
+                                <button type="button" class="btn btn-outline-secondary" id="fc-back">رجوع</button>
+                            </div>
+                        </div>
+                        <div class="transfer-note"><i class="bi bi-info-circle"></i> واتساب بيسمح بالتحويل بس للعملاء اللي بعتولنا خلال آخر 24 ساعة.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         @if (currentRole == "1" || currentRole == "7" || currentRole == "8")
         {
             @* Transfer a chat to another salesperson *@

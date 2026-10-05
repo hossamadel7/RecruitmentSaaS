@@ -67,6 +67,13 @@ namespace RecruitmentSaaS.Models.DTOs
         public DateTime WhatsAppTimestamp { get; set; }
     }
 
+    /// <summary>Forward an existing message (text or media) into another chat.</summary>
+    public class ForwardMessageDto
+    {
+        public Guid SourceConversationId { get; set; }
+        public Guid MessageId { get; set; }
+    }
+
     public class SendMessageDto
     {
         [Required(ErrorMessage = "نص الرسالة مطلوب")]

@@ -395,7 +395,11 @@
             '<div class="' + classes + '" dir="' + (text && !hasMediaShown ? textDir(text) : 'rtl') + '">' + sender + media +
             (text ? '<span class="bubble-text">' + esc(text) + '</span>' : '') +
             meta + failure +
-            '</div></div>';
+            '</div>' +
+            (m.id && m.status !== 6 && m.status !== 2 && (text || hasMediaShown)
+                ? '<button type="button" class="bubble-forward-btn" data-forward="' + m.id + '" title="تحويل الرسالة لمحادثة تانية"><i class="bi bi-forward-fill"></i></button>'
+                : '') +
+            '</div>';
     }
 
     // The same message can arrive several times: the send response plus one realtime event per
@@ -1275,5 +1279,74 @@
         t._timer = setTimeout(function () { t.classList.remove('show'); }, 3500);
     }
 
-    window.Inbox = { showScreen: showScreen, openTransfer: openTransfer };
+    // ── Forward a message into another chat ─────────────────────────────────
+    async function openForward(messageId) {
+        var source = state.selectedConversation;
+        if (!source) return;
+        var modalEl = document.getElementById('forwardModal');
+        if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        var list = document.getElementById('forward-list'), search = document.getElementById('forward-search');
+        var confirmBox = document.getElementById('forward-confirm'), errorBox = document.getElementById('fc-error');
+        var row = document.querySelector('.chat-bubble-row[data-message-id="' + messageId + '"] .chat-bubble');
+        document.getElementById('forward-preview').innerHTML = row ? row.innerHTML : '';
+
+        function showPick() { confirmBox.hidden = true; list.hidden = false; search.hidden = false; }
+        showPick();
+        search.value = '';
+
+        async function load(term) {
+            list.innerHTML = '<div class="text-muted text-center py-3"><span class="spinner-border spinner-border-sm"></span></div>';
+            try {
+                var data = await api('/api/conversations?' + new URLSearchParams(term ? { search: term } : {}).toString());
+                var items = (data.items || []).filter(function (c) { return c.id !== source.id; });
+                list.innerHTML = items.length ? items.map(function (c) {
+                    var name = (c.contactName && c.contactName.replace(/[.\s]/g, '')) ? c.contactName : c.contactPhone;
+                    return '<button type="button" class="transfer-item" data-id="' + esc(c.id) + '" data-name="' + esc(name) + '">' +
+                        '<span class="conv-avatar">' + initials(name) + '</span>' +
+                        '<span class="transfer-name">' + esc(name) + '<small class="d-block text-muted" dir="ltr" style="text-align:right">' + esc(c.contactPhone || '') + '</small></span>' +
+                        '<i class="bi bi-chevron-left"></i></button>';
+                }).join('') : '<div class="text-muted text-center py-3">مفيش محادثات</div>';
+            } catch (e) { list.innerHTML = '<div class="text-danger text-center py-3">تعذر تحميل المحادثات</div>'; }
+        }
+        var debounce = null;
+        search.oninput = function () { clearTimeout(debounce); debounce = setTimeout(function () { load(search.value.trim()); }, 300); };
+        load('');
+
+        list.onclick = function (e) {
+            var item = e.target.closest('.transfer-item');
+            if (!item) return;
+            document.getElementById('fc-text').innerHTML = 'تحويل الرسالة دي لـ <strong>' + esc(item.dataset.name) + '</strong>؟';
+            errorBox.hidden = true;
+            list.hidden = true; search.hidden = true; confirmBox.hidden = false;
+            document.getElementById('fc-back').onclick = showPick;
+            var ok = document.getElementById('fc-ok');
+            ok.onclick = async function () {
+                ok.disabled = true;
+                ok.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جارٍ التحويل...';
+                try {
+                    await api('/api/conversations/' + item.dataset.id + '/forward', {
+                        method: 'POST', body: JSON.stringify({ sourceConversationId: source.id, messageId: messageId })
+                    });
+                    modal.hide();
+                    loadConversations();
+                    showToast('تم تحويل الرسالة لـ ' + item.dataset.name);
+                } catch (err) {
+                    errorBox.textContent = (err.body && err.body.error) || 'تعذر التحويل';
+                    errorBox.hidden = false;
+                } finally {
+                    ok.disabled = false;
+                    ok.innerHTML = '<i class="bi bi-forward-fill"></i> تحويل';
+                }
+            };
+        };
+        modal.show();
+    }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.bubble-forward-btn');
+        if (btn) { e.stopPropagation(); openForward(btn.dataset.forward); }
+    });
+
+    window.Inbox = { showScreen: showScreen, openTransfer: openTransfer, openForward: openForward };
 })();

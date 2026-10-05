@@ -384,6 +384,121 @@ namespace RecruitmentSaaS.Controllers.Api
             });
         }
 
+        // ── POST /api/conversations/{id}/forward ──────────────────────────────
+        // Re-sends a message from one chat into this one: text as text, photos / voice notes /
+        // videos / files re-uploaded from our copy. Free-form messages are only allowed while the
+        // customer's 24-hour window is open (they wrote to us in the last 24 hours).
+        [HttpPost("{id:guid}/forward")]
+        public async Task<IActionResult> Forward(Guid id, [FromBody] ForwardMessageDto dto, CancellationToken ct)
+        {
+            var target = await _context.WhatsAppConversations
+                .Include(c => c.Contact)
+                .Include(c => c.WhatsAppAccount)
+                .FirstOrDefaultAsync(c => c.Id == id, ct);
+            var source = await _context.WhatsAppConversations.AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == dto.SourceConversationId, ct);
+            if (target == null || source == null) return NotFound(new { error = "المحادثة غير موجودة" });
+            if (!await CanSeeAsync(target) || !await CanSeeAsync(source))
+                return Forbid();
+
+            var original = await _context.WhatsAppMessages.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.Id == dto.MessageId && m.ConversationId == source.Id, ct);
+            if (original == null) return NotFound(new { error = "الرسالة غير موجودة" });
+
+            var now = DateTime.UtcNow;
+            var lastIncoming = await _context.WhatsAppMessages
+                .Where(m => m.ConversationId == target.Id && m.Direction == (byte)MessageDirection.Incoming)
+                .MaxAsync(m => (DateTime?)m.WhatsAppTimestamp, ct);
+            if (lastIncoming == null || lastIncoming < now.AddHours(-24))
+                return BadRequest(new { error = "مينفعش تبعت للعميل ده دلوقتي — آخر رسالة منه أقدم من 24 ساعة، وواتساب بيسمح بس برسالة البداية المعتمدة" });
+
+            var type = (WhatsAppMessageType)original.MessageType;
+            var isMedia = type is WhatsAppMessageType.Image or WhatsAppMessageType.Audio or WhatsAppMessageType.Video or WhatsAppMessageType.Document;
+            if (!isMedia && string.IsNullOrWhiteSpace(original.TextBody))
+                return BadRequest(new { error = "نوع الرسالة دي مينفعش يتحوّل" });
+
+            // Media: our server copy, else Meta's (received files stay downloadable for a while)
+            WhatsAppMediaFile? file = null;
+            string mime = "", kindType = "";
+            if (isMedia)
+            {
+                if (string.IsNullOrWhiteSpace(original.MediaId)) return BadRequest(new { error = "الملف مش متاح للتحويل" });
+                file = await _mediaCache.TryGetAsync(original.MediaId, ct) ?? await _cloudApi.DownloadMediaAsync(original.MediaId, ct);
+                if (file == null) return BadRequest(new { error = "تعذر تحميل الملف (يمكن انتهت صلاحيته عند واتساب)" });
+                mime = (file.ContentType ?? "").Split(';')[0].Trim();
+                if (!AllowedMedia.TryGetValue(mime, out var kind))
+                    return BadRequest(new { error = $"نوع الملف ده مينفعش يتبعت على واتساب ({mime})" });
+                if (file.Data.Length > kind.maxBytes)
+                    return BadRequest(new { error = "حجم الملف أكبر من المسموح" });
+                kindType = kind.type;
+            }
+
+            var caption = isMedia && (kindType == "image" || kindType == "video") ? original.TextBody : null;
+            var fileName = kindType == "document" ? (original.TextBody ?? "file") : null;
+
+            var message = new WhatsAppMessage
+            {
+                Id = Guid.NewGuid(),
+                ConversationId = target.Id,
+                WhatsAppAccountId = target.WhatsAppAccountId,
+                Direction = (byte)MessageDirection.Outgoing,
+                MessageType = isMedia ? original.MessageType : (byte)WhatsAppMessageType.Text,
+                MessageSource = (byte)MessageSource.CloudApi,
+                TextBody = isMedia ? (kindType == "document" ? fileName : caption) : original.TextBody,
+                SenderUserId = CurrentUserId,
+                Status = (byte)MessageStatus.Queued,
+                WhatsAppTimestamp = now,
+                CreatedAt = now
+            };
+            _context.WhatsAppMessages.Add(message);
+            target.LastMessageAt = now;
+            target.UpdatedAt = now;
+            if (target.Status == (byte)ConversationStatus.New || target.Status == (byte)ConversationStatus.Open)
+                target.Status = (byte)ConversationStatus.WaitingForCustomer;
+            await _context.SaveChangesAsync(ct);
+
+            var phoneNumberId = target.WhatsAppAccount.PhoneNumberId;
+            var to = target.Contact.WhatsAppPhoneNumber;
+            WhatsAppSendResult result;
+            if (isMedia)
+            {
+                var upload = await _cloudApi.UploadMediaAsync(phoneNumberId, file!.Data, mime, fileName ?? "file", ct);
+                result = upload.Success && upload.MediaId != null
+                    ? await _cloudApi.SendMediaMessageAsync(phoneNumberId, to, kindType, upload.MediaId, caption, fileName, ct)
+                    : upload;
+                message.MediaId = upload.MediaId;
+                if (upload.MediaId != null)
+                    await _mediaCache.SaveAsync(upload.MediaId, new WhatsAppMediaFile { Data = file.Data, ContentType = mime }, ct);
+            }
+            else
+            {
+                result = await _cloudApi.SendTextMessageAsync(phoneNumberId, to, original.TextBody!, ct);
+            }
+
+            message.Status = result.Success ? (byte)MessageStatus.Sent : (byte)MessageStatus.Failed;
+            message.WhatsAppMessageId = result.WhatsAppMessageId;
+            message.ErrorCode = result.ErrorCode;
+            message.ErrorMessage = result.ErrorMessage;
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                ActorId = CurrentUserId,
+                ActorType = 1,
+                EventType = "MessageForwarded",
+                EntityType = "WhatsAppConversation",
+                EntityId = target.Id,
+                NewValueJson = $"{{\"fromConversation\":\"{source.Id}\",\"fromMessage\":\"{original.Id}\"}}",
+                CreatedAt = now
+            });
+            await _context.SaveChangesAsync(ct);
+
+            await _notifier.NewMessageAsync(message, target.AssignedSalesAgentId, CurrentUserName);
+            if (!result.Success)
+                return BadRequest(new { error = "تعذر التحويل" + (string.IsNullOrWhiteSpace(result.ErrorMessage) ? "" : ": " + result.ErrorMessage) });
+
+            return Ok(new { success = true, conversationId = target.Id });
+        }
+
         [HttpPost("{id:guid}/messages")]
         public async Task<IActionResult> SendMessage(Guid id, [FromBody] SendMessageDto dto)
         {

@@ -1261,3 +1261,17 @@
 .transfer-confirm-error { background: #fef2f2; color: #b91c1c; border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 12px; }
 .transfer-confirm-actions { display: flex; gap: 8px; }
 .transfer-confirm-actions .btn { flex: 1; }
+
+/* Forward a message */
+.chat-bubble-row { align-items: center; gap: 6px; }
+.chat-bubble-row.outgoing { flex-direction: row-reverse; justify-content: flex-start; }
+.bubble-forward-btn {
+    flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 0;
+    background: rgba(0,0,0,.06); color: #54656f; font-size: 14px; display: inline-flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity .15s; cursor: pointer;
+}
+.chat-bubble-row:hover .bubble-forward-btn, .bubble-forward-btn:focus { opacity: 1; }
+@media (hover: none) { .bubble-forward-btn { opacity: .7; } }
+.forward-preview { background: #f0f2f5; border-radius: 10px; padding: 8px 10px; margin-bottom: 12px; max-height: 160px; overflow: hidden; font-size: 13px; }
+.forward-preview .bubble-meta, .forward-preview .bubble-sender, .forward-preview .bubble-error { display: none; }
+.forward-preview img, .forward-preview video { max-height: 120px; border-radius: 8px; }
