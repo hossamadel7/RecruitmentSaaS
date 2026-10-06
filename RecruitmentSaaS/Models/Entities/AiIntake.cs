@@ -73,6 +73,9 @@ public partial class LeadFormSetting
     /// <summary>Under-age WhatsApp customers go to the team's rotation instead of waiting with the team leader.</summary>
     public bool AiUnderAgeToRotation { get; set; }
 
+    /// <summary>The assistant's messages as edited on the admin page (JSON key → text); missing keys use the defaults in AiMessages.</summary>
+    public string? AiMessagesJson { get; set; }
+
     public const string DefaultAiGreeting =
         "أهلاً بحضرتك 👋 أنا المساعد الآلي لشركة الفهد العربي لإلحاق العمالة بالخارج (ترخيص 492). هسأل حضرتك ٣ أسئلة بسيطة وبعدها هحولك لمستشار يكمل معاك.";
 }

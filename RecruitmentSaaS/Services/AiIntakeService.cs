@@ -107,7 +107,7 @@ namespace RecruitmentSaaS.Services
                     await HandOffAsync(conversation, "العميل بيبعت رسايل صوتية/صور ومش بيكتب", ct);
                     return;
                 }
-                await SendAsync(conversation, "معلش يا فندم 🙏 مش بقدر أسمع الرسايل الصوتية أو أشوف الصور — ممكن تكتبلي الرد كتابة؟", ct);
+                await SendAsync(conversation, AiMessages.Get(settings, AiMessages.NoVoice), ct);
                 return;
             }
 
@@ -140,7 +140,7 @@ namespace RecruitmentSaaS.Services
             if (isFirstReply)
             {
                 // Their first message is usually "السلام عليكم" or a question — greet, then ask the name
-                reply = greeting + "\n\n" + IntakeScript.AskName;
+                reply = greeting + "\n\n" + AiMessages.Get(settings, AiMessages.AskName);
             }
             else
             {
@@ -168,10 +168,11 @@ namespace RecruitmentSaaS.Services
                     return;
                 }
 
-                var prefix = asked ? IntakeScript.ConsultantWillExplain + "\n\n" : "";
-                reply = prefix + (conversation.IntakeName == null ? (ok ? IntakeScript.AskName : IntakeScript.AskNameAgain)
-                    : conversation.IntakeAge == null ? (ok ? IntakeScript.AskAge(conversation.IntakeName) : IntakeScript.AskAgeAgain)
-                    : (ok ? IntakeScript.AskJob : IntakeScript.AskJobAgain));
+                var prefix = asked ? AiMessages.Get(settings, AiMessages.ConsultantWillExplain) + "\n\n" : "";
+                var next = conversation.IntakeName == null ? (ok ? AiMessages.AskName : AiMessages.AskNameAgain)
+                    : conversation.IntakeAge == null ? (ok ? AiMessages.AskAge : AiMessages.AskAgeAgain)
+                    : (ok ? AiMessages.AskJob : AiMessages.AskJobAgain);
+                reply = prefix + AiMessages.Get(settings, next, conversation.IntakeName);
             }
 
             conversation.IntakeTurns++;
@@ -266,12 +267,7 @@ namespace RecruitmentSaaS.Services
                 });
                 await _context.SaveChangesAsync(ct);
 
-                var welcome = await _context.LeadFormSettings.AsNoTracking().Select(s => new { s.WelcomeMessageEnabled, s.WelcomeMessage }).FirstOrDefaultAsync(ct);
-                var customer = conversation.IntakeName ?? "";
-                var text = welcome?.WelcomeMessageEnabled == true && !string.IsNullOrWhiteSpace(welcome.WelcomeMessage)
-                    ? welcome.WelcomeMessage.Replace("{agent}", agent.DisplayNameAr).Replace("{name}", customer)
-                    : $"شكراً يا أ/ {customer} 🙏 معاك أ/ {agent.DisplayNameAr} هتكمل مع حضرتك دلوقتي.";
-                await SendAsync(conversation, text, ct);
+                await SendAsync(conversation, AiMessages.Get(settings, AiMessages.DoneAssigned, conversation.IntakeName, agent.DisplayNameAr), ct);
 
                 await NotifyAsync(agent.Id, "عميل جديد من واتساب (المساعد الآلي)",
                     $"{lead.FullName} — السن {conversation.IntakeAge?.ToString() ?? "؟"} — {conversation.IntakeJob ?? ""}", $"/Inbox/Index?c={conversation.Id}");
@@ -282,7 +278,7 @@ namespace RecruitmentSaaS.Services
                 // Under the age (or no salesperson available): waits with the team leader, like the form
                 conversation.PendingTeamManagerId = team;
                 await _context.SaveChangesAsync(ct);
-                await SendAsync(conversation, $"شكراً يا أ/ {conversation.IntakeName ?? "فندم"} 🙏 هيتواصل مع حضرتك مستشار من فريقنا قريب.", ct);
+                await SendAsync(conversation, AiMessages.Get(settings, AiMessages.DoneWaiting, conversation.IntakeName), ct);
                 await NotifyTeamLeaderAsync(team, "عميل جديد من واتساب في انتظار التعيين",
                     $"{lead.FullName} — السن {conversation.IntakeAge?.ToString() ?? "؟"} — {conversation.IntakeJob ?? ""}", conversation.Id, ct);
                 await _notifier.ConversationAssignedAsync(conversation.Id, conversation.WhatsAppAccountId, null, null);
@@ -299,7 +295,8 @@ namespace RecruitmentSaaS.Services
             conversation.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync(ct);
 
-            await SendAsync(conversation, "تمام 🙏 هحول حضرتك لمسؤول الفريق وهيرد عليك في أقرب وقت.", ct);
+            var settings = await _context.LeadFormSettings.AsNoTracking().FirstOrDefaultAsync(ct);
+            await SendAsync(conversation, AiMessages.Get(settings, AiMessages.HandOff), ct);
             var who = conversation.IntakeName ?? conversation.Contact.Name ?? conversation.Contact.WhatsAppPhoneNumber;
             await NotifyTeamLeaderAsync(team, "محادثة واتساب محتاجة تدخلك", $"{who} — {reason}", conversation.Id, ct);
             await _notifier.ConversationAssignedAsync(conversation.Id, conversation.WhatsAppAccountId, null, null);
@@ -483,23 +480,11 @@ namespace RecruitmentSaaS.Services
 namespace RecruitmentSaaS.Services
 {
     /// <summary>
-    /// The assistant's questions and the rules for reading the answers (Egyptian Arabic, free text).
+    /// The rules for reading the customer's answers (the texts it sends are in AiMessages) (Egyptian Arabic, free text).
     /// No AI: digits / common number words for the age, simple keyword lists for "I want a person" etc.
     /// </summary>
     public static class IntakeScript
     {
-        public const string AskName = "اسم حضرتك إيه؟ (الاسم ثلاثي لو سمحت)";
-        public const string AskNameAgain = "ممكن تكتبلي اسم حضرتك؟ 🙏";
-        public static string AskAge(string? name) =>
-            $"تمام يا أ/ {FirstName(name)} 🙏 حضرتك عندك كام سنة؟ (اكتب الرقم بس، مثال: 45)";
-        public const string AskAgeAgain = "معلش اكتبلي السن بالأرقام بس، مثال: 45";
-        public const string AskJob = "حضرتك عايز تشتغل إيه؟ (مثال: سواق، نجار، فني كهرباء)";
-        public const string AskJobAgain = "ممكن تكتبلي الوظيفة اللي حضرتك عايزها؟ (مثال: سواق، نجار)";
-        public const string ConsultantWillExplain = "المستشار هيوضح لحضرتك كل التفاصيل بعد ما نخلص الأسئلة دي 🙏";
-
-        private static string FirstName(string? name) =>
-            string.IsNullOrWhiteSpace(name) ? "فندم" : name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
-
         /// <summary>Same spelling for the same word: أ/إ/آ→ا، ة→ه، ى→ي، Arabic digits → 0-9, no tashkeel.</summary>
         public static string Normalize(string? text)
         {

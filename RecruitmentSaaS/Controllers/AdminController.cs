@@ -1897,7 +1897,8 @@ namespace RecruitmentSaaS.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AiAssistant(bool enabled, bool testMode, string? testNumbers, string? greeting,
-                                                     int waitAfterAgeMinutes, int waitNoAgeHours, bool underAgeToRotation, List<Guid>? numberIds)
+                                                     int waitAfterAgeMinutes, int waitNoAgeHours, bool underAgeToRotation, List<Guid>? numberIds,
+                                                     Dictionary<string, string>? messages)
         {
             if (waitAfterAgeMinutes < 5 || waitAfterAgeMinutes > 7 * 24 * 60 || waitNoAgeHours < 1 || waitNoAgeHours > 14 * 24)
             {
@@ -1922,6 +1923,7 @@ namespace RecruitmentSaaS.Controllers
             settings.AiWaitAfterAgeMinutes = waitAfterAgeMinutes;
             settings.AiWaitNoAgeHours = waitNoAgeHours;
             settings.AiUnderAgeToRotation = underAgeToRotation;
+            settings.AiMessagesJson = RecruitmentSaaS.Services.AiMessages.ToJson(messages);
             settings.UpdatedAt = DateTime.UtcNow;
             settings.UpdatedById = CurrentUserId;
 
