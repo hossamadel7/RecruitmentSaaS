@@ -1890,8 +1890,6 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.HandoffReasons = chats.Where(c => c.IntakeHandoffReason != null)
                 .GroupBy(c => c.IntakeHandoffReason!).Select(g => (Reason: g.Key, Count: g.Count()))
                 .OrderByDescending(x => x.Count).ToList();
-            ViewBag.ApiKeyConfigured = !string.IsNullOrWhiteSpace(HttpContext.RequestServices.GetRequiredService<IConfiguration>()["Anthropic:ApiKey"])
-                                    || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY"));
             return View(settings);
         }
 

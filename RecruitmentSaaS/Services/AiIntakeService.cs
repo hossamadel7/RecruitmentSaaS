@@ -1,9 +1,5 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
 using System.Threading.Channels;
-using Anthropic;
-using Anthropic.Exceptions;
-using Anthropic.Models.Messages;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
 using RecruitmentSaaS.Models.Entities;
@@ -11,14 +7,14 @@ using RecruitmentSaaS.Models.Entities;
 namespace RecruitmentSaaS.Services
 {
     /// <summary>
-    /// AI WhatsApp assistant ("المساعد الآلي"). For a customer who writes to a team's number directly
+    /// Scripted WhatsApp assistant ("المساعد الآلي", free — no AI service). For a customer who writes to a team's number directly
     /// (no form, not already a lead) it asks name, age and job, then creates the lead and routes it the
     /// same way the registration form does: age at/above the threshold → the team's rotation, under it
     /// → waits with the team leader. Anything it can't handle goes to the team leader.
     /// </summary>
     public class AiIntakeService
     {
-        public const int MaxTurns = 8;
+        public const int MaxTurns = 10;
         public const byte LeadSourceWhatsApp = 5;
         private const string AssistantName = "المساعد الآلي";
 
@@ -26,17 +22,15 @@ namespace RecruitmentSaaS.Services
         private readonly IWhatsAppCloudApiService _cloudApi;
         private readonly IInboxRealtimeNotifier _notifier;
         private readonly INotificationService _notifications;
-        private readonly IConfiguration _config;
         private readonly ILogger<AiIntakeService> _logger;
 
         public AiIntakeService(RecruitmentCrmContext context, IWhatsAppCloudApiService cloudApi, IInboxRealtimeNotifier notifier,
-                               INotificationService notifications, IConfiguration config, ILogger<AiIntakeService> logger)
+                               INotificationService notifications, ILogger<AiIntakeService> logger)
         {
             _context = context;
             _cloudApi = cloudApi;
             _notifier = notifier;
             _notifications = notifications;
-            _config = config;
             _logger = logger;
         }
 
@@ -123,143 +117,68 @@ namespace RecruitmentSaaS.Services
                 return;
             }
 
-            AssistantTurn? turn;
-            try
+            // What the customer just wrote (all their messages since our last reply)
+            var said = string.Join(" ", fresh.Where(m => !string.IsNullOrWhiteSpace(m.TextBody)).Select(m => m.TextBody!.Trim()));
+            var norm = IntakeScript.Normalize(said);
+
+            if (IntakeScript.WantsPerson(norm))
             {
-                turn = await AskClaudeAsync(conversation, settings, history, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogError(ex, "AI assistant failed for conversation {ConversationId}", conversationId);
-                await HandOffAsync(conversation, "المساعد الآلي واجه مشكلة تقنية", ct);
+                await HandOffAsync(conversation, "العميل طلب يكلم موظف", ct);
                 return;
             }
-            if (turn == null)
+            if (IntakeScript.NotInterested(norm))
             {
-                await HandOffAsync(conversation, "المساعد الآلي ما قدرش يرد", ct);
-                return;
-            }
-
-            // Someone took the chat over while the model was thinking — stay quiet
-            var noTextCount = conversation.IntakeNoTextCount;
-            await _context.Entry(conversation).ReloadAsync(ct);
-            if (conversation.IntakeStatus != (byte)IntakeStatus.Collecting) return;
-            conversation.IntakeNoTextCount = noTextCount;
-
-            // Keep what we already know; take new answers (age must be a real 18–65)
-            if (!string.IsNullOrWhiteSpace(turn.Name)) conversation.IntakeName = Cut(turn.Name, 200);
-            if (turn.Age is >= 18 and <= 65 && conversation.IntakeAge == null)
-            {
-                conversation.IntakeAge = (byte)turn.Age.Value;
-                conversation.IntakeAgeAt = DateTime.UtcNow;
-            }
-            if (!string.IsNullOrWhiteSpace(turn.Job)) conversation.IntakeJob = Cut(turn.Job, 200);
-
-            if (turn.Handoff)
-            {
-                await HandOffAsync(conversation, string.IsNullOrWhiteSpace(turn.HandoffReason) ? "العميل طلب يكلم موظف" : Cut(turn.HandoffReason, 200)!, ct);
+                await HandOffAsync(conversation, "العميل قال إنه مش مهتم", ct);
                 return;
             }
 
-            if (conversation.IntakeName != null && conversation.IntakeAge != null && conversation.IntakeJob != null)
+            var greeting = string.IsNullOrWhiteSpace(settings.AiGreeting) ? LeadFormSetting.DefaultAiGreeting : settings.AiGreeting!;
+            var isFirstReply = lastOut == null;
+            var asked = IntakeScript.IsQuestion(norm);
+            string reply;
+
+            if (isFirstReply)
             {
-                await CompleteAsync(conversation, settings, ct);
-                return;
+                // Their first message is usually "السلام عليكم" or a question — greet, then ask the name
+                reply = greeting + "\n\n" + IntakeScript.AskName;
+            }
+            else
+            {
+                // Read the answer to whatever we asked last: name → age → job
+                var ok = false;
+                if (conversation.IntakeName == null)
+                {
+                    var name = asked ? null : IntakeScript.ParseName(said);
+                    if (name != null) { conversation.IntakeName = Cut(name, 200); ok = true; }
+                }
+                else if (conversation.IntakeAge == null)
+                {
+                    var age = IntakeScript.ParseAge(said);
+                    if (age != null) { conversation.IntakeAge = (byte)age.Value; conversation.IntakeAgeAt = DateTime.UtcNow; ok = true; }
+                }
+                else if (conversation.IntakeJob == null)
+                {
+                    var job = asked ? null : IntakeScript.ParseJob(said);
+                    if (job != null) { conversation.IntakeJob = Cut(job, 200); ok = true; }
+                }
+
+                if (conversation.IntakeName != null && conversation.IntakeAge != null && conversation.IntakeJob != null)
+                {
+                    await CompleteAsync(conversation, settings, ct);
+                    return;
+                }
+
+                var prefix = asked ? IntakeScript.ConsultantWillExplain + "\n\n" : "";
+                reply = prefix + (conversation.IntakeName == null ? (ok ? IntakeScript.AskName : IntakeScript.AskNameAgain)
+                    : conversation.IntakeAge == null ? (ok ? IntakeScript.AskAge(conversation.IntakeName) : IntakeScript.AskAgeAgain)
+                    : (ok ? IntakeScript.AskJob : IntakeScript.AskJobAgain));
             }
 
             conversation.IntakeTurns++;
-            await SendAsync(conversation, string.IsNullOrWhiteSpace(turn.Reply) ? "ممكن توضحلي أكتر يا فندم؟" : turn.Reply.Trim(), ct);
+            await SendAsync(conversation, reply, ct);
         }
 
         private static string? Cut(string? v, int max) => v == null ? null : (v.Trim().Length > max ? v.Trim()[..max] : v.Trim());
-
-        // ── Claude ──────────────────────────────────────────────────────────
-
-        private sealed record AssistantTurn(string? Reply, string? Name, int? Age, string? Job, bool Handoff, string? HandoffReason);
-
-        private async Task<AssistantTurn?> AskClaudeAsync(WhatsAppConversation conversation, LeadFormSetting settings,
-                                                          List<WhatsAppMessage> history, CancellationToken ct)
-        {
-            var apiKey = _config["Anthropic:ApiKey"] ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
-            if (string.IsNullOrWhiteSpace(apiKey)) throw new InvalidOperationException("Anthropic API key is not configured");
-            var client = new AnthropicClient { ApiKey = apiKey, Timeout = TimeSpan.FromSeconds(60) };
-
-            var greeting = string.IsNullOrWhiteSpace(settings.AiGreeting) ? LeadFormSetting.DefaultAiGreeting : settings.AiGreeting!;
-            var known = $"Already collected — name: {conversation.IntakeName ?? "(not yet)"}, age: {(conversation.IntakeAge?.ToString() ?? "(not yet)")}, job: {conversation.IntakeJob ?? "(not yet)"}.";
-            var system = $"""
-You are the WhatsApp intake assistant of "الفهد العربي لإلحاق العمالة المصرية بالخارج", a licensed Egyptian overseas recruitment company (license 492). The first consultation is free.
-
-Your only job: collect three things from the customer, then a human consultant takes over:
-1. full name (الاسم), 2. age in years (السن) — an exact whole number, 3. the job they want (الوظيفة المطلوبة).
-
-How to talk:
-- Egyptian Arabic, short, warm and polite ("حضرتك", "يا فندم"). One question per message. No long paragraphs.
-- If this is your first message in the chat, start it with exactly this greeting, then ask for the name: "{greeting}"
-- Ask in this order: name → age → job. Skip what's already known. Accept free answers ("عندي ٤٧ سنة", "شغال سواق نقل تقيل").
-- Age must be an exact number between 18 and 65. If the answer is vague ("فوق الأربعين", "كبير شوية") or out of range, ask again politely for the exact age. Never guess an age.
-- You are an automated assistant; if asked, say so honestly.
-- If they ask about salaries, countries, visas, fees or timelines: say briefly that the consultant will explain everything after these questions, then continue. Never promise anything.
-- Set handoff=true (with a short Arabic reason) if they ask to talk to a person/employee, are angry or insulting, say they're not interested, or the conversation clearly can't continue.
-
-Output: reply = your next WhatsApp message to the customer (Arabic). name/age/job = everything known so far (null if not given yet). When all three are known, reply with a short thank-you.
-
-{known}
-""";
-
-            // WhatsApp history → alternating user/assistant turns (consecutive messages merged)
-            var turns = new List<(Role Role, string Text)>();
-            foreach (var m in history)
-            {
-                var role = m.Direction == (byte)MessageDirection.Incoming ? Role.User : Role.Assistant;
-                var text = string.IsNullOrWhiteSpace(m.TextBody)
-                    ? (role == Role.User ? "[رسالة صوتية أو صورة — غير مقروءة]" : "")
-                    : m.TextBody!.Trim();
-                if (text.Length == 0) continue;
-                if (turns.Count > 0 && turns[^1].Role == role) turns[^1] = (role, turns[^1].Text + "\n" + text);
-                else turns.Add((role, text));
-            }
-            while (turns.Count > 0 && turns[0].Role != Role.User) turns.RemoveAt(0);   // must start with the customer
-            if (turns.Count == 0 || turns[^1].Role != Role.User) return null;          // nothing new to answer
-
-            var schema = new Dictionary<string, JsonElement>
-            {
-                ["type"] = JsonSerializer.SerializeToElement("object"),
-                ["properties"] = JsonSerializer.SerializeToElement(new Dictionary<string, object>
-                {
-                    ["reply"] = new { type = "string" },
-                    ["name"] = new { type = new[] { "string", "null" } },
-                    ["age"] = new { type = new[] { "integer", "null" } },
-                    ["job"] = new { type = new[] { "string", "null" } },
-                    ["handoff"] = new { type = "boolean" },
-                    ["handoff_reason"] = new { type = new[] { "string", "null" } },
-                }),
-                ["required"] = JsonSerializer.SerializeToElement(new[] { "reply", "name", "age", "job", "handoff", "handoff_reason" }),
-                ["additionalProperties"] = JsonSerializer.SerializeToElement(false),
-            };
-
-            var response = await client.Messages.Create(new MessageCreateParams
-            {
-                Model = _config["Anthropic:Model"] ?? "claude-opus-5-5",
-                MaxTokens = 2000,
-                System = system,
-                OutputConfig = new OutputConfig { Effort = Effort.Low, Format = new JsonOutputFormat { Schema = schema } },
-                Messages = turns.Select(t => new MessageParam { Role = t.Role, Content = t.Text }).ToList(),
-            }, ct);
-
-            if (response.StopReason == "refusal")
-            {
-                _logger.LogWarning("AI assistant refusal for conversation {ConversationId}", conversation.Id);
-                return null;
-            }
-
-            var json = string.Concat(response.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text));
-            using var doc = JsonDocument.Parse(json);
-            var r = doc.RootElement;
-            string? Str(string k) => r.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
-            int? Int(string k) => r.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i) ? i : null;
-            bool Bool(string k) => r.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.True;
-            return new AssistantTurn(Str("reply"), Str("name"), Int("age"), Str("job"), Bool("handoff"), Str("handoff_reason"));
-        }
 
         // ── Outcomes ────────────────────────────────────────────────────────
 
@@ -557,6 +476,157 @@ Output: reply = your next WhatsApp message to the customer (Arabic). name/age/jo
                 }
                 await Task.Delay(TimeSpan.FromMinutes(5), ct);
             }
+        }
+    }
+}
+
+namespace RecruitmentSaaS.Services
+{
+    /// <summary>
+    /// The assistant's questions and the rules for reading the answers (Egyptian Arabic, free text).
+    /// No AI: digits / common number words for the age, simple keyword lists for "I want a person" etc.
+    /// </summary>
+    public static class IntakeScript
+    {
+        public const string AskName = "اسم حضرتك إيه؟ (الاسم ثلاثي لو سمحت)";
+        public const string AskNameAgain = "ممكن تكتبلي اسم حضرتك؟ 🙏";
+        public static string AskAge(string? name) =>
+            $"تمام يا أ/ {FirstName(name)} 🙏 حضرتك عندك كام سنة؟ (اكتب الرقم بس، مثال: 45)";
+        public const string AskAgeAgain = "معلش اكتبلي السن بالأرقام بس، مثال: 45";
+        public const string AskJob = "حضرتك عايز تشتغل إيه؟ (مثال: سواق، نجار، فني كهرباء)";
+        public const string AskJobAgain = "ممكن تكتبلي الوظيفة اللي حضرتك عايزها؟ (مثال: سواق، نجار)";
+        public const string ConsultantWillExplain = "المستشار هيوضح لحضرتك كل التفاصيل بعد ما نخلص الأسئلة دي 🙏";
+
+        private static string FirstName(string? name) =>
+            string.IsNullOrWhiteSpace(name) ? "فندم" : name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
+
+        /// <summary>Same spelling for the same word: أ/إ/آ→ا، ة→ه، ى→ي، Arabic digits → 0-9, no tashkeel.</summary>
+        public static string Normalize(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            var sb = new System.Text.StringBuilder(text.Length);
+            foreach (var ch in text.Trim().ToLowerInvariant())
+            {
+                var c = ch switch
+                {
+                    'أ' or 'إ' or 'آ' => 'ا',
+                    'ة' => 'ه',
+                    'ى' => 'ي',
+                    >= '٠' and <= '٩' => (char)('0' + (ch - '٠')),
+                    >= '۰' and <= '۹' => (char)('0' + (ch - '۰')),
+                    _ => ch
+                };
+                if (c is >= '\u064B' and <= '\u0652') continue;   // tashkeel
+                if (c == 'ـ') continue;                           // tatweel
+                sb.Append(c);
+            }
+            return sb.ToString();
+        }
+
+        private static readonly string[] PersonWords =
+        {
+            "اكلم حد", "اكلم موظف", "اكلم انسان", "اكلم بني ادم", "اكلم مسئول", "اكلم مسؤول", "اكلم المسئول", "اكلم المسؤول",
+            "عايز موظف", "عاوز موظف", "عايز حد", "عاوز حد", "حد يكلمني", "حد يرد", "موظف حقيقي", "مش روبوت", "مش عايز روبوت",
+            "اتصلوا بي", "كلموني", "كلمني", "رقم تليفون", "عايز اتصل", "عاوز اتصل"
+        };
+        private static readonly string[] NotInterestedWords =
+        {
+            "مش مهتم", "مش عايز حاجه", "مش عاوز حاجه", "مش عايز اسافر", "مش عاوز اسافر", "لا شكرا", "شكرا مش",
+            "الغي", "الغاء", "متبعتليش", "ما تبعتليش", "بطلوا", "بلوك"
+        };
+
+        public static bool WantsPerson(string norm) => PersonWords.Any(w => norm.Contains(Normalize(w)));
+        public static bool NotInterested(string norm) => NotInterestedWords.Any(w => norm.Contains(Normalize(w)));
+
+        private static readonly string[] QuestionWords =
+            { "؟", "?", "كام", "بكام", "المرتب", "مرتب", "الراتب", "راتب", "فيزا", "تاشيره", "السفر امتي", "امتي", "فين", "ليه", "ازاي", "هل ", "مصاريف", "فلوس", "تكلفه" };
+        public static bool IsQuestion(string norm) => QuestionWords.Any(w => norm.Contains(Normalize(w)));
+
+        private static readonly string[] GreetingOnly =
+            { "السلام عليكم ورحمه الله وبركاته", "السلام عليكم ورحمه الله", "السلام عليكم", "سلام عليكم", "السلام", "اهلا وسهلا", "اهلا",
+              "مرحبا", "صباح الخير", "صباح النور", "صباح الفل", "مساء الخير", "مساء النور", "مساء الفل", "هاي", "hi", "hello",
+              "ازيك", "ازيكم", "تمام", "ok", "اوك", "ايوه", "نعم", "حاضر", "شكرا", "يا جماعه", "يا فندم" };
+
+        /// <summary>A name: letters only, 2–5 words, not just a greeting. "انا اسمي محمد احمد" → "محمد احمد".</summary>
+        public static string? ParseName(string? said)
+        {
+            // Punctuation → spaces so "السلام عليكم، أنا…" matches "السلام عليكم"
+            var text = System.Text.RegularExpressions.Regex.Replace(said ?? "", @"[,،.!؛;:\-]+", " ");
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+            // "السلام عليكم انا محمد" → drop the greeting(s) first and keep what follows
+            for (var stripped = true; stripped;)
+            {
+                stripped = false;
+                text = text.Trim(' ', ',', '،', '.', '!', '-');
+                var normText = Normalize(text);
+                foreach (var g in GreetingOnly.OrderByDescending(x => x.Length))
+                {
+                    var ng = Normalize(g);
+                    if (normText.StartsWith(ng + " ") || normText == ng)
+                    {
+                        text = text.Length > ng.Length ? text[ng.Length..] : "";
+                        stripped = true;
+                        break;
+                    }
+                }
+            }
+            text = text.Trim(' ', ',', '،', '.', '!', '-');
+            foreach (var lead in new[] { "انا اسمي", "أنا اسمي", "اسمي", "انا", "أنا", "الاسم", "إسمي" })
+                if (text.StartsWith(lead + " ")) { text = text[(lead.Length + 1)..].Trim(); break; }
+            text = new string(text.Where(c => char.IsLetter(c) || c == ' ').ToArray()).Trim();
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+            if (text.Count(char.IsLetter) < 2) return null;
+            var norm = Normalize(text);
+            if (GreetingOnly.Any(g => norm == Normalize(g) || norm.StartsWith(Normalize(g) + " "))) return null;   // "مساء الخير يا جماعة" isn't a name
+            var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length > 6) return null;   // a sentence, not a name
+            return text;
+        }
+
+        private static readonly (string Word, int Value)[] Units =
+        {
+            ("واحد", 1), ("اتنين", 2), ("اثنين", 2), ("تلاته", 3), ("ثلاثه", 3), ("تلات", 3), ("ثلاث", 3),
+            ("اربعه", 4), ("اربع", 4), ("خمسه", 5), ("خمس", 5), ("سته", 6), ("ست", 6), ("سبعه", 7), ("سبع", 7),
+            ("تمانيه", 8), ("ثمانيه", 8), ("تمن", 8), ("تمان", 8), ("تسعه", 9), ("تسع", 9)
+        };
+        private static readonly (string Word, int Value)[] Tens =
+            { ("عشرين", 20), ("تلاتين", 30), ("ثلاثين", 30), ("اربعين", 40), ("خمسين", 50), ("ستين", 60) };
+        private static readonly (string Word, int Value)[] Teens =
+            { ("تمنتاشر", 18), ("ثمانتاشر", 18), ("ثمانيه عشر", 18), ("تسعتاشر", 19), ("تسعه عشر", 19) };
+
+        /// <summary>An exact age 18–65 from "45", "٤٥", "عندي 47 سنه", "خمسه واربعين"… null when unclear.</summary>
+        public static int? ParseAge(string? said)
+        {
+            var norm = Normalize(said);
+            var numbers = System.Text.RegularExpressions.Regex.Matches(norm, @"\d{1,3}").Select(m => int.Parse(m.Value)).ToList();
+            if (numbers.Count == 1) return numbers[0] is >= 18 and <= 65 ? numbers[0] : null;
+            if (numbers.Count > 1) return null;   // "من 40 ل 50" — not an exact age
+
+            foreach (var (w, v) in Teens) if (norm.Contains(w)) return v;
+            var words = norm.Split(new[] { ' ', 'و', ',', '،', '.' }, StringSplitOptions.RemoveEmptyEntries);
+            int? tens = null, units = null;
+            foreach (var word in words)
+            {
+                var t = Tens.FirstOrDefault(x => word == x.Word || word == "و" + x.Word);
+                if (t.Word != null) { tens = t.Value; continue; }
+                var u = Units.FirstOrDefault(x => word == x.Word);
+                if (u.Word != null && units == null) units = u.Value;
+            }
+            if (tens == null) return null;
+            var age = tens.Value + (units ?? 0);
+            return age is >= 18 and <= 65 ? age : null;
+        }
+
+        /// <summary>A job: some letters, not a greeting, not a long story.</summary>
+        public static string? ParseJob(string? said)
+        {
+            var text = (said ?? "").Trim();
+            foreach (var lead in new[] { "عايز اشتغل", "عاوز اشتغل", "عايز أشتغل", "عاوز أشتغل", "انا", "أنا", "شغال" })
+                if (text.StartsWith(lead + " ")) { text = text[(lead.Length + 1)..].Trim(); break; }
+            if (text.Count(char.IsLetter) < 2) return null;
+            var norm = Normalize(text);
+            if (GreetingOnly.Any(g => norm == Normalize(g))) return null;
+            return text.Length > 200 ? text[..200] : text;
         }
     }
 }

@@ -6,7 +6,6 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 
     var numbers = ViewBag.Numbers as List<(WhatsAppAccount Account, string? Team)> ?? new();
-    bool apiKey = ViewBag.ApiKeyConfigured == true;
     var reasons = ViewBag.HandoffReasons as List<(string Reason, int Count)> ?? new();
     var greeting = string.IsNullOrWhiteSpace(Model.AiGreeting) ? LeadFormSetting.DefaultAiGreeting : Model.AiGreeting;
     var waitAfterAge = Model.AiWaitAfterAgeMinutes > 0 ? Model.AiWaitAfterAgeMinutes : LeadFormSetting.DefaultAiWaitAfterAgeMinutes;
@@ -15,13 +14,11 @@
 
 <div style="padding:24px;max-width:1000px">
 
-    @if (!apiKey)
-    {
-        <div class="alert alert-warning">
-            <i class="bi bi-key-fill me-1"></i>
-            مفتاح Anthropic API لسه مش متضاف على السيرفر — المساعد مش هيقدر يرد لحد ما يتضاف.
-        </div>
-    }
+    <div class="alert alert-info" style="font-size:13px">
+        <i class="bi bi-info-circle-fill me-1"></i>
+        مساعد مجاني بأسئلة ثابتة (من غير ذكاء اصطناعي): بيسأل الاسم ← السن ← الوظيفة، وبيفهم السن بالأرقام أو بالكلام (زي "خمسة وأربعين")،
+        ولو العميل طلب يكلم موظف أو قال إنه مش مهتم بيحوّله لمسؤول الفريق.
+    </div>
 
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-3"><div class="card"><div class="card-body p-3"><div style="font-size:1.5rem;font-weight:800">@ViewBag.StatTotal</div><div style="font-size:12px;color:#64748B">محادثات اتعامل معاها (30 يوم)</div></div></div></div>
