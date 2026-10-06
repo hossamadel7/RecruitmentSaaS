@@ -218,7 +218,11 @@ namespace RecruitmentSaaS.Controllers.Api
 
             var query = _context.WhatsAppMessages.AsNoTracking().Where(m => m.ConversationId == id);
             if (before.HasValue)
-                query = query.Where(m => m.CreatedAt < before.Value);
+            {
+                // The browser sends UTC ("…Z"); compare as the plain UTC value the DB stores
+                var beforeUtc = DateTime.SpecifyKind(before.Value.Kind == DateTimeKind.Local ? before.Value.ToUniversalTime() : before.Value, DateTimeKind.Unspecified);
+                query = query.Where(m => m.CreatedAt < beforeUtc);
+            }
 
             var messages = await query
                 .OrderByDescending(m => m.CreatedAt)

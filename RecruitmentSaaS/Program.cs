@@ -40,7 +40,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddMemoryCache();
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+    // Dates go to the browser as UTC ("…Z") so they show in the viewer's local time
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter()));
 
 builder.Services.AddHttpClient();
 
@@ -60,7 +62,8 @@ builder.Services.AddScoped<RecruitmentSaaS.Services.IVisaParserService,
 builder.Services.AddHostedService<RecruitmentSaaS.Services.AppointmentReminderService>();
 
 // WhatsApp Shared Inbox
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter()));
 builder.Services.AddScoped<IWhatsAppCloudApiService, WhatsAppCloudApiService>();
 builder.Services.AddScoped<LeadChatStarter>();
 builder.Services.AddScoped<AiIntakeService>();                // AI WhatsApp assistant (name / age / job)
