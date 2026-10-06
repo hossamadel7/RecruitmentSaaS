@@ -41,6 +41,23 @@ public partial class RecruitmentCrmContext
                 .HasConstraintName("FK_demorecruitment_WA_Cnv_PendTeam");
         });
 
+        // AI WhatsApp assistant
+        modelBuilder.Entity<WhatsAppConversation>(entity =>
+        {
+            entity.Property(e => e.IntakeName).HasMaxLength(200);
+            entity.Property(e => e.IntakeJob).HasMaxLength(200);
+            entity.Property(e => e.IntakeHandoffReason).HasMaxLength(200);
+            entity.Property(e => e.IntakeStartedAt).HasPrecision(0);
+            entity.Property(e => e.IntakeAgeAt).HasPrecision(0);
+            entity.Property(e => e.IntakeLastCustomerAt).HasPrecision(0);
+            entity.HasIndex(e => e.IntakeStatus, "IX_demorecruitment_WA_Cnv_Intake").HasFilter("(\"IntakeStatus\" = 1)");
+        });
+        modelBuilder.Entity<LeadFormSetting>(entity =>
+        {
+            entity.Property(e => e.AiTestNumbers).HasMaxLength(1000);
+            entity.Property(e => e.AiGreeting).HasMaxLength(1000);
+        });
+
         modelBuilder.Entity<FormVisit>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK_demorecruitment_FormVisits");

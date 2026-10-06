@@ -79,6 +79,8 @@ namespace RecruitmentSaaS.Services
             else
             {
                 conversation.LeadId ??= lead.Id;
+                if (conversation.IntakeStatus == (byte)IntakeStatus.Collecting)
+                    conversation.IntakeStatus = (byte)IntakeStatus.StoppedByStaff;   // a person took over from the AI assistant
                 if (conversation.AssignedSalesAgentId == null)
                 {
                     conversation.AssignedSalesAgentId = agent.Id;

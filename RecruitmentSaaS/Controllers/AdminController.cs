@@ -1863,6 +1863,80 @@ namespace RecruitmentSaaS.Controllers
             return RedirectToAction("LeadFormSettings");
         }
 
+        // ── GET /Admin/AiAssistant ──────────────────────────────────────────
+        // The AI WhatsApp assistant: on/off, test mode, greeting, wait times, numbers, and how it's doing
+        public async Task<IActionResult> AiAssistant()
+        {
+            var settings = await _context.LeadFormSettings.AsNoTracking().FirstOrDefaultAsync()
+                ?? new LeadFormSetting { SeniorAgeThreshold = HomeController.DefaultSeniorAgeThreshold };
+
+            var numbers = await _context.WhatsAppAccounts.AsNoTracking().Where(a => a.IsActive).OrderBy(a => a.Name).ToListAsync();
+            var teamForms = await _context.TeamLeadForms.AsNoTracking().Where(f => f.WhatsAppNumber != null)
+                .Select(f => new { f.WhatsAppNumber, f.Manager.FullName }).ToListAsync();
+            string Digits(string? v) => new string((v ?? "").Where(char.IsDigit).ToArray());
+            ViewBag.Numbers = numbers.Select(a => (Account: a,
+                Team: teamForms.FirstOrDefault(f => Digits(f.WhatsAppNumber) == Digits(a.DisplayPhoneNumber))?.FullName)).ToList();
+
+            var since = DateTime.UtcNow.AddDays(-30);
+            var chats = await _context.WhatsAppConversations.AsNoTracking()
+                .Where(c => c.IntakeStartedAt != null && c.IntakeStartedAt >= since)
+                .Select(c => new { c.IntakeStatus, c.IntakeHandoffReason, c.IntakeStartedAt, c.UpdatedAt })
+                .ToListAsync();
+            ViewBag.StatTotal = chats.Count;
+            ViewBag.StatCollecting = chats.Count(c => c.IntakeStatus == (byte)IntakeStatus.Collecting);
+            ViewBag.StatCompleted = chats.Count(c => c.IntakeStatus == (byte)IntakeStatus.Completed);
+            ViewBag.StatHandedOff = chats.Count(c => c.IntakeStatus == (byte)IntakeStatus.HandedOff);
+            ViewBag.StatStopped = chats.Count(c => c.IntakeStatus == (byte)IntakeStatus.StoppedByStaff);
+            ViewBag.HandoffReasons = chats.Where(c => c.IntakeHandoffReason != null)
+                .GroupBy(c => c.IntakeHandoffReason!).Select(g => (Reason: g.Key, Count: g.Count()))
+                .OrderByDescending(x => x.Count).ToList();
+            ViewBag.ApiKeyConfigured = !string.IsNullOrWhiteSpace(HttpContext.RequestServices.GetRequiredService<IConfiguration>()["Anthropic:ApiKey"])
+                                    || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY"));
+            return View(settings);
+        }
+
+        // ── POST /Admin/AiAssistant ─────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AiAssistant(bool enabled, bool testMode, string? testNumbers, string? greeting,
+                                                     int waitAfterAgeMinutes, int waitNoAgeHours, bool underAgeToRotation, List<Guid>? numberIds)
+        {
+            if (waitAfterAgeMinutes < 5 || waitAfterAgeMinutes > 7 * 24 * 60 || waitNoAgeHours < 1 || waitNoAgeHours > 14 * 24)
+            {
+                TempData["Error"] = "أوقات الانتظار مش منطقية — راجعها";
+                return RedirectToAction("AiAssistant");
+            }
+            greeting = greeting?.Trim();
+            if (greeting?.Length > 1000) greeting = greeting[..1000];
+            testNumbers = testNumbers?.Trim();
+            if (testNumbers?.Length > 1000) testNumbers = testNumbers[..1000];
+
+            var settings = await _context.LeadFormSettings.FirstOrDefaultAsync();
+            if (settings == null)
+            {
+                settings = new LeadFormSetting { Id = Guid.NewGuid(), SeniorAgeThreshold = HomeController.DefaultSeniorAgeThreshold };
+                _context.LeadFormSettings.Add(settings);
+            }
+            settings.AiEnabled = enabled;
+            settings.AiTestMode = testMode;
+            settings.AiTestNumbers = string.IsNullOrEmpty(testNumbers) ? null : testNumbers;
+            settings.AiGreeting = string.IsNullOrEmpty(greeting) ? null : greeting;
+            settings.AiWaitAfterAgeMinutes = waitAfterAgeMinutes;
+            settings.AiWaitNoAgeHours = waitNoAgeHours;
+            settings.AiUnderAgeToRotation = underAgeToRotation;
+            settings.UpdatedAt = DateTime.UtcNow;
+            settings.UpdatedById = CurrentUserId;
+
+            var picked = numberIds ?? new List<Guid>();
+            foreach (var account in await _context.WhatsAppAccounts.Where(a => a.IsActive).ToListAsync())
+                account.AiAssistantEnabled = picked.Contains(account.Id);
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = !enabled ? "تم حفظ الإعدادات (المساعد متوقف)"
+                : testMode ? "تم الحفظ ✅ المساعد شغال في وضع التجربة بس" : "تم الحفظ ✅ المساعد شغال مع العملاء";
+            return RedirectToAction("AiAssistant");
+        }
+
         // ── GET /Admin/FormStats ────────────────────────────────────────────
         // Registration form funnel (anonymous): seen → started → submitted → WhatsApp → wrote to us,
         // where people stop, the errors they hit, and how each source / device / team link converts.

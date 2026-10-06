@@ -27,15 +27,21 @@ namespace RecruitmentSaaS.Services
         private readonly IWhatsAppCloudApiService _cloudApi;
 
         private readonly INotificationService _notifications;
+        private readonly AiIntakeService _aiIntake;
+        private readonly AiIntakeQueue _aiQueue;
 
         public WhatsAppWebhookProcessor(
             RecruitmentCrmContext context,
             IInboxRealtimeNotifier notifier,
             ILogger<WhatsAppWebhookProcessor> logger,
             IWhatsAppCloudApiService cloudApi,
-            INotificationService notifications)
+            INotificationService notifications,
+            AiIntakeService aiIntake,
+            AiIntakeQueue aiQueue)
         {
             _notifications = notifications;
+            _aiIntake = aiIntake;
+            _aiQueue = aiQueue;
             _context = context;
             _notifier = notifier;
             _logger = logger;
@@ -175,6 +181,11 @@ namespace RecruitmentSaaS.Services
             await TryConnectHandoffAsync(conversation, account, fromWaId, textBody, now, ct);
             await TryAssignDirectChatAsync(conversation, textBody, ct);
 
+            // A new chat from someone who isn't a lead yet: the AI assistant collects name / age / job
+            var aiOwnsChat = false;
+            try { aiOwnsChat = await _aiIntake.ClaimAsync(conversation, account, fromWaId, ct); }
+            catch (Exception ex) { _logger.LogWarning(ex, "AI assistant check failed for {ConversationId}", conversation.Id); }
+
             await _context.SaveChangesAsync(ct);
 
             if (isNewConversation)
@@ -194,6 +205,11 @@ namespace RecruitmentSaaS.Services
             await _notifier.NewMessageAsync(message, conversation.AssignedSalesAgentId);
             await _notifier.UnreadCountUpdatedAsync(conversation.Id, account.Id, conversation.UnreadCount, conversation.AssignedSalesAgentId);
 
+            if (aiOwnsChat)
+            {
+                _aiQueue.Enqueue(conversation.Id);   // answered a few seconds later, off the webhook
+                return;
+            }
             await TrySendWelcomeAsync(conversation, account, ct);
         }
 

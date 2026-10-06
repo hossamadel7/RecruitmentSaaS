@@ -25,7 +25,7 @@
 
     string SourceLabel(Lead l) => l.GoogleSheetId != null ? "Google Sheets"
         : l.TeamManagerId != null ? "فورم الفريق"
-        : l.LeadSource switch { 1 => "فيسبوك", 2 => "الموقع", 3 => "زيارة الفرع", _ => "—" };
+        : l.LeadSource switch { 1 => "فيسبوك", 2 => "الموقع", 3 => "زيارة الفرع", 5 => "واتساب (المساعد الآلي)", _ => "—" };
 
     // Keep the current filters in links and after assigning
     int? minAge = ViewBag.MinAge as int?;

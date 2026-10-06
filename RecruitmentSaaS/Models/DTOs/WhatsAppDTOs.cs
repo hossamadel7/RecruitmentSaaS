@@ -43,6 +43,12 @@ namespace RecruitmentSaaS.Models.DTOs
         public byte? LastMessageType { get; set; }
         public DateTime? LastMessageAt { get; set; }
         public string? LeadCode { get; set; }
+        /// <summary>AI assistant state (IntakeStatus enum) and what it collected so far.</summary>
+        public byte IntakeStatus { get; set; }
+        public string? IntakeName { get; set; }
+        public byte? IntakeAge { get; set; }
+        public string? IntakeJob { get; set; }
+        public string? IntakeHandoffReason { get; set; }
     }
 
     public class ConversationDetailDto : ConversationListItemDto

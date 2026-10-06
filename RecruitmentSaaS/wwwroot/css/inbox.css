@@ -1417,3 +1417,16 @@
     .chat-recorder { background: var(--wa-bar); border-top: none; }
     .chat-recorder .composer-send-btn { background: var(--wa-green); }
 }
+
+/* AI assistant */
+.conv-ai-badge { font-size: 13px; flex-shrink: 0; margin-inline-end: 2px; }
+.intake-box { border: 1px solid #c7d2fe; background: #eef2ff; border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-size: 13px; }
+.intake-box.intake-2 { border-color: #bbf7d0; background: #f0fdf4; }
+.intake-box.intake-3 { border-color: #fed7aa; background: #fff7ed; }
+.intake-box.intake-4 { border-color: #e2e8f0; background: #f8fafc; }
+.intake-title { font-weight: 800; margin-bottom: 6px; }
+.intake-row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.intake-row span { color: #64748b; }
+.intake-missing { color: #94a3b8; font-weight: 500; }
+.intake-reason { margin-top: 6px; color: #9a3412; font-weight: 600; }
+.intake-hint { margin-top: 6px; font-size: 11.5px; color: #64748b; }

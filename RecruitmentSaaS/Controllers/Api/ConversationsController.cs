@@ -128,6 +128,7 @@ namespace RecruitmentSaaS.Controllers.Api
                     UnreadCount = c.UnreadCount,
                     LastMessageAt = c.LastMessageAt,
                     LeadCode = c.Lead != null ? c.Lead.LeadCode : null,
+                    IntakeStatus = c.IntakeStatus,
                     LastMessagePreview = _context.WhatsAppMessages
                         .Where(m => m.ConversationId == c.Id)
                         .OrderByDescending(m => m.CreatedAt)
@@ -188,7 +189,12 @@ namespace RecruitmentSaaS.Controllers.Api
                 LeadFullName = conversation.Lead?.FullName,
                 LeadCode = conversation.Lead?.LeadCode,
                 CreatedAt = conversation.CreatedAt,
-                OpenedAt = conversation.OpenedAt
+                OpenedAt = conversation.OpenedAt,
+                IntakeStatus = conversation.IntakeStatus,
+                IntakeName = conversation.IntakeName,
+                IntakeAge = conversation.IntakeAge,
+                IntakeJob = conversation.IntakeJob,
+                IntakeHandoffReason = conversation.IntakeHandoffReason
             };
             var windowCloses = await WindowClosesAtAsync(conversation.Id);
             dto.CanSendFreeText = windowCloses != null;
@@ -228,7 +234,7 @@ namespace RecruitmentSaaS.Controllers.Api
                     Status = m.Status,
                     ErrorMessage = m.ErrorMessage,
                     SenderUserId = m.SenderUserId,
-                    SenderUserName = m.SenderUser != null ? m.SenderUser.FullName : null,
+                    SenderUserName = m.SenderUser != null ? m.SenderUser.FullName : (m.MessageSource == (byte)MessageSource.System ? "🤖 تلقائي" : null),
                     ReplyToMessageId = m.ReplyToMessageId,
                     WhatsAppTimestamp = m.WhatsAppTimestamp
                 })
@@ -314,6 +320,8 @@ namespace RecruitmentSaaS.Controllers.Api
             if (await WindowClosesAtAsync(conversation.Id) == null)
                 return BadRequest(new { error = WindowClosedError });
 
+            if (conversation.IntakeStatus == (byte)IntakeStatus.Collecting)
+                conversation.IntakeStatus = (byte)IntakeStatus.StoppedByStaff;   // a person took over from the AI assistant
             caption = string.IsNullOrWhiteSpace(caption) ? null : caption.Trim();
             var fileName = Path.GetFileName(file.FileName);
             var now = DateTime.UtcNow;
@@ -441,6 +449,8 @@ namespace RecruitmentSaaS.Controllers.Api
             if (lastIncoming == null || lastIncoming < now.AddHours(-24))
                 return BadRequest(new { error = "مينفعش تبعت للعميل ده دلوقتي — آخر رسالة منه أقدم من 24 ساعة، وواتساب بيسمح بس برسالة البداية المعتمدة" });
 
+            if (target.IntakeStatus == (byte)IntakeStatus.Collecting)
+                target.IntakeStatus = (byte)IntakeStatus.StoppedByStaff;   // a person took over from the AI assistant
             var type = (WhatsAppMessageType)original.MessageType;
             var isMedia = type is WhatsAppMessageType.Image or WhatsAppMessageType.Audio or WhatsAppMessageType.Video or WhatsAppMessageType.Document;
             if (!isMedia && string.IsNullOrWhiteSpace(original.TextBody))
@@ -543,6 +553,8 @@ namespace RecruitmentSaaS.Controllers.Api
             if (await WindowClosesAtAsync(conversation.Id) == null)
                 return BadRequest(new { error = WindowClosedError });
 
+            if (conversation.IntakeStatus == (byte)IntakeStatus.Collecting)
+                conversation.IntakeStatus = (byte)IntakeStatus.StoppedByStaff;   // a person took over from the AI assistant
             var now = DateTime.UtcNow;
 
             var message = new WhatsAppMessage
@@ -663,6 +675,8 @@ namespace RecruitmentSaaS.Controllers.Api
             var previousAgentId = conversation.AssignedSalesAgentId;
             if (previousAgentId == dto.AgentId) return Ok(new { success = true, leadMoved = false });
 
+            if (conversation.IntakeStatus == (byte)IntakeStatus.Collecting)
+                conversation.IntakeStatus = (byte)IntakeStatus.StoppedByStaff;   // a person took over from the AI assistant
             conversation.AssignedSalesAgentId = dto.AgentId;
             if (dto.AgentId.HasValue) conversation.PendingTeamManagerId = null; // no longer waiting
             conversation.UpdatedAt = DateTime.UtcNow;

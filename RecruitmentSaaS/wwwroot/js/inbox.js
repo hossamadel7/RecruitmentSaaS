@@ -230,7 +230,7 @@
                 '  <div class="conv-body">' +
                 '    <div class="conv-top-row"><span class="conv-name">' + esc(name) + '</span><span class="conv-time">' + listTime(c.lastMessageAt) + '</span></div>' +
                 '    <div class="conv-bottom-row">' +
-                '      <div class="conv-preview">' + listPreview(c) + '</div>' +
+                '      <div class="conv-preview">' + (c.intakeStatus === 1 ? '<span class="conv-ai-badge" title="المساعد الآلي بيجمع البيانات">🤖</span>' : '') + listPreview(c) + '</div>' +
                 (c.unreadCount > 0 ? '<span class="conv-unread-badge">' + c.unreadCount + '</span>' : '') +
                 '    </div>' +
                 '    <div class="conv-meta-row">' +
@@ -270,6 +270,19 @@
             out += '<span>' + (c.lastMessagePreview ? esc(c.lastMessagePreview) : '—') + '</span>';
         }
         return out;
+    }
+
+    // What the AI assistant has collected (and whether it's still talking)
+    function intakeBox(c) {
+        if (!c.intakeStatus) return '';
+        var state = { 1: '🤖 المساعد الآلي بيجمع البيانات', 2: '✅ المساعد الآلي جمع البيانات', 3: '⚠️ المساعد الآلي حوّل المحادثة', 4: '👤 موظف استلم المحادثة من المساعد' }[c.intakeStatus] || '';
+        function row(label, v) { return '<div class="intake-row"><span>' + label + '</span><strong>' + (v != null && v !== '' ? esc(v) : '<span class="intake-missing">لسه</span>') + '</strong></div>'; }
+        return '<div class="intake-box intake-' + c.intakeStatus + '">' +
+            '<div class="intake-title">' + state + '</div>' +
+            row('الاسم', c.intakeName) + row('السن', c.intakeAge) + row('الوظيفة', c.intakeJob) +
+            (c.intakeHandoffReason ? '<div class="intake-reason">السبب: ' + esc(c.intakeHandoffReason) + '</div>' : '') +
+            (c.intakeStatus === 1 ? '<div class="intake-hint">أي رد منك أو تحويل للمحادثة هيوقف المساعد.</div>' : '') +
+            '</div>';
     }
 
     function patchListRow(conversationId, patch) {
@@ -869,6 +882,7 @@
             '<div style="text-align:center;font-weight:700;font-size:15px">' + esc(c.contactName) + '</div>' +
             '<div style="text-align:center;color:var(--text-muted);font-size:12px;margin-bottom:6px">' + esc(c.contactPhone) + '</div>' +
 
+            intakeBox(c) +
             '<div class="customer-field"><span class="customer-field-label">رقم الواتساب المستقبِل</span><span class="customer-field-value">' + esc(c.whatsAppAccountName) + '</span></div>' +
             '<div class="customer-field"><span class="customer-field-label">المندوب المسؤول</span>' + agentField + '</div>' +
             '<div class="customer-field"><span class="customer-field-label">حالة المحادثة</span>' +

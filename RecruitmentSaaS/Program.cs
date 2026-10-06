@@ -63,6 +63,9 @@ builder.Services.AddHostedService<RecruitmentSaaS.Services.AppointmentReminderSe
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IWhatsAppCloudApiService, WhatsAppCloudApiService>();
 builder.Services.AddScoped<LeadChatStarter>();
+builder.Services.AddScoped<AiIntakeService>();                // AI WhatsApp assistant (name / age / job)
+builder.Services.AddSingleton<AiIntakeQueue>();
+builder.Services.AddHostedService<AiIntakeWorker>();
 builder.Services.AddHostedService<LeadAutoFollowupService>();   // opening template for 45+ leads who never wrote
 builder.Services.AddScoped<IWhatsAppWebhookProcessor, WhatsAppWebhookProcessor>();
 builder.Services.AddScoped<IInboxRealtimeNotifier, InboxRealtimeNotifier>();
