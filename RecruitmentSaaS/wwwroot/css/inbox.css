@@ -756,6 +756,24 @@
 
 @keyframes recorder-pulse { 50% { opacity: .25; } }
 
+/* Paused: listen before sending, like WhatsApp */
+.recorder-status[hidden], .recorder-review[hidden] { display: none !important; }
+.recorder-review { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.recorder-play {
+    width: 36px; height: 36px; flex-shrink: 0; border: none; border-radius: 50%;
+    background: transparent; color: #00a884; font-size: 26px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.recorder-track { flex: 1; height: 4px; border-radius: 2px; background: #d1d7db; overflow: hidden; }
+.recorder-progress { height: 100%; width: 0; background: #00a884; }
+.recorder-review-time { font-size: 13px; font-weight: 600; color: var(--text-muted); min-width: 34px; }
+.recorder-pause {
+    width: 40px; height: 40px; flex-shrink: 0; border: none; border-radius: 50%;
+    background: transparent; color: #e5484d; font-size: 22px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.recorder-pause.is-paused { color: #e5484d; border: 2px solid #e5484d; font-size: 18px; }
+
 /* Photo / video preview before sending */
 #chat-active { position: relative; }
 

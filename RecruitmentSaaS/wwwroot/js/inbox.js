@@ -295,6 +295,7 @@
     // ── Conversation selection / chat ───────────────────────────────────────
     async function selectConversation(id) {
         var isNewSelection = id !== state.selectedConversationId;
+        if (isNewSelection && recorder) stopRecording(true); // a recording never follows you to another chat
         if (isNewSelection) state.panelDirty = false; // unsaved edits belonged to the previous chat
         state.selectedConversationId = id;
         state.oldestLoadedAt = null;
@@ -613,9 +614,17 @@
         return 5;
     }
 
-    async function sendMedia(blob, fileName, caption) {
-        var conversationId = state.selectedConversationId;
+    async function sendMedia(blob, fileName, caption, toConversationId) {
+        var conversationId = toConversationId || state.selectedConversationId;
         if (!conversationId || !blob) return;
+        if (conversationId !== state.selectedConversationId) {
+            // Not the open chat (a voice note that finished encoding after you left): upload without drawing it here
+            var bg = new FormData();
+            bg.append('file', blob, fileName);
+            if (caption) bg.append('caption', caption);
+            fetch('/api/conversations/' + conversationId + '/media', { method: 'POST', body: bg }).catch(function () { });
+            return;
+        }
 
         var type = mediaTypeFor(blob.type);
         var container = document.getElementById('chat-messages');
@@ -715,7 +724,7 @@
     // WhatsApp only plays OGG/Opus as a real voice note. Browsers record WebM (Chrome) or MP4
     // (Safari), so we use opus-recorder (WASM Ogg/Opus encoder) and fall back to MediaRecorder.
     var OPUS_CDN = 'https://cdn.jsdelivr.net/npm/opus-recorder@8.0.5/dist/';
-    var recorder = null, recordTimer = null, recordStart = 0, recordCancelled = false, opusReady = null;
+    var recorder = null, recordTimer = null, recordStart = 0, opusReady = null;
 
     function loadScript(src) {
         return new Promise(function (resolve, reject) {
@@ -744,35 +753,118 @@
         return null;
     }
 
+    // One recording at a time. It belongs to the chat it started in: switching chats or going back to
+    // the list throws it away, and a note still encoding when you leave goes to its own chat, never the open one.
+    // Pause works like WhatsApp: listen to what you have, then carry on recording, delete or send.
+    var recordElapsed = 0, recordAudio = null, recordAudioUrl = null;
+
+    // A MediaRecorder whose recording so far can be read at any moment (to listen while paused)
+    function chunkRecorder(stream, mime) {
+        var mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+        var chunks = [], waiting = [];
+        var type = function () { return (mr.mimeType || mime || 'audio/webm').split(';')[0]; };
+        var blob = function () { return new Blob(chunks, { type: type() }); };
+        mr.ondataavailable = function (ev) {
+            if (ev.data && ev.data.size) chunks.push(ev.data);
+            var w = waiting; waiting = [];
+            w.forEach(function (f) { f(); });
+        };
+        mr.start();
+        return {
+            type: type,
+            pause: function () { if (mr.state === 'recording') mr.pause(); },
+            resume: function () { if (mr.state === 'paused') mr.resume(); },
+            snapshot: function () {
+                return new Promise(function (resolve) {
+                    if (mr.state === 'inactive') { resolve(blob()); return; }
+                    waiting.push(function () { resolve(blob()); });
+                    mr.requestData();
+                });
+            },
+            stop: function () {
+                return new Promise(function (resolve) {
+                    var done = function () { stream.getTracks().forEach(function (t) { t.stop(); }); resolve(blob()); };
+                    if (mr.state === 'inactive') { done(); return; }
+                    mr.onstop = done;
+                    mr.stop();
+                });
+            }
+        };
+    }
+
+    function pickPreviewType() {
+        if (typeof MediaRecorder === 'undefined') return null;
+        var types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/webm'];
+        for (var i = 0; i < types.length; i++) if (MediaRecorder.isTypeSupported(types[i])) return types[i];
+        return '';
+    }
+
+    function recorderElapsed() {
+        if (!recorder) return 0;
+        return recordElapsed + (recorder.paused ? 0 : Date.now() - recordStart);
+    }
+
     function showRecorderBar(on) {
         document.getElementById('chat-composer').hidden = on;
         document.getElementById('chat-recorder').hidden = !on;
         clearInterval(recordTimer);
+        stopRecordPreview();
         if (on) {
+            recordElapsed = 0;
             recordStart = Date.now();
             var timeEl = document.getElementById('recorder-time');
             timeEl.textContent = '0:00';
-            recordTimer = setInterval(function () { timeEl.textContent = formatDuration((Date.now() - recordStart) / 1000); }, 250);
+            recordTimer = setInterval(function () { timeEl.textContent = formatDuration(recorderElapsed() / 1000); }, 250);
         }
+        setRecorderPaused(false);
     }
 
-    function finishRecording(blob, ext) {
-        showRecorderBar(false);
-        recorder = null;
-        if (recordCancelled || !blob || blob.size < 1200) return; // cancelled, or a mis-tap
-        sendMedia(blob, 'voice-' + Date.now() + '.' + ext, null);
+    function setRecorderPaused(paused) {
+        document.getElementById('recorder-live').hidden = paused;
+        document.getElementById('recorder-review').hidden = !paused;
+        var btn = document.getElementById('recorder-pause');
+        btn.classList.toggle('is-paused', paused);
+        btn.title = paused ? 'كمّل التسجيل' : 'إيقاف مؤقت';
+        btn.innerHTML = paused ? '<i class="bi bi-mic-fill"></i>' : '<i class="bi bi-pause-fill"></i>';
+        document.getElementById('recorder-review-time').textContent = formatDuration(recordElapsed / 1000);
+        document.getElementById('recorder-progress').style.width = '0%';
+        document.getElementById('recorder-play').innerHTML = '<i class="bi bi-play-fill"></i>';
+    }
+
+    function finishRecording(blob, ext, conversationId, session) {
+        if (recorder && recorder.session === session) { showRecorderBar(false); recorder = null; }
+        if (session.cancelled || !blob || blob.size < 1200) return; // deleted, or a mis-tap
+        sendMedia(blob, 'voice-' + Date.now() + '.' + ext, null, conversationId);
     }
 
     async function startRecording() {
         if (recorder || !state.selectedConversationId) return;
-        recordCancelled = false;
+        var conversationId = state.selectedConversationId;
+        var session = { cancelled: false };
+        var previewMime = pickPreviewType();
         try {
             var workerUrl = await loadOpusRecorder();
             if (!window.Recorder || !window.Recorder.isRecordingSupported()) throw new Error('opus unsupported');
             var rec = new window.Recorder({ encoderPath: workerUrl, numberOfChannels: 1, encoderSampleRate: 48000, streamPages: false, maxFramesPerPage: 40 });
-            rec.ondataavailable = function (bytes) { finishRecording(new Blob([bytes], { type: 'audio/ogg' }), 'ogg'); };
+            var preview = null;
+            rec.ondataavailable = function (bytes) {
+                if (preview) preview.stop();
+                finishRecording(new Blob([bytes], { type: 'audio/ogg' }), 'ogg', conversationId, session);
+            };
             await rec.start();
-            recorder = { stop: function () { rec.stop(); } };
+            if (conversationId !== state.selectedConversationId) { session.cancelled = true; rec.stop(); return; } // left while the mic was opening
+            // WhatsApp needs the Ogg/Opus file above; a second, plain recording is only for listening while paused
+            if (previewMime !== null) {
+                try { preview = chunkRecorder(await navigator.mediaDevices.getUserMedia({ audio: true }), previewMime); }
+                catch (e) { preview = null; }
+            }
+            recorder = {
+                session: session, conversationId: conversationId, paused: false,
+                pause: function () { rec.pause(); if (preview) preview.pause(); },
+                resume: function () { rec.resume(); if (preview) preview.resume(); },
+                listen: function () { return preview ? preview.snapshot() : Promise.resolve(null); },
+                stop: function () { rec.stop(); }
+            };
             showRecorderBar(true);
             return;
         } catch (e) { /* fall back to the browser recorder below */ }
@@ -781,16 +873,16 @@
         if (!mime) { alert('المتصفح ده مش بيدعم تسجيل رسائل صوتية لواتساب'); return; }
         try {
             var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            var mr = new MediaRecorder(stream, { mimeType: mime });
-            var chunks = [];
-            mr.ondataavailable = function (ev) { if (ev.data.size) chunks.push(ev.data); };
-            mr.onstop = function () {
-                stream.getTracks().forEach(function (t) { t.stop(); });
-                var baseType = mime.split(';')[0];
-                finishRecording(new Blob(chunks, { type: baseType }), baseType === 'audio/ogg' ? 'ogg' : baseType === 'audio/mpeg' ? 'mp3' : 'm4a');
+            var cr = chunkRecorder(stream, mime);
+            if (conversationId !== state.selectedConversationId) { cr.stop(); return; }
+            var baseType = mime.split(';')[0];
+            var ext = baseType === 'audio/ogg' ? 'ogg' : baseType === 'audio/mpeg' ? 'mp3' : 'm4a';
+            recorder = {
+                session: session, conversationId: conversationId, paused: false,
+                pause: cr.pause, resume: cr.resume,
+                listen: cr.snapshot,
+                stop: function () { cr.stop().then(function (blob) { finishRecording(blob, ext, conversationId, session); }); }
             };
-            mr.start();
-            recorder = { stop: function () { mr.stop(); } };
             showRecorderBar(true);
         } catch (err) {
             alert('لازم تسمح للموقع باستخدام الميكروفون عشان تسجل رسالة صوتية');
@@ -799,9 +891,57 @@
 
     function stopRecording(cancel) {
         if (!recorder) return;
-        recordCancelled = !!cancel;
+        recorder.session.cancelled = !!cancel;
+        stopRecordPreview();
         recorder.stop();
-        if (cancel) showRecorderBar(false);
+        if (cancel) { showRecorderBar(false); recorder = null; }
+    }
+
+    function togglePauseRecording() {
+        if (!recorder) return;
+        if (recorder.paused) {
+            stopRecordPreview();
+            recorder.resume();
+            recorder.paused = false;
+            recordStart = Date.now();
+            setRecorderPaused(false);
+        } else {
+            recordElapsed += Date.now() - recordStart;
+            recorder.pause();
+            recorder.paused = true;
+            setRecorderPaused(true);
+        }
+    }
+
+    // Listen to the recording so far (only while paused)
+    async function toggleRecordPreview() {
+        if (!recorder || !recorder.paused) return;
+        var playBtn = document.getElementById('recorder-play');
+        if (recordAudio) {
+            if (recordAudio.paused) recordAudio.play(); else recordAudio.pause();
+            return;
+        }
+        var blob = await recorder.listen();
+        if (!blob || !blob.size) { alert('المتصفح ده مش بيقدر يشغل التسجيل قبل الإرسال'); return; }
+        if (!recorder || !recorder.paused) return;
+        recordAudioUrl = URL.createObjectURL(blob);
+        recordAudio = new Audio(recordAudioUrl);
+        var total = recordElapsed / 1000;
+        var progress = document.getElementById('recorder-progress'), timeEl = document.getElementById('recorder-review-time');
+        recordAudio.addEventListener('play', function () { playBtn.innerHTML = '<i class="bi bi-pause-fill"></i>'; });
+        recordAudio.addEventListener('pause', function () { playBtn.innerHTML = '<i class="bi bi-play-fill"></i>'; });
+        recordAudio.addEventListener('timeupdate', function () {
+            if (!recordAudio) return;
+            progress.style.width = Math.min(100, total ? (recordAudio.currentTime / total) * 100 : 0) + '%';
+            timeEl.textContent = formatDuration(recordAudio.currentTime);
+        });
+        recordAudio.addEventListener('ended', function () { progress.style.width = '0%'; timeEl.textContent = formatDuration(total); });
+        recordAudio.play().catch(function () { /* nothing to play yet */ });
+    }
+
+    function stopRecordPreview() {
+        if (recordAudio) { recordAudio.pause(); recordAudio = null; }
+        if (recordAudioUrl) { URL.revokeObjectURL(recordAudioUrl); recordAudioUrl = null; }
     }
 
     function formatDuration(sec) {
@@ -1074,6 +1214,7 @@
     }
 
     function showScreen(name, fromHistory) {
+        if (name === 'list' && recorder) stopRecording(true); // back to the chat list throws the recording away
         var columns = document.getElementById('inbox-columns');
         columns.classList.remove('screen-chat', 'screen-customer');
         if (name === 'chat') columns.classList.add('screen-chat');
@@ -1207,6 +1348,10 @@
         // voice notes
         document.getElementById('recorder-cancel').addEventListener('click', function () { stopRecording(true); });
         document.getElementById('recorder-send').addEventListener('click', function () { stopRecording(false); });
+        document.getElementById('recorder-pause').addEventListener('click', togglePauseRecording);
+        document.getElementById('recorder-play').addEventListener('click', toggleRecordPreview);
+        // Leaving the page (another menu item, closing the tab) stops the microphone
+        window.addEventListener('pagehide', function () { if (recorder) stopRecording(true); });
 
         // voice-note players inside bubbles
         document.getElementById('chat-messages').addEventListener('click', function (e) {

@@ -105,7 +105,13 @@
                 @* Voice-note recording bar (replaces the composer while recording) *@
                 <div class="chat-recorder" id="chat-recorder" hidden>
                     <button type="button" class="recorder-cancel" id="recorder-cancel" title="إلغاء"><i class="bi bi-trash3"></i></button>
-                    <div class="recorder-status"><span class="recorder-dot"></span><span id="recorder-time">0:00</span><span class="recorder-label">جارٍ التسجيل…</span></div>
+                    <div class="recorder-status" id="recorder-live"><span class="recorder-dot"></span><span id="recorder-time">0:00</span><span class="recorder-label">جارٍ التسجيل…</span></div>
+                    <div class="recorder-review" id="recorder-review" hidden>
+                        <button type="button" class="recorder-play" id="recorder-play" title="اسمع التسجيل"><i class="bi bi-play-fill"></i></button>
+                        <div class="recorder-track"><div class="recorder-progress" id="recorder-progress"></div></div>
+                        <span class="recorder-review-time" id="recorder-review-time">0:00</span>
+                    </div>
+                    <button type="button" class="recorder-pause" id="recorder-pause" title="إيقاف مؤقت"><i class="bi bi-pause-fill"></i></button>
                     <button type="button" class="composer-send-btn" id="recorder-send" title="إرسال الرسالة الصوتية"><i class="bi bi-send-fill"></i></button>
                 </div>
 
