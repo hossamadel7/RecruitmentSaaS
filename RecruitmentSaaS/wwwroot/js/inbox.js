@@ -6,9 +6,26 @@
     var USER = window.__INBOX_USER__ || {};
     var IS_MOBILE = window.matchMedia('(max-width: 991px)').matches;
 
-    var STATUS_LABEL = { 1: 'جديد', 2: 'مفتوح', 3: 'بانتظار العميل', 4: 'متابعة', 5: 'مغلق' };
-    var LEAD_STAGE_LABEL = { 1: 'جديد', 2: 'تم التواصل', 3: 'مهتم', 4: 'متابعة', 5: 'مؤهل', 6: 'تم الفوز', 7: 'خسارة' };
-    var LEAD_STAGE_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
+    // The one "حالة العميل" choice on a chat (the chat status and the lead move together on the server)
+    var OUTCOMES = [
+        { key: 'waiting', icon: 'bi-hourglass-split', label: 'بانتظار العميل' },
+        { key: 'followup', icon: 'bi-calendar-event', label: 'متابعة', needsTime: true, timeLabel: 'يوم ووقت المتابعة' },
+        { key: 'booked', icon: 'bi-building-check', label: 'حجز', needsTime: true, timeLabel: 'يوم ووقت الحجز في المكتب' },
+        { key: 'visited', icon: 'bi-person-check-fill', label: 'حضر للمكتب' },
+        { key: 'lost', icon: 'bi-x-circle', label: 'خسارة', needsReason: true }
+    ];
+    function outcomeOf(key) { return OUTCOMES.filter(function (o) { return o.key === key; })[0] || null; }
+    // <input type="datetime-local"> value for a Date, in the viewer's local time
+    function toLocalInput(d) {
+        var pad = function (n) { return String(n).padStart(2, '0'); };
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+    function formatAppointment(value) {
+        if (!value) return '';
+        var d = new Date(value); // "yyyy-MM-ddTHH:mm" without a zone = local time
+        return d.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'numeric' }) + ' — ' +
+            d.toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' });
+    }
     var MSG_STATUS_ICON = { 2: 'bi-clock', 3: 'bi-check', 4: 'bi-check-all', 5: 'bi-check-all', 6: 'bi-exclamation-circle-fill' };
 
     var state = {
@@ -1034,10 +1051,6 @@
             ? '<select id="cp-agent-select" class="form-select form-select-sm mt-1"><option value="">— غير مخصص —</option></select>'
             : '<div class="customer-field-value">' + (c.assignedSalesAgentName ? esc(c.assignedSalesAgentName) : 'غير مخصص') + '</div>';
 
-        var stageOptions = LEAD_STAGE_OPTIONS.map(function (v) {
-            return '<option value="' + v + '"' + (v === c.leadStage ? ' selected' : '') + '>' + LEAD_STAGE_LABEL[v] + '</option>';
-        }).join('');
-
         body.innerHTML = '' +
             '<div class="customer-avatar-lg">' + initials(c.contactName) + '</div>' +
             '<div style="text-align:center;font-weight:700;font-size:15px">' + esc(c.contactName) + '</div>' +
@@ -1046,13 +1059,24 @@
             intakeBox(c) +
             '<div class="customer-field"><span class="customer-field-label">رقم الواتساب المستقبِل</span><span class="customer-field-value">' + esc(c.whatsAppAccountName) + '</span></div>' +
             '<div class="customer-field"><span class="customer-field-label">المندوب المسؤول</span>' + agentField + '</div>' +
-            '<div class="customer-field"><span class="customer-field-label">حالة المحادثة</span>' +
-            '  <select id="cp-status-select" class="form-select form-select-sm mt-1">' +
-            Object.keys(STATUS_LABEL).map(function (k) { return '<option value="' + k + '"' + (Number(k) === c.status ? ' selected' : '') + '>' + STATUS_LABEL[k] + '</option>'; }).join('') +
-            '  </select></div>' +
-            '<div class="customer-field"><span class="customer-field-label">مرحلة الصفقة</span>' +
-            '  <select id="cp-stage-select" class="form-select form-select-sm mt-1">' + stageOptions + '</select>' +
-            '  <input type="text" id="cp-lost-reason" class="form-control form-control-sm mt-1" placeholder="سبب الخسارة" style="display:' + (c.leadStage === 7 ? 'block' : 'none') + '" value="' + esc(c.lostReason || '') + '" />' +
+            '<div class="customer-field"><span class="customer-field-label">حالة العميل</span>' +
+            '  <div class="outcome-options" id="cp-outcome" role="radiogroup">' +
+            OUTCOMES.map(function (o) {
+                return '<button type="button" class="outcome-chip outcome-' + o.key + '" data-outcome="' + o.key + '" role="radio">' +
+                    '<i class="bi ' + o.icon + '"></i> ' + o.label + '</button>';
+            }).join('') +
+            '  </div>' +
+            '  <div class="outcome-extra" id="cp-outcome-time-box" hidden>' +
+            '    <label class="outcome-extra-label" for="cp-outcome-at" id="cp-outcome-at-label"></label>' +
+            '    <input type="datetime-local" id="cp-outcome-at" class="form-control form-control-sm" />' +
+            '    <div class="outcome-quick">' +
+            '      <button type="button" class="btn btn-sm btn-ghost" data-outcome-day="0">النهارده</button>' +
+            '      <button type="button" class="btn btn-sm btn-ghost" data-outcome-day="1">بكره</button>' +
+            '      <button type="button" class="btn btn-sm btn-ghost" data-outcome-day="2">بعد بكره</button>' +
+            '    </div>' +
+            '  </div>' +
+            '  <input type="text" id="cp-outcome-reason" class="form-control form-control-sm mt-2" maxlength="500" placeholder="سبب الخسارة (مطلوب)" hidden />' +
+            '  <div class="outcome-current" id="cp-outcome-current"></div>' +
             '</div>' +
             (c.leadCode ? '<div class="customer-field"><span class="customer-field-label">كود العميل المحتمل</span><span class="customer-field-value">' + esc(c.leadCode) + (c.leadFullName ? ' — ' + esc(c.leadFullName) : '') + '</span></div>' : '') +
 
@@ -1061,14 +1085,6 @@
             '<textarea id="cp-note-input" class="form-control form-control-sm mt-2" rows="2" placeholder="أضف ملاحظة داخلية (لن تُرسل للعميل)"></textarea>' +
             '<button id="cp-note-add-btn" class="btn btn-sm btn-primary mt-2 w-100">إضافة ملاحظة</button>' +
 
-            '<div class="panel-section-title">المتابعات</div>' +
-            '<div class="d-flex gap-1 flex-wrap mb-2">' +
-            '  <button class="btn btn-sm btn-ghost" data-quick-followup="today">اليوم لاحقاً</button>' +
-            '  <button class="btn btn-sm btn-ghost" data-quick-followup="tomorrow">غداً</button>' +
-            '  <button class="btn btn-sm btn-ghost" data-quick-followup="3days">خلال 3 أيام</button>' +
-            '  <button class="btn btn-sm btn-ghost" data-quick-followup="week">الأسبوع القادم</button>' +
-            '</div>' +
-            '<div id="cp-followups-list"></div>' +
 
             // Sticky at the bottom of the panel so it's reachable without scrolling back up
             '<div class="cp-save-bar">' +
@@ -1077,12 +1093,15 @@
             '</div>';
 
         // Agent / status / stage are edited together and saved with one button
+        var initialAt = c.outcome === 'booked' ? (c.appointmentAt || '')
+            : c.outcome === 'followup' && c.nextFollowUpAt ? toLocalInput(new Date(c.nextFollowUpAt)) : '';
         var saved = {
             agentId: c.assignedSalesAgentId || '',
-            status: c.status,
-            stage: c.leadStage,
-            lostReason: (c.lostReason || '').trim()
+            outcome: c.outcome || '',
+            at: initialAt,
+            reason: c.outcome === 'lost' ? (c.lostReason || '').trim() : ''
         };
+        var picked = saved.outcome;
         var saveBtn = document.getElementById('cp-save-btn');
         var saveMsg = document.getElementById('cp-save-msg');
         var UNSAVED = 'لديك تغييرات غير محفوظة';
@@ -1091,15 +1110,32 @@
             var agentSelect = document.getElementById('cp-agent-select');
             return {
                 agentId: agentSelect ? agentSelect.value : saved.agentId,
-                status: Number(document.getElementById('cp-status-select').value),
-                stage: Number(document.getElementById('cp-stage-select').value),
-                lostReason: document.getElementById('cp-lost-reason').value.trim()
+                outcome: picked,
+                at: document.getElementById('cp-outcome-at').value,
+                reason: document.getElementById('cp-outcome-reason').value.trim()
             };
+        }
+        function showOutcome() {
+            var o = outcomeOf(picked);
+            body.querySelectorAll('.outcome-chip').forEach(function (b) {
+                var on = b.dataset.outcome === picked;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-checked', on ? 'true' : 'false');
+            });
+            document.getElementById('cp-outcome-time-box').hidden = !(o && o.needsTime);
+            if (o && o.needsTime) document.getElementById('cp-outcome-at-label').textContent = o.timeLabel;
+            document.getElementById('cp-outcome-reason').hidden = !(o && o.needsReason);
+            var info = '';
+            if (saved.outcome === 'booked' && saved.at) info = '<i class="bi bi-building-check"></i> الحجز: ' + esc(formatAppointment(saved.at));
+            else if (saved.outcome === 'followup' && saved.at) info = '<i class="bi bi-calendar-event"></i> المتابعة: ' + esc(formatAppointment(saved.at));
+            else if (saved.outcome === 'lost' && saved.reason) info = '<i class="bi bi-x-circle"></i> السبب: ' + esc(saved.reason);
+            document.getElementById('cp-outcome-current').innerHTML = info;
         }
         function refreshDirty() {
             var now = current();
-            var dirty = now.agentId !== saved.agentId || now.status !== saved.status || now.stage !== saved.stage ||
-                (now.stage === 7 && now.lostReason !== saved.lostReason);
+            var o = outcomeOf(now.outcome);
+            var dirty = now.agentId !== saved.agentId || now.outcome !== saved.outcome ||
+                (o && o.needsTime && now.at !== saved.at) || (o && o.needsReason && now.reason !== saved.reason);
             saveBtn.disabled = !dirty;
             state.panelDirty = dirty;
             if (dirty) { saveMsg.className = 'cp-save-msg'; saveMsg.textContent = UNSAVED; }
@@ -1108,17 +1144,47 @@
 
         if (USER.canAssign) populateAgentSelect(c.assignedSalesAgentId).then(refreshDirty);
         body.addEventListener('change', function (e) {
-            if (e.target.id === 'cp-stage-select')
-                document.getElementById('cp-lost-reason').style.display = Number(e.target.value) === 7 ? 'block' : 'none';
-            if (['cp-agent-select', 'cp-status-select', 'cp-stage-select'].indexOf(e.target.id) !== -1) refreshDirty();
+            if (['cp-agent-select', 'cp-outcome-at'].indexOf(e.target.id) !== -1) refreshDirty();
         });
-        document.getElementById('cp-lost-reason').addEventListener('input', refreshDirty);
+        document.getElementById('cp-outcome-at').value = saved.at;
+        document.getElementById('cp-outcome-reason').value = saved.reason;
+        document.getElementById('cp-outcome-at').addEventListener('input', refreshDirty);
+        document.getElementById('cp-outcome-reason').addEventListener('input', refreshDirty);
+        body.querySelectorAll('.outcome-chip').forEach(function (b) {
+            b.addEventListener('click', function () {
+                picked = b.dataset.outcome;
+                var o = outcomeOf(picked);
+                var atInput = document.getElementById('cp-outcome-at');
+                // Switching between متابعة and حجز: the time picked for the other one doesn't carry over
+                atInput.value = picked === saved.outcome ? saved.at : '';
+                if (o && o.needsTime) atInput.min = toLocalInput(new Date());
+                showOutcome();
+                refreshDirty();
+                if (o && o.needsTime && !atInput.value) atInput.focus();
+                if (o && o.needsReason) document.getElementById('cp-outcome-reason').focus();
+            });
+        });
+        // Quick days keep the time of day already picked (11:00 when none)
+        body.querySelectorAll('[data-outcome-day]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var atInput = document.getElementById('cp-outcome-at');
+                var d = new Date();
+                d.setDate(d.getDate() + Number(b.dataset.outcomeDay));
+                var time = atInput.value ? atInput.value.slice(11, 16) : '11:00';
+                atInput.value = toLocalInput(d).slice(0, 10) + 'T' + time;
+                refreshDirty();
+            });
+        });
+        showOutcome();
 
         saveBtn.addEventListener('click', async function () {
             var now = current();
-            if (now.stage === 7 && !now.lostReason) {
+            var picked0 = outcomeOf(now.outcome);
+            var problem = picked0 && picked0.needsTime && !now.at ? 'حدد ' + picked0.timeLabel + ' قبل الحفظ'
+                : picked0 && picked0.needsReason && !now.reason ? 'اكتب سبب الخسارة قبل الحفظ' : '';
+            if (problem) {
                 saveMsg.className = 'cp-save-msg error';
-                saveMsg.textContent = 'اكتب سبب الخسارة قبل الحفظ';
+                saveMsg.textContent = problem;
                 return;
             }
             saveBtn.disabled = true;
@@ -1132,17 +1198,18 @@
                     var agentName = now.agentId ? agentSelect.options[agentSelect.selectedIndex].text : null;
                     document.getElementById('chat-header-sub').textContent = c.contactPhone + ' · ' + (agentName || 'غير مخصص');
                 }
-                if (now.status !== saved.status) {
-                    await api('/api/conversations/' + c.id + '/status', { method: 'PATCH', body: JSON.stringify({ status: now.status }) });
-                    saved.status = now.status;
-                }
-                if (now.stage !== saved.stage || (now.stage === 7 && now.lostReason !== saved.lostReason)) {
-                    await api('/api/conversations/' + c.id + '/leadstage', {
-                        method: 'PATCH',
-                        body: JSON.stringify({ leadStage: now.stage, lostReason: now.stage === 7 ? now.lostReason : null })
+                var o = outcomeOf(now.outcome);
+                if (o && (now.outcome !== saved.outcome || (o.needsTime && now.at !== saved.at) || (o.needsReason && now.reason !== saved.reason))) {
+                    // متابعة is a moment (sent as UTC); a حجز is an office time, sent as typed (Egypt time)
+                    var at = !o.needsTime ? null : now.outcome === 'followup' ? new Date(now.at).toISOString() : now.at;
+                    await api('/api/conversations/' + c.id + '/outcome', {
+                        method: 'POST',
+                        body: JSON.stringify({ outcome: now.outcome, at: at, reason: o.needsReason ? now.reason : null })
                     });
-                    saved.stage = now.stage;
-                    saved.lostReason = now.lostReason;
+                    saved.outcome = now.outcome;
+                    saved.at = o.needsTime ? now.at : '';
+                    saved.reason = o.needsReason ? now.reason : '';
+                    showOutcome();
                 }
                 state.panelSavedAt = Date.now();
                 saveMsg.className = 'cp-save-msg success';
@@ -1157,9 +1224,6 @@
             }
         });
         document.getElementById('cp-note-add-btn').addEventListener('click', function () { addNote(c.id); });
-        body.querySelectorAll('[data-quick-followup]').forEach(function (btn) {
-            btn.addEventListener('click', function () { createFollowUp(c.id, btn.dataset.quickFollowup); });
-        });
 
         loadNotes(c.id);
     }
@@ -1204,24 +1268,6 @@
             input.value = '';
             loadNotes(id);
         } catch (e) { alert('تعذر إضافة الملاحظة'); }
-    }
-
-    function quickFollowUpDate(kind) {
-        var d = new Date();
-        switch (kind) {
-            case 'today': d.setHours(d.getHours() + 3); break;
-            case 'tomorrow': d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); break;
-            case '3days': d.setDate(d.getDate() + 3); d.setHours(10, 0, 0, 0); break;
-            case 'week': d.setDate(d.getDate() + 7); d.setHours(10, 0, 0, 0); break;
-        }
-        return d.toISOString();
-    }
-
-    async function createFollowUp(id, kind) {
-        try {
-            await api('/api/conversations/' + id + '/followups', { method: 'POST', body: JSON.stringify({ dueAt: quickFollowUpDate(kind) }) });
-            alert('تم إنشاء متابعة');
-        } catch (e) { alert('تعذر إنشاء المتابعة'); }
     }
 
     // ── Mobile screen navigation ─────────────────────────────────────────────

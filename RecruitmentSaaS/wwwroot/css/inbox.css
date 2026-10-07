@@ -1451,3 +1451,25 @@
 
 /* Older chats load as you scroll */
 .conv-list-more { padding: 14px; text-align: center; font-size: 12.5px; color: var(--text-muted); }
+
+/* "حالة العميل": one tap per status */
+.outcome-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.outcome-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid var(--border); background: var(--card-bg); color: var(--text-primary);
+    border-radius: 999px; padding: 6px 11px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    transition: var(--transition);
+}
+.outcome-chip:hover { border-color: #94a3b8; }
+.outcome-chip.active { color: #fff; border-color: transparent; }
+.outcome-chip.outcome-waiting.active { background: #64748b; }
+.outcome-chip.outcome-followup.active { background: #d97706; }
+.outcome-chip.outcome-booked.active { background: #2563eb; }
+.outcome-chip.outcome-visited.active { background: #16a34a; }
+.outcome-chip.outcome-lost.active { background: #dc2626; }
+.outcome-extra { margin-top: 8px; }
+.outcome-extra[hidden], #cp-outcome-reason[hidden] { display: none !important; }
+.outcome-extra-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
+.outcome-quick { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+.outcome-current { margin-top: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-primary); }
+.outcome-current:empty { display: none; }

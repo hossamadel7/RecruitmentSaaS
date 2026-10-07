@@ -1,0 +1,190 @@
+@using RecruitmentSaaS.Controllers
+@{
+    ViewData["Title"] = "تقرير الحجوزات";
+    ViewData["Subtitle"] = "كل تيلي سيلز عمل كام حجز في اليوم، وكام واحد حضر للمكتب";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    DateTime from = ViewBag.From;
+    DateTime to = ViewBag.To;
+    DateTime today = ViewBag.Today;
+    var days = ViewBag.Days as List<DateTime> ?? new();
+    var rows = ViewBag.Rows as List<ReservationsController.AgentRow> ?? new();
+    var appointments = ViewBag.Appointments as List<ReservationsController.Appointment> ?? new();
+    int visits = ViewBag.Visits;
+    bool isAdmin = ViewBag.IsAdmin;
+    var teams = ViewBag.Teams as List<(Guid Id, string Name)> ?? new();
+    Guid? team = ViewBag.Team;
+
+    var total = rows.Sum(r => r.Total);
+    var came = rows.Sum(r => r.Came);
+    var todayTotal = rows.Sum(r => r.Today);
+    string Rate(int part, int whole) => whole == 0 ? "—" : $"{Math.Round(part * 100.0 / whole)}%";
+    string Q(DateTime f, DateTime t) => $"?from={f:yyyy-MM-dd}&to={t:yyyy-MM-dd}" + (team != null ? $"&team={team}" : "");
+    var ar = new System.Globalization.CultureInfo("ar-EG");
+}
+
+<style>
+    .rv-wrap { padding: 24px; max-width: 1200px; }
+    .rv-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+    .rv-filters .form-control, .rv-filters .form-select { width: auto; min-width: 150px; }
+    .rv-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .rv-stat { font-size: 1.6rem; font-weight: 800; line-height: 1.2; }
+    .rv-stat-label { font-size: 12px; color: #64748B; }
+    .rv-table th, .rv-table td { white-space: nowrap; vertical-align: middle; font-size: 13px; }
+    .rv-table td.num, .rv-table th.num { text-align: center; }
+    .rv-day-today { background: #eff6ff !important; }
+    .rv-zero { color: #cbd5e1; }
+    .rv-badge-late { background: #fee2e2; color: #b91c1c; }
+    .rv-badge-today { background: #dbeafe; color: #1d4ed8; }
+    .rv-badge-soon { background: #f1f5f9; color: #475569; }
+    @@media (max-width: 576px) {
+        .rv-wrap { padding: 14px; }
+        .rv-filters .form-control, .rv-filters .form-select { min-width: 0; flex: 1 1 140px; }
+    }
+</style>
+
+<div class="rv-wrap">
+    <form method="get" class="card mb-3">
+        <div class="card-body p-3">
+            <div class="rv-filters">
+                <div>
+                    <label class="form-label mb-1" style="font-size:12px">من</label>
+                    <input type="date" name="from" class="form-control form-control-sm" value="@from.ToString("yyyy-MM-dd")" />
+                </div>
+                <div>
+                    <label class="form-label mb-1" style="font-size:12px">إلى</label>
+                    <input type="date" name="to" class="form-control form-control-sm" value="@to.ToString("yyyy-MM-dd")" />
+                </div>
+                @if (isAdmin)
+                {
+                    <div>
+                        <label class="form-label mb-1" style="font-size:12px">الفريق</label>
+                        <select name="team" class="form-select form-select-sm">
+                            <option value="">كل الفرق</option>
+                            @foreach (var (id, name) in teams)
+                            {
+                                <option value="@id" selected="@(team == id)">فريق @name</option>
+                            }
+                        </select>
+                    </div>
+                }
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> عرض</button>
+            </div>
+            <div class="rv-quick">
+                <a class="btn btn-sm btn-outline-secondary" href="@Q(today, today)">النهارده</a>
+                <a class="btn btn-sm btn-outline-secondary" href="@Q(today.AddDays(-1), today.AddDays(-1))">امبارح</a>
+                <a class="btn btn-sm btn-outline-secondary" href="@Q(today.AddDays(-6), today)">آخر 7 أيام</a>
+                <a class="btn btn-sm btn-outline-secondary" href="@Q(new DateTime(today.Year, today.Month, 1), today)">الشهر ده</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="card"><div class="card-body p-3"><div class="rv-stat" style="color:#2563eb">@todayTotal</div><div class="rv-stat-label">حجوزات النهارده</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card"><div class="card-body p-3"><div class="rv-stat">@total</div><div class="rv-stat-label">حجوزات الفترة</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card"><div class="card-body p-3"><div class="rv-stat" style="color:#16a34a">@came</div><div class="rv-stat-label">حضروا من حجوزات الفترة (@Rate(came, total))</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card"><div class="card-body p-3"><div class="rv-stat" style="color:#0f766e">@visits</div><div class="rv-stat-label">زيارات للمكتب في الفترة</div></div></div></div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body p-0">
+            <div class="p-3 pb-2" style="font-weight:800">الحجوزات لكل تيلي سيلز</div>
+            @if (!rows.Any())
+            {
+                <div class="p-3 text-muted" style="font-size:13px">مفيش تيلي سيلز في الفريق ده.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0 rv-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>التيلي سيلز</th>
+                                @if (isAdmin && team == null) { <th>الفريق</th> }
+                                <th class="num">النهارده</th>
+                                <th class="num">الفترة</th>
+                                <th class="num">حضروا</th>
+                                <th class="num">نسبة الحضور</th>
+                                @foreach (var d in days)
+                                {
+                                    <th class="num @(d == today ? "rv-day-today" : "")" title="@d.ToString("dddd d/M", ar)">@d.ToString("ddd d/M", ar)</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in rows)
+                            {
+                                <tr>
+                                    <td style="font-weight:600">@r.Name</td>
+                                    @if (isAdmin && team == null) { <td style="color:#64748B">@(r.Team ?? "—")</td> }
+                                    <td class="num" style="font-weight:800;color:#2563eb">@r.Today</td>
+                                    <td class="num" style="font-weight:800">@r.Total</td>
+                                    <td class="num" style="color:#16a34a;font-weight:700">@r.Came</td>
+                                    <td class="num">@Rate(r.Came, r.Total)</td>
+                                    @foreach (var d in days)
+                                    {
+                                        var n = r.PerDay.GetValueOrDefault(d);
+                                        <td class="num @(d == today ? "rv-day-today" : "") @(n == 0 ? "rv-zero" : "")">@n</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr style="font-weight:800">
+                                <td>الإجمالي</td>
+                                @if (isAdmin && team == null) { <td></td> }
+                                <td class="num">@todayTotal</td>
+                                <td class="num">@total</td>
+                                <td class="num">@came</td>
+                                <td class="num">@Rate(came, total)</td>
+                                @foreach (var d in days)
+                                {
+                                    <td class="num @(d == today ? "rv-day-today" : "")">@rows.Sum(r => r.PerDay.GetValueOrDefault(d))</td>
+                                }
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="p-3 pb-2" style="font-weight:800">مواعيد المكتب</div>
+            <div class="px-3 pb-2" style="font-size:12.5px;color:#64748B">حجوزات الأسبوع الجاي، والحجوزات اللي ميعادها عدّى ولسه ما اتسجلش إنهم حضروا.</div>
+            @if (!appointments.Any())
+            {
+                <div class="p-3 text-muted" style="font-size:13px">مفيش مواعيد.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0 rv-table">
+                        <thead class="table-light">
+                            <tr><th>الميعاد</th><th>العميل</th><th>الموبايل</th><th>التيلي سيلز</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var a in appointments)
+                            {
+                                var late = a.At.Date < today;
+                                var isToday = a.At.Date == today;
+                                <tr>
+                                    <td>@a.At.ToString("dddd d/M — h:mm tt", ar)</td>
+                                    <td><span style="font-weight:600">@a.Name</span> <span style="color:#94a3b8;font-size:11.5px">@a.LeadCode</span></td>
+                                    <td dir="ltr" style="text-align:right">@a.Phone</td>
+                                    <td>@(a.Agent ?? "—")</td>
+                                    <td>
+                                        @if (late) { <span class="badge rv-badge-late">ميعاده عدّى ومجاش</span> }
+                                        else if (isToday) { <span class="badge rv-badge-today">النهارده</span> }
+                                        else { <span class="badge rv-badge-soon">جاي</span> }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>

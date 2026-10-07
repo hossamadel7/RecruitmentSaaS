@@ -203,6 +203,12 @@ namespace RecruitmentSaaS.Controllers.Api
             dto.CanSendFreeText = windowCloses != null;
             dto.WindowClosesAt = windowCloses;
 
+            dto.Outcome = CustomerOutcomeService.Current(conversation, conversation.Lead);
+            dto.AppointmentAt = conversation.Lead?.AppointmentDate?.ToString("yyyy-MM-dd'T'HH:mm");
+            dto.NextFollowUpAt = await _context.ConversationFollowUps.AsNoTracking()
+                .Where(f => f.ConversationId == id && f.Status == (byte)FollowUpStatus.Pending)
+                .OrderBy(f => f.DueAt).Select(f => (DateTime?)f.DueAt).FirstOrDefaultAsync();
+
             return Ok(dto);
         }
 
@@ -770,6 +776,35 @@ namespace RecruitmentSaaS.Controllers.Api
             return result.Success
                 ? Ok(new { conversationId = result.ConversationId, templateSent = result.TemplateSent })
                 : BadRequest(new { error = result.Error, conversationId = result.ConversationId });
+        }
+
+        // ── POST /api/conversations/{id}/outcome ──────────────────────────────
+        // The single "حالة العميل" choice: بانتظار العميل / متابعة (+ time) / حجز (+ time) / حضر للمكتب / خسارة (+ reason)
+        [HttpPost("{id:guid}/outcome")]
+        public async Task<IActionResult> SetOutcome(Guid id, [FromBody] SetOutcomeDto dto,
+                                                    [FromServices] CustomerOutcomeService outcomes)
+        {
+            var conversation = await _context.WhatsAppConversations.Include(c => c.Contact).FirstOrDefaultAsync(c => c.Id == id);
+            if (conversation == null) return NotFound();
+            if (!await CanSeeAsync(conversation))
+                return Forbid();
+
+            DateTime? at = null;
+            if (!string.IsNullOrWhiteSpace(dto.At))
+            {
+                if (!DateTime.TryParse(dto.At, System.Globalization.CultureInfo.InvariantCulture,
+                        dto.Outcome == CustomerOutcomeService.FollowUp
+                            ? System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal
+                            : System.Globalization.DateTimeStyles.None, out var parsed))
+                    return BadRequest(new { error = "التاريخ مش صحيح" });
+                at = dto.Outcome == CustomerOutcomeService.FollowUp ? DateTime.SpecifyKind(parsed, DateTimeKind.Utc) : DateTime.SpecifyKind(parsed, DateTimeKind.Unspecified);
+            }
+
+            var error = await outcomes.ApplyAsync(conversation, dto.Outcome, at, dto.Reason, CurrentUserId, CurrentUserName);
+            if (error != null) return BadRequest(new { error });
+
+            await _notifier.ConversationUpdatedAsync(conversation.Id, conversation.WhatsAppAccountId, conversation.AssignedSalesAgentId);
+            return Ok(new { success = true, leadId = conversation.LeadId });
         }
 
         // ── PATCH /api/conversations/{id}/status ──────────────────────────────

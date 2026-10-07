@@ -66,6 +66,7 @@ builder.Services.AddSignalR()
     .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter()));
 builder.Services.AddScoped<IWhatsAppCloudApiService, WhatsAppCloudApiService>();
 builder.Services.AddScoped<LeadChatStarter>();
+builder.Services.AddScoped<CustomerOutcomeService>();       // the one "حالة العميل" choice on a chat (حجز, متابعة, خسارة…)
 builder.Services.AddScoped<AiIntakeService>();                // AI WhatsApp assistant (name / age / job)
 builder.Services.AddSingleton<AiIntakeQueue>();
 builder.Services.AddHostedService<AiIntakeWorker>();

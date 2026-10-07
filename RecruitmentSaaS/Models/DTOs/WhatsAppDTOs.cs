@@ -62,6 +62,23 @@ namespace RecruitmentSaaS.Models.DTOs
         public bool CanSendFreeText { get; set; }
         /// <summary>When that 24-hour window closes (UTC); null when it's closed.</summary>
         public DateTime? WindowClosesAt { get; set; }
+
+        /// <summary>The "حالة العميل" choice: waiting / followup / booked / visited / lost, or "" when none yet.</summary>
+        public string Outcome { get; set; } = "";
+        /// <summary>The office appointment in Egypt time, "yyyy-MM-ddTHH:mm" (kept as text so it isn't converted).</summary>
+        public string? AppointmentAt { get; set; }
+        /// <summary>The next open follow-up (UTC).</summary>
+        public DateTime? NextFollowUpAt { get; set; }
+    }
+
+    public class SetOutcomeDto
+    {
+        public string Outcome { get; set; } = "";
+        /// <summary>متابعة: an ISO time (UTC). حجز: "yyyy-MM-ddTHH:mm" in Egypt time.</summary>
+        public string? At { get; set; }
+        /// <summary>Loss reason (required for خسارة) or a short note.</summary>
+        [MaxLength(500)]
+        public string? Reason { get; set; }
     }
 
     public class WhatsAppMessageDto
