@@ -68,8 +68,11 @@ namespace RecruitmentSaaS.Controllers.Api
             [FromQuery] byte? status,
             [FromQuery] bool unreadOnly = false,
             [FromQuery] string? search = null,
-            [FromQuery] int page = 1)
+            [FromQuery] int page = 1,
+            [FromQuery] int? pageSize = null)
         {
+            // The list grows as you scroll: the page asks for everything it has shown so far (up to 1000)
+            var size = Math.Clamp(pageSize ?? PageSize, 1, 1000);
             var userId = CurrentUserId;
 
             var query = _context.WhatsAppConversations.AsNoTracking().AsQueryable();
@@ -112,8 +115,8 @@ namespace RecruitmentSaaS.Controllers.Api
 
             var items = await query
                 .OrderByDescending(c => c.LastMessageAt ?? c.CreatedAt)
-                .Skip((Math.Max(page, 1) - 1) * PageSize)
-                .Take(PageSize)
+                .Skip((Math.Max(page, 1) - 1) * size)
+                .Take(size)
                 .Select(c => new ConversationListItemDto
                 {
                     Id = c.Id,
@@ -152,7 +155,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 })
                 .ToListAsync();
 
-            return Ok(new { items, totalCount, page, pageSize = PageSize });
+            return Ok(new { items, totalCount, page, pageSize = size });
         }
 
         // ── GET /api/conversations/{id} ───────────────────────────────────────

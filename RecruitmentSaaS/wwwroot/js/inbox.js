@@ -142,6 +142,11 @@
         if (state.agentFilter === 'unassigned') params.set('assigned', 'unassigned');
         else if (state.agentFilter.indexOf('agent:') === 0) params.set('assigned', state.agentFilter.slice(6));
         else if (state.agentFilter.indexOf('team:') === 0) params.set('team', state.agentFilter.slice(5));
+
+        // Another filter / search / number → start again from the newest 30
+        var filterKey = params.toString();
+        if (filterKey !== listState.filterKey) { listState.filterKey = filterKey; listState.limit = LIST_PAGE; }
+        params.set('pageSize', listState.limit);
         return params.toString();
     }
 
@@ -202,15 +207,29 @@
         });
     }
 
+    // The chat list shows the newest 30 and loads 30 more each time you scroll to its end
+    var LIST_PAGE = 30;
+    var listState = { limit: LIST_PAGE, total: 0, filterKey: null, loading: false };
+
     async function loadConversations() {
         var listEl = document.getElementById('conversation-list');
+        listState.loading = true;
         try {
             var data = await api('/api/conversations?' + buildListQuery());
             state.conversations = data.items;
+            listState.total = data.totalCount;
             renderConversationList();
         } catch (e) {
             listEl.innerHTML = '<div class="inbox-empty-state"><i class="bi bi-exclamation-triangle"></i><div>تعذر تحميل المحادثات</div></div>';
+        } finally {
+            listState.loading = false;
         }
+    }
+
+    function loadMoreConversations() {
+        if (listState.loading || state.conversations.length >= listState.total) return;
+        listState.limit += LIST_PAGE;
+        loadConversations();
     }
 
     function renderConversationList() {
@@ -240,7 +259,9 @@
                 '    </div>' +
                 '  </div>' +
                 '</div>';
-        }).join('');
+        }).join('') + (state.conversations.length < listState.total
+            ? '<div class="conv-list-more">جارٍ تحميل محادثات أقدم… (' + state.conversations.length + ' من ' + listState.total + ')</div>'
+            : '');
 
         listEl.querySelectorAll('.conversation-row').forEach(function (row) {
             row.addEventListener('click', function () { selectConversation(row.dataset.id); });
@@ -1373,6 +1394,10 @@
 
         document.getElementById('chat-messages').addEventListener('scroll', function (e) {
             if (e.target.scrollTop < 60) loadMessages(false);
+        });
+        document.getElementById('conversation-list').addEventListener('scroll', function (e) {
+            var el = e.target;
+            if (el.scrollTop + el.clientHeight > el.scrollHeight - 300) loadMoreConversations();
         });
 
         // Lightweight fallback so the list/badges stay fresh even if SignalR can't connect

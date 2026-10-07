@@ -1448,3 +1448,6 @@
 .intake-missing { color: #94a3b8; font-weight: 500; }
 .intake-reason { margin-top: 6px; color: #9a3412; font-weight: 600; }
 .intake-hint { margin-top: 6px; font-size: 11.5px; color: #64748b; }
+
+/* Older chats load as you scroll */
+.conv-list-more { padding: 14px; text-align: center; font-size: 12.5px; color: var(--text-muted); }
