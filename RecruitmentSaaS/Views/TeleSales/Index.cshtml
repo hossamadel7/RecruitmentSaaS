@@ -2,74 +2,109 @@
 @{
     ViewData["Title"] = "لوحة تيلي سيلز";
     ViewData["Subtitle"] = "مرحباً، هنا ملخص نشاطك اليوم";
+    int bookedToday = ViewBag.BookedToday;
+    int bookedMonth = ViewBag.BookedMonth;
+    int cameMonth = ViewBag.CameMonth;
+    DateTime egyptToday = ViewBag.EgyptToday;
+    var followUps = ViewBag.ChatFollowUps as List<RecruitmentSaaS.Controllers.TeleSalesController.ChatFollowUpItem> ?? new();
+    var appointments = ViewBag.Appointments as List<RecruitmentSaaS.Controllers.TeleSalesController.OfficeAppointmentItem> ?? new();
+    var ar = new System.Globalization.CultureInfo("ar-EG");
 }
+
+<style>
+    .ts-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #F1F5F9; }
+    .ts-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ts-name { font-size: 13.5px; font-weight: 600; }
+    .ts-sub { font-size: 12px; color: var(--text-muted); }
+    @@media (max-width: 576px) { .ts-row { flex-wrap: wrap; } }
+</style>
 
 <!-- Stat Cards -->
 <div class="row g-3 mb-4">
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card blue">
+            <div class="stat-icon"><i class="bi bi-building-check"></i></div>
+            <div class="stat-value">@bookedToday</div>
+            <div class="stat-label">حجوزاتي النهارده</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card green">
+            <div class="stat-icon"><i class="bi bi-person-check-fill"></i></div>
+            <div class="stat-value">@bookedMonth</div>
+            <div class="stat-label">حجوزات الشهر — حضر منهم @cameMonth</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card amber">
+            <div class="stat-icon"><i class="bi bi-calendar-event"></i></div>
+            <div class="stat-value">@(followUps.Count + Model.TodayReminders.Count)</div>
+            <div class="stat-label">متابعات النهارده</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card red">
             <div class="stat-icon"><i class="bi bi-person-lines-fill"></i></div>
             <div class="stat-value">@Model.MyLeadsTotal</div>
             <div class="stat-label">إجمالي عملائي</div>
         </div>
     </div>
-    <div class="col-sm-6 col-xl-3">
-        <div class="stat-card amber">
-            <div class="stat-icon"><i class="bi bi-person-exclamation"></i></div>
-            <div class="stat-value">@Model.MyLeadsNew</div>
-            <div class="stat-label">جدد لم يُتواصل معهم</div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-3">
-        <div class="stat-card green">
-            <div class="stat-icon"><i class="bi bi-bell-fill"></i></div>
-            <div class="stat-value">@Model.TodayReminders.Count</div>
-            <div class="stat-label">تذكيرات اليوم</div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-3">
-        <div class="stat-card red">
-            <div class="stat-icon"><i class="bi bi-trophy-fill"></i></div>
-            <div class="stat-value">@Model.DealsThisMonth</div>
-            <div class="stat-label">تحويلات هذا الشهر</div>
-        </div>
-    </div>
 </div>
 
-<div class="row g-3">
+<div class="row g-3 mb-3">
 
-    <!-- Today's Reminders -->
-    <div class="col-lg-5">
+    <!-- Today's follow-ups: from chats (متابعة) and lead reminders -->
+    <div class="col-lg-6">
         <div class="card h-100">
             <div class="card-header">
-                <div class="header-icon" style="background:#FEF2F2;color:#DC2626">
-                    <i class="bi bi-bell-fill"></i>
+                <div class="header-icon" style="background:#FFFBEB;color:#D97706">
+                    <i class="bi bi-calendar-event"></i>
                 </div>
-                تذكيرات اليوم
-                @if (Model.TodayReminders.Any())
+                متابعات النهارده
+                @if (followUps.Count + Model.TodayReminders.Count > 0)
                 {
-                    <span class="badge ms-auto" style="background:#EF4444;color:#fff">@Model.TodayReminders.Count</span>
+                    <span class="badge ms-auto" style="background:#D97706;color:#fff">@(followUps.Count + Model.TodayReminders.Count)</span>
                 }
             </div>
-            @if (!Model.TodayReminders.Any())
+            @if (!followUps.Any() && !Model.TodayReminders.Any())
             {
                 <div class="empty-state">
                     <i class="bi bi-check2-circle"></i>
-                    <p>لا توجد تذكيرات اليوم</p>
+                    <p>مفيش متابعات النهارده</p>
                 </div>
             }
             else
             {
                 <div class="card-body p-0">
+                    @foreach (var f in followUps)
+                    {
+                        <div class="ts-row">
+                            <div class="ts-icon" style="background:@(f.Overdue ? "#FEF2F2" : "#FFFBEB");color:@(f.Overdue ? "#DC2626" : "#D97706")"><i class="bi bi-whatsapp"></i></div>
+                            <div style="flex:1;min-width:0">
+                                <div class="ts-name">@f.Name</div>
+                                <div class="ts-sub">
+                                    @if (f.Overdue) { <span style="color:#DC2626;font-weight:700">متأخرة ·</span> }
+                                    @(f.DueLocal.Date == egyptToday ? "النهارده" : f.DueLocal.ToString("dddd d/M", ar)) الساعة @f.DueLocal.ToString("h:mm tt", ar)
+                                    @if (!string.IsNullOrWhiteSpace(f.Notes)) { <span>— @f.Notes</span> }
+                                </div>
+                            </div>
+                            <div class="d-flex gap-1">
+                                <a href="/Inbox/Index?c=@f.ConversationId" class="btn btn-sm btn-success"><i class="bi bi-whatsapp"></i> افتح</a>
+                                <form asp-action="CompleteChatFollowUp" asp-controller="TeleSales" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@f.Id" />
+                                    <button type="submit" class="btn btn-sm" style="border:1px solid var(--border);background:#fff">تم</button>
+                                </form>
+                            </div>
+                        </div>
+                    }
                     @foreach (var r in Model.TodayReminders)
                     {
-                        <div class="d-flex align-items-center gap-3 px-4 py-3" style="border-bottom:1px solid #F1F5F9">
-                            <div style="width:36px;height:36px;border-radius:50%;background:#FEF2F2;display:flex;align-items:center;justify-content:center;color:#DC2626;flex-shrink:0">
-                                <i class="bi bi-alarm"></i>
-                            </div>
+                        <div class="ts-row">
+                            <div class="ts-icon" style="background:#FEF2F2;color:#DC2626"><i class="bi bi-alarm"></i></div>
                             <div style="flex:1;min-width:0">
-                                <div style="font-size:13.5px;font-weight:600">@r.LeadName</div>
-                                <div style="font-size:12px;color:var(--text-muted)">@r.LeadPhone — @r.Notes</div>
+                                <div class="ts-name">@r.LeadName</div>
+                                <div class="ts-sub">@r.LeadPhone — @r.Notes</div>
                             </div>
                             <div class="d-flex gap-1">
                                 <a href="/TeleSales/LeadDetail/@r.LeadId" class="btn btn-sm btn-primary">عرض</a>
@@ -87,8 +122,58 @@
         </div>
     </div>
 
+    <!-- Office appointments (حجز) -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <div class="header-icon" style="background:#EFF6FF;color:#2563EB">
+                    <i class="bi bi-building-check"></i>
+                </div>
+                مواعيد المكتب
+            </div>
+            @if (!appointments.Any())
+            {
+                <div class="empty-state">
+                    <i class="bi bi-calendar2-check"></i>
+                    <p>مفيش حجوزات جاية — اعمل حجز من المحادثة</p>
+                </div>
+            }
+            else
+            {
+                <div class="card-body p-0">
+                    @foreach (var a in appointments)
+                    {
+                        var late = a.At.Date < egyptToday;
+                        var isToday = a.At.Date == egyptToday;
+                        <div class="ts-row">
+                            <div class="ts-icon" style="background:@(late ? "#FEF2F2" : "#EFF6FF");color:@(late ? "#DC2626" : "#2563EB")"><i class="bi bi-building"></i></div>
+                            <div style="flex:1;min-width:0">
+                                <div class="ts-name">@a.Name</div>
+                                <div class="ts-sub">
+                                    @(isToday ? "النهارده" : a.At.ToString("dddd d/M", ar)) الساعة @a.At.ToString("h:mm tt", ar)
+                                    @if (late) { <span class="badge" style="background:#FEE2E2;color:#B91C1C">ميعاده عدّى ومجاش</span> }
+                                    else if (isToday) { <span class="badge" style="background:#DBEAFE;color:#1D4ED8">النهارده</span> }
+                                </div>
+                            </div>
+                            @if (a.ConversationId != null)
+                            {
+                                <a href="/Inbox/Index?c=@a.ConversationId" class="btn btn-sm btn-success"><i class="bi bi-whatsapp"></i> افتح</a>
+                            }
+                            else
+                            {
+                                <a href="/TeleSales/LeadDetail/@a.LeadId" class="btn btn-sm btn-primary">عرض</a>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
     <!-- Recent Leads -->
-    <div class="col-lg-7">
+    <div class="col-12">
         <div class="card h-100">
             <div class="card-header">
                 <div class="header-icon" style="background:#EEF2FF;color:var(--primary)">

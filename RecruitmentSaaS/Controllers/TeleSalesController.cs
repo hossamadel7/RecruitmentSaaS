@@ -86,7 +86,75 @@ namespace RecruitmentSaaS.Controllers
                     .ToListAsync()
             };
 
+            // ── Bookings, chat follow-ups and office appointments (Egypt days) ──
+            var egyptToday = EgyptTime.Today;
+            var todayStartUtc = EgyptTime.ToUtc(egyptToday);
+            var tomorrowStartUtc = EgyptTime.ToUtc(egyptToday.AddDays(1));
+            var monthStartUtc = EgyptTime.ToUtc(new DateTime(egyptToday.Year, egyptToday.Month, 1));
+
+            var myBookings = await _context.LeadFunnelHistories.AsNoTracking()
+                .Where(h => h.ToStatus == 5 && h.ChangedById == userId && h.CreatedAt >= monthStartUtc)
+                .Select(h => new { h.LeadId, h.CreatedAt, LeadStatus = h.Lead.Status })
+                .ToListAsync();
+            ViewBag.BookedToday = myBookings.Where(b => b.CreatedAt >= todayStartUtc).Select(b => b.LeadId).Distinct().Count();
+            ViewBag.BookedMonth = myBookings.Select(b => b.LeadId).Distinct().Count();
+            ViewBag.CameMonth = myBookings.Where(b => b.LeadStatus == 6 || b.LeadStatus == 7).Select(b => b.LeadId).Distinct().Count();
+
+            ViewBag.ChatFollowUps = (await _context.ConversationFollowUps.AsNoTracking()
+                    .Where(f => f.AssignedToId == userId && f.Status == (byte)FollowUpStatus.Pending && f.DueAt < tomorrowStartUtc)
+                    .OrderBy(f => f.DueAt)
+                    .Select(f => new
+                    {
+                        f.Id, f.ConversationId, f.DueAt, f.Notes,
+                        Name = f.Conversation.Lead != null ? f.Conversation.Lead.FullName : (f.Conversation.Contact.Name ?? f.Conversation.Contact.WhatsAppPhoneNumber),
+                        Phone = f.Conversation.Contact.WhatsAppPhoneNumber
+                    })
+                    .Take(50)
+                    .ToListAsync())
+                .Select(f => new ChatFollowUpItem(f.Id, f.ConversationId, f.Name, f.Phone, EgyptTime.FromUtc(f.DueAt), f.DueAt < DateTime.UtcNow, f.Notes))
+                .ToList();
+
+            var apptFrom = egyptToday.AddDays(-14);
+            var apptTo = egyptToday.AddDays(8);
+            var appts = await _context.Leads.AsNoTracking()
+                .Where(l => l.AssignedSalesId == userId && l.Status == 5 && l.AppointmentDate != null
+                         && l.AppointmentDate >= apptFrom && l.AppointmentDate < apptTo)
+                .OrderBy(l => l.AppointmentDate)
+                .Select(l => new { l.Id, l.FullName, l.Phone, At = l.AppointmentDate!.Value })
+                .ToListAsync();
+            var apptIds = appts.Select(a => a.Id).ToList();
+            var chatOf = await _context.WhatsAppConversations.AsNoTracking()
+                .Where(c => c.LeadId != null && apptIds.Contains(c.LeadId.Value))
+                .Select(c => new { LeadId = c.LeadId!.Value, c.Id })
+                .ToListAsync();
+            ViewBag.Appointments = appts
+                .Select(a => new OfficeAppointmentItem(a.Id, a.FullName, a.Phone, a.At, chatOf.FirstOrDefault(c => c.LeadId == a.Id)?.Id))
+                .ToList();
+            ViewBag.EgyptToday = egyptToday;
+
             return View(dto);
+        }
+
+        public sealed record ChatFollowUpItem(Guid Id, Guid ConversationId, string Name, string Phone, DateTime DueLocal, bool Overdue, string? Notes);
+        public sealed record OfficeAppointmentItem(Guid LeadId, string Name, string Phone, DateTime At, Guid? ConversationId);
+
+        // ── POST /TeleSales/CompleteChatFollowUp ─────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CompleteChatFollowUp(Guid id)
+        {
+            var userId = CurrentUserId;
+            var followUp = await _context.ConversationFollowUps
+                .FirstOrDefaultAsync(f => f.Id == id && f.AssignedToId == userId && f.Status == (byte)FollowUpStatus.Pending);
+            if (followUp != null)
+            {
+                followUp.Status = (byte)FollowUpStatus.Completed;
+                followUp.CompletedAt = DateTime.UtcNow;
+                followUp.CompletedById = userId;
+                await _context.SaveChangesAsync();
+                TempData["Success"] = "تم ✅";
+            }
+            return RedirectToAction("Index");
         }
 
         // ── GET /TeleSales/Pool ───────────────────────────────────────────────

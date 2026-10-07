@@ -78,6 +78,20 @@ namespace RecruitmentSaaS.Services
             reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
             if (reason?.Length > 500) reason = reason[..500];
 
+            if (outcome is Waiting or FollowUp or Booked or Visited or Lost)
+            {
+                // A new choice settles the chat's open follow-up (a new متابعة replaces it)
+                var open = await _context.ConversationFollowUps
+                    .Where(f => f.ConversationId == conversation.Id && f.Status == (byte)FollowUpStatus.Pending)
+                    .ToListAsync();
+                foreach (var f in open)
+                {
+                    f.Status = (byte)FollowUpStatus.Completed;
+                    f.CompletedAt = now;
+                    f.CompletedById = actorId;
+                }
+            }
+
             switch (outcome)
             {
                 case Waiting:
