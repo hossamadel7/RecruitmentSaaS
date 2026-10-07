@@ -20,7 +20,11 @@ public enum WhatsAppMessageType : byte
     Sticker = 6,
     Location = 7,
     Contacts = 8,
-    Interactive = 9
+    Interactive = 9,
+    /// <summary>The customer reacted with an emoji to one of the messages (TextBody = the emoji).</summary>
+    Reaction = 10,
+    /// <summary>A WhatsApp message type the Cloud API doesn't deliver (poll, view-once, edited message…); TextBody explains.</summary>
+    Unsupported = 11
 }
 
 public enum MessageStatus : byte

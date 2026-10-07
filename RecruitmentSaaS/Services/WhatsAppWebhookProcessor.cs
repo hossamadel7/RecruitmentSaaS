@@ -133,6 +133,11 @@ namespace RecruitmentSaaS.Services
             if (string.IsNullOrWhiteSpace(fromWaId))
                 return;
 
+            // "request_welcome" = the customer only opened the chat; a removed reaction has no emoji — nothing to show
+            var rawType = messageJ["type"]?.ToString();
+            if (rawType == "request_welcome") return;
+            if (rawType == "reaction" && string.IsNullOrWhiteSpace(messageJ["reaction"]?["emoji"]?.ToString())) return;
+
             var profileName = contactsJ
                 .FirstOrDefault(c => string.Equals(c["wa_id"]?.ToString(), fromWaId, StringComparison.OrdinalIgnoreCase))
                 ?["profile"]?["name"]?.ToString();
@@ -143,9 +148,12 @@ namespace RecruitmentSaaS.Services
             var (conversation, isNewConversation) = await FindOrCreateConversationAsync(contact, account, now, ct);
 
             var (messageType, textBody, mediaId) = ExtractContent(messageJ);
+            if (messageType == WhatsAppMessageType.Unsupported)
+                _logger.LogWarning("WhatsApp message type not shown in the inbox ({Type}): {Payload}", rawType, messageJ.ToString(Newtonsoft.Json.Formatting.None));
 
             Guid? replyToMessageId = null;
-            var contextWamid = messageJ["context"]?["id"]?.ToString();
+            // A reaction points at the message it reacts to
+            var contextWamid = messageJ["context"]?["id"]?.ToString() ?? messageJ["reaction"]?["message_id"]?.ToString();
             if (!string.IsNullOrWhiteSpace(contextWamid))
             {
                 replyToMessageId = await _context.WhatsAppMessages
@@ -711,8 +719,31 @@ namespace RecruitmentSaaS.Services
                 "contacts" => (WhatsAppMessageType.Contacts, "Contact card", null),
                 "interactive" => (WhatsAppMessageType.Interactive, ExtractInteractiveText(messageJ["interactive"]), null),
                 "button" => (WhatsAppMessageType.Interactive, messageJ["button"]?["text"]?.ToString(), null),
-                _ => (WhatsAppMessageType.Unknown, null, null)
+                "reaction" => (WhatsAppMessageType.Reaction, messageJ["reaction"]?["emoji"]?.ToString(), null),
+                "system" => (WhatsAppMessageType.Text, messageJ["system"]?["body"]?.ToString() ?? "تنبيه من واتساب", null),
+                "order" => (WhatsAppMessageType.Text, "🛒 العميل بعت طلب منتجات", null),
+                // Never Unknown (0): the DB default would silently turn it into an empty text message
+                _ => (WhatsAppMessageType.Unsupported, UnsupportedText(messageJ), null)
             };
+        }
+
+        /// <summary>What to show for a message the Cloud API doesn't deliver (Meta sends type "unsupported").</summary>
+        private static string UnsupportedText(JToken messageJ)
+        {
+            var title = messageJ["errors"]?[0]?["title"]?.ToString()
+                     ?? messageJ["unsupported"]?["type"]?.ToString()
+                     ?? messageJ["type"]?.ToString();
+            var kind = title?.ToLowerInvariant() switch
+            {
+                var t when t != null && t.Contains("poll") => "استطلاع رأي",
+                var t when t != null && (t.Contains("view") || t.Contains("ephemeral")) => "صورة/فيديو بيتشاف مرة واحدة",
+                var t when t != null && t.Contains("edit") => "تعديل على رسالة",
+                var t when t != null && t.Contains("event") => "دعوة لمناسبة",
+                _ => null
+            };
+            return kind == null
+                ? "⚠️ العميل بعت رسالة نوعها مش بيوصل عن طريق واتساب API — اطلب منه يكتبها نص"
+                : $"⚠️ العميل بعت {kind} ودي مش بتوصل عن طريق واتساب API — اطلب منه يكتبها نص";
         }
 
         private static string? FormatLocation(JToken? location)

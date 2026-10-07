@@ -97,9 +97,10 @@ namespace RecruitmentSaaS.Services
             // Customer's new messages since our last reply: only voice notes / photos?
             var lastOut = history.LastOrDefault(m => m.Direction == (byte)MessageDirection.Outgoing);
             var fresh = history.Where(m => m.Direction == (byte)MessageDirection.Incoming
+                                        && m.MessageType != (byte)WhatsAppMessageType.Reaction
                                         && (lastOut == null || m.WhatsAppTimestamp >= lastOut.WhatsAppTimestamp)).ToList();
             if (fresh.Count == 0) return;
-            if (fresh.All(m => string.IsNullOrWhiteSpace(m.TextBody)))
+            if (fresh.All(m => string.IsNullOrWhiteSpace(m.TextBody) || m.MessageType == (byte)WhatsAppMessageType.Unsupported))
             {
                 conversation.IntakeNoTextCount++;
                 if (conversation.IntakeNoTextCount >= 2)
@@ -118,7 +119,7 @@ namespace RecruitmentSaaS.Services
             }
 
             // What the customer just wrote (all their messages since our last reply)
-            var said = string.Join(" ", fresh.Where(m => !string.IsNullOrWhiteSpace(m.TextBody)).Select(m => m.TextBody!.Trim()));
+            var said = string.Join(" ", fresh.Where(m => !string.IsNullOrWhiteSpace(m.TextBody) && m.MessageType != (byte)WhatsAppMessageType.Unsupported).Select(m => m.TextBody!.Trim()));
             var norm = IntakeScript.Normalize(said);
 
             if (IntakeScript.WantsPerson(norm))

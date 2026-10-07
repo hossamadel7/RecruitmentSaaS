@@ -533,7 +533,7 @@
 
     function mediaPlaceholderText(m) {
         var labels = { 2: '📷 صورة', 3: '🎥 فيديو', 4: '🎤 رسالة صوتية', 5: '📄 مستند', 6: 'ملصق', 7: '📍 موقع', 8: '👤 جهة اتصال', 9: 'رد تفاعلي' };
-        return labels[m.messageType] || 'رسالة غير مدعومة';
+        return labels[m.messageType] || 'رسالة مش ظاهرة (نوعها مش بيوصل عن طريق واتساب API)';
     }
 
     function updateBubbleStatus(payload) {
