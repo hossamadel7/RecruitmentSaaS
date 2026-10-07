@@ -67,6 +67,7 @@ namespace RecruitmentSaaS.Controllers.Api
             [FromQuery] Guid? team,
             [FromQuery] byte? status,
             [FromQuery] bool unreadOnly = false,
+            [FromQuery] string? outcome = null,
             [FromQuery] string? search = null,
             [FromQuery] int page = 1,
             [FromQuery] int? pageSize = null)
@@ -87,6 +88,28 @@ namespace RecruitmentSaaS.Controllers.Api
 
             if (unreadOnly)
                 query = query.Where(c => c.UnreadCount > 0);
+
+            // The "حالة العميل" filters — same order of precedence as CustomerOutcomeService.Current
+            switch (outcome)
+            {
+                case CustomerOutcomeService.Lost:
+                    query = query.Where(c => c.LeadStage == (byte)LeadStage.Lost || (c.Lead != null && c.Lead.Status == 8));
+                    break;
+                case CustomerOutcomeService.Visited:
+                    query = query.Where(c => c.LeadStage != (byte)LeadStage.Lost && c.Lead != null && (c.Lead.Status == 6 || c.Lead.Status == 7));
+                    break;
+                case CustomerOutcomeService.Booked:
+                    query = query.Where(c => c.LeadStage != (byte)LeadStage.Lost && c.Lead != null && c.Lead.Status == 5);
+                    break;
+                case CustomerOutcomeService.FollowUp:
+                    query = query.Where(c => c.Status == (byte)ConversationStatus.FollowUp && c.LeadStage != (byte)LeadStage.Lost
+                                          && (c.Lead == null || c.Lead.Status < 5));
+                    break;
+                case CustomerOutcomeService.Waiting:
+                    query = query.Where(c => c.Status == (byte)ConversationStatus.WaitingForCustomer && c.LeadStage != (byte)LeadStage.Lost
+                                          && (c.Lead == null || c.Lead.Status < 5));
+                    break;
+            }
 
             if (!string.IsNullOrWhiteSpace(assigned))
             {

@@ -151,9 +151,8 @@
 
         switch (state.currentFilter) {
             case 'unread': params.set('unreadOnly', 'true'); break;
-            case 'open': params.set('status', '2'); break;
-            case 'followup': params.set('status', '4'); break;
-            case 'closed': params.set('status', '5'); break;
+            case 'waiting': case 'followup': case 'booked': case 'visited': case 'lost':
+                params.set('outcome', state.currentFilter); break;
         }
 
         if (state.agentFilter === 'unassigned') params.set('assigned', 'unassigned');
