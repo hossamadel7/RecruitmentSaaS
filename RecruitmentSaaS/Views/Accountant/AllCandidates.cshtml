@@ -161,7 +161,8 @@
 @section Scripts {
 <script>
 const searchInput = document.getElementById('searchInput');
-searchInput?.addEventListener('input', CRM.debounce(() => {
+const debounce = (fn, ms) => { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; };
+searchInput?.addEventListener('input', debounce(() => {
     const url = new URL(window.location.href);
     url.searchParams.set('q', searchInput.value.trim());
     url.searchParams.set('page', '1');

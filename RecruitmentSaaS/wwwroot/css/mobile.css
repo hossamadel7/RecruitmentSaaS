@@ -11,6 +11,9 @@
     .page-body .row.g-4, .page-body .row.g-5, .page-body .row.gx-4, .page-body .row.gx-5 { --bs-gutter-x: 1rem; }
     .page-body .row.g-4, .page-body .row.g-5 { --bs-gutter-y: 1rem; }
     .page-body { overflow-wrap: anywhere; }
+    /* Pages with their own 24px padding box: the page already has a phone gutter, don't double it */
+    .page-body > [style*="padding:24px"], .page-body > [style*="padding: 24px"],
+    .page-body > .fs-wrap, .page-body > .rr-wrap, .page-body > .rv-wrap { padding: 0 !important; }
     .page-body img, .page-body video, .page-body iframe, .page-body canvas { max-width: 100%; height: auto; }
     .page-body input, .page-body select, .page-body textarea { max-width: 100%; }
 
