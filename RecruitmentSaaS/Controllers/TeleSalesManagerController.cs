@@ -73,9 +73,20 @@ namespace RecruitmentSaaS.Controllers
                 ViewBag.SelMonth = selMonth;
                 ViewBag.SelYear = selYear;
                 ViewBag.MonthLabel = curStart.ToString("MMMM yyyy", new System.Globalization.CultureInfo("ar-EG"));
+                ViewBag.PrevMonthLabel = prevStart.ToString("MMMM yyyy", new System.Globalization.CultureInfo("ar-EG"));
+                ViewBag.ManagerName = CurrentUserName;
                 ViewBag.TeamStats = new List<object>();
+                ViewBag.TeamStatusBreakdown = new List<object>();
+                // A team with no TeleSales yet: every number is zero (the page reads all of them)
                 ViewBag.TotalLeads = 0;
                 ViewBag.TotalConverted = 0;
+                ViewBag.TotalRate = 0d;
+                ViewBag.PrevTotalLeads = 0;
+                ViewBag.PrevTotalConverted = 0;
+                ViewBag.PrevTotalRate = 0d;
+                ViewBag.LeadsTrend = 0;
+                ViewBag.ConvTrend = 0;
+                ViewBag.RateTrend = 0d;
                 return View();
             }
 
