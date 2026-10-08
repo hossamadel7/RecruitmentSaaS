@@ -51,7 +51,7 @@ namespace RecruitmentSaaS.Controllers.Api
             _visibility ??= await WhatsAppScope.ForUserAsync(_context, CurrentRole, CurrentUserId);
 
         private async Task<bool> CanSeeAsync(WhatsAppConversation c) =>
-            WhatsAppScope.CanSee(await VisibilityAsync(), c.AssignedSalesAgentId, c.PendingTeamManagerId);
+            WhatsAppScope.CanSee(await VisibilityAsync(), c.AssignedSalesAgentId, c.PendingTeamManagerId, c.WhatsAppAccountId);
 
         // May a chat be given to this person? (the TeleSales manager: only their team)
         private async Task<bool> CanSeeAgentAsync(Guid agentId) =>

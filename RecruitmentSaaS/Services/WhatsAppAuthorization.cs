@@ -4,7 +4,7 @@ namespace RecruitmentSaaS.Services
     /// Maps the WhatsApp Inbox's Admin/Supervisor/Moderator/SalesAgent permission model onto the
     /// app's existing Role byte codes (no separate WhatsApp role column):
     ///   1 Admin            -> Admin      (full access, manage accounts, assign, view all)
-    ///   7 Team leader      -> Supervisor (view all, assign/transfer, monitor)
+    ///   7 Team leader      -> Supervisor of their own team only (see WhatsAppScope)
     ///   8 TeleSales manager -> SalesAgent + supervisor of their own team only (see WhatsAppScope)
     ///   2 Reception        -> Moderator  (create Messenger handoffs)
     ///   6 Sales, 3 TeleSales -> SalesAgent (reply/act only on conversations assigned to them)
@@ -15,7 +15,8 @@ namespace RecruitmentSaaS.Services
     {
         public const string AllowedRoles = "1,2,3,6,7,8";
 
-        public static bool IsOrgWide(string? role) => role == "1" || role == "7";
+        /// <summary>Sees every team (admin only — team leaders see their own team, see WhatsAppScope).</summary>
+        public static bool IsOrgWide(string? role) => role == "1";
 
         public static bool IsAdmin(string? role) => role == "1";
 
@@ -29,6 +30,6 @@ namespace RecruitmentSaaS.Services
             IsOrgWide(role) || assignedAgentId == userId;
 
         /// <summary>Supervisors see more than their own chats: org-wide roles, or role 8 for their team.</summary>
-        public static bool IsSupervisor(string? role) => IsOrgWide(role) || role == "8";
+        public static bool IsSupervisor(string? role) => IsOrgWide(role) || role == "7" || role == "8";
     }
 }

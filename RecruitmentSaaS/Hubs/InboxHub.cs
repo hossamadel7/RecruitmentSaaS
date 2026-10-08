@@ -26,7 +26,7 @@ namespace RecruitmentSaaS.Hubs
 
         private string? CurrentRole => Context.User!.FindFirstValue(ClaimTypes.Role);
 
-        private bool IsOrgWideRole => WhatsAppAuthorization.IsOrgWide(CurrentRole); // Admin, team leaders, head TeleSales
+        private bool IsOrgWideRole => WhatsAppAuthorization.IsOrgWide(CurrentRole); // Admin only
 
         public override async Task OnConnectedAsync()
         {
@@ -41,7 +41,7 @@ namespace RecruitmentSaaS.Hubs
             else if (visibility.TeamLeaderId != null)
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"team-waiting-{visibility.TeamLeaderId}");
 
-            if (CurrentRole == "8" && visibility.Agents != null)
+            if ((CurrentRole == "7" || CurrentRole == "8") && visibility.Agents != null)
             {
                 // Receive whatever each team member receives (their chats' messages and assignments)
                 foreach (var memberId in visibility.Agents.Where(id => id != CurrentUserId))

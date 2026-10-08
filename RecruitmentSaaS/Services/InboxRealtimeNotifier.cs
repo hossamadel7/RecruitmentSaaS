@@ -87,7 +87,7 @@ namespace RecruitmentSaaS.Services
             await BroadcastAsync("UnreadCountUpdated", conversationId, assignedAgentId, payload);
         }
 
-        // Groups (see InboxHub): "org-all" = admin + team leaders, "org-admin" = admin only,
+        // Groups (see InboxHub): "org-all" = admin, "org-admin" = admin only,
         // "team-waiting-{leaderId}" = that team's leader + TeleSales manager.
         private async Task BroadcastAsync(string eventName, Guid conversationId, Guid? assignedAgentId, object payload)
         {
@@ -107,6 +107,12 @@ namespace RecruitmentSaaS.Services
             if (waitingTeam == null)
             {
                 await _hub.Clients.Group("org-all").SendAsync(eventName, payload);
+                // Not taken yet: the team whose number it came in on sees it too
+                var accountId = await _context.WhatsAppConversations.AsNoTracking()
+                    .Where(c => c.Id == conversationId).Select(c => c.WhatsAppAccountId).FirstOrDefaultAsync();
+                var numberTeam = await WhatsAppScope.TeamOfAccountAsync(_context, accountId);
+                if (numberTeam != null)
+                    await _hub.Clients.Group($"team-waiting-{numberTeam}").SendAsync(eventName, payload);
                 return;
             }
             await _hub.Clients.Group("org-admin").SendAsync(eventName, payload);
