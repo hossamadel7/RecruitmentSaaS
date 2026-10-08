@@ -549,8 +549,17 @@
             container.insertAdjacentHTML('beforeend', '<div class="chat-date-separator">' + today + '</div>');
     }
 
+    // A photo / voice note we sent can be drawn before its upload finished (the chat reloaded meanwhile):
+    // it shows only "🎤 رسالة صوتية". Redraw it once the saved message has its file.
+    function refreshIfMediaArrived(row, m) {
+        if (!m.hasMedia || row.querySelector('.voice-note, .bubble-image, .bubble-video, .bubble-doc, audio, video, img')) return false;
+        row.outerHTML = renderBubble(m);
+        return true;
+    }
+
     function appendBubble(container, m) {
-        if (m.id && container.querySelector('.chat-bubble-row[data-message-id="' + m.id + '"]')) return;
+        var existing = m.id && container.querySelector('.chat-bubble-row[data-message-id="' + m.id + '"]');
+        if (existing) { if (refreshIfMediaArrived(existing, m)) afterRender(container); return; }
         // Our own just-sent message: replace its pending placeholder instead of adding a second bubble
         if (m.direction === 2) {
             var key = (m.messageType || 1) + '|' + (m.textBody || '');
@@ -689,7 +698,12 @@
             var res = await fetch('/api/conversations/' + conversationId + '/media', { method: 'POST', body: form });
             var message = await res.json().catch(function () { return null; });
             if (!res.ok) throw { body: message };
-            if (!tempRow.isConnected) return;
+            if (!tempRow.isConnected) {
+                // The chat was redrawn while uploading: fix the copy that's on screen now
+                var drawn = container.isConnected && container.querySelector('.chat-bubble-row[data-message-id="' + message.id + '"]');
+                if (drawn && refreshIfMediaArrived(drawn, message)) afterRender(container);
+                return;
+            }
             if (container.querySelector('.chat-bubble-row[data-message-id="' + message.id + '"]')) tempRow.remove();
             else replacePending(tempRow, message);
             afterRender(container);
