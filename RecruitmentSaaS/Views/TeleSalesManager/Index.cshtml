@@ -23,7 +23,7 @@
     var breakdown = ViewBag.TeamStatusBreakdown as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
     var myTeam = ViewBag.MyTeam as IEnumerable<User> ?? Enumerable.Empty<User>();
 
-    string[] statusLabels = ViewBag.StatusLabels as string[] ?? new[] { "", "عميل جديد", "تم التواصل", "مهتم", "يفكر", "وعد بالزيارة", "زيارة", "تحويل", "ملغى" };
+    string[] statusLabels = ViewBag.StatusLabels as string[] ?? new[] { "", "عميل جديد", "تم التواصل", "استجاب", "متابعة", "حجز", "حضر للمكتب", "تحويل", "خسارة" };
     string[] statusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626" };
 }
 
