@@ -14,13 +14,6 @@ namespace RecruitmentSaaS.Services
     {
         public const string AllScope = "all";
 
-        /// <summary>
-        /// How general leads are split between teams (rows = team leaders, Share = leads per turn).
-        /// Each team's share then goes through that team's own rotation. No team with a share = the
-        /// per-person general rotation ("all") as before.
-        /// </summary>
-        public const string TeamsScope = "teams";
-
         public static string TeamScope(Guid managerId) => "team:" + managerId.ToString("N");
 
         public static Guid? ManagerOfScope(string? scope) =>
@@ -50,64 +43,6 @@ namespace RecruitmentSaaS.Services
                 .ThenBy(u => u.Name).ThenBy(u => u.Id)
                 .Select(u => new RotationSlot(u.Id, u.Name, config.TryGetValue(u.Id, out var m) ? m.Share : (short)1))
                 .ToList();
-        }
-
-        /// <summary>Teams that can take general leads (active leader with at least one active TeleSales), in order with their shares.</summary>
-        public static async Task<List<RotationSlot>> TeamRotationAsync(RecruitmentCrmContext db, CancellationToken ct = default)
-        {
-            var teams = await db.Users.AsNoTracking()
-                .Where(u => u.Role == 7 && u.IsActive
-                         && db.Users.Any(m => m.ManagerId == u.Id && (m.Role == 3 || m.Role == 8) && m.IsActive))
-                .Select(u => new { u.Id, Name = u.FullNameAr != null && u.FullNameAr != "" ? u.FullNameAr : u.FullName })
-                .ToListAsync(ct);
-            var ids = teams.Select(t => t.Id).ToList();
-            var config = await db.LeadRotationMembers.AsNoTracking()
-                .Where(m => m.ScopeKey == TeamsScope && ids.Contains(m.UserId))
-                .ToDictionaryAsync(m => m.UserId, ct);
-            // A team not set yet gets 0: the split only starts when the admin sets it
-            return teams
-                .OrderBy(t => config.TryGetValue(t.Id, out var m) ? m.Position : int.MaxValue)
-                .ThenBy(t => t.Name).ThenBy(t => t.Id)
-                .Select(t => new RotationSlot(t.Id, t.Name, config.TryGetValue(t.Id, out var m) ? m.Share : (short)0))
-                .ToList();
-        }
-
-        /// <summary>
-        /// A lead that belongs to no team (main site form, a WhatsApp number with no team, Facebook / Sheets):
-        /// split between the teams by their shares, then the team's own rotation picks the TeleSales.
-        /// Falls back to the per-person general rotation when no team has a share (or the team has nobody free).
-        /// Also returns the team it went to.
-        /// </summary>
-        public static async Task<(Guid? SalesId, Guid? Team)> NextForGeneralLeadAsync(RecruitmentCrmContext db, CancellationToken ct = default)
-        {
-            var teams = await TeamRotationAsync(db, ct);
-            if (teams.Any(t => t.Share > 0))
-            {
-                Guid team;
-                await Gate.WaitAsync(ct);
-                try
-                {
-                    var state = await db.LeadRotationStates.FirstOrDefaultAsync(s => s.ScopeKey == TeamsScope, ct);
-                    if (state == null)
-                    {
-                        state = new LeadRotationState { ScopeKey = TeamsScope };
-                        db.LeadRotationStates.Add(state);
-                    }
-                    var (teamId, given) = Advance(teams, state.CurrentUserId, state.GivenInTurn);
-                    state.CurrentUserId = teamId;
-                    state.GivenInTurn = given;
-                    state.UpdatedAt = DateTime.UtcNow;
-                    await db.SaveChangesAsync(ct);
-                    team = teamId;
-                }
-                finally
-                {
-                    Gate.Release();
-                }
-                var inTeam = await NextTeleSalesAsync(db, db.Users.Where(u => u.ManagerId == team), TeamScope(team), ct);
-                if (inTeam != null) return (inTeam, team);
-            }
-            return (await NextTeleSalesAsync(db, db.Users, AllScope, ct), null);
         }
 
         public static Task<Guid?> NextTeleSalesAsync(RecruitmentCrmContext db, IQueryable<User> candidates, string scope, CancellationToken ct = default) =>
@@ -252,16 +187,7 @@ namespace RecruitmentSaaS.Services
             foreach (var lead in waiting)
             {
                 var (candidates, stateScope) = await LeadDistributor.CandidatesForSheetAsync(db, lead.GoogleSheetId, ct);
-                Guid? salesId;
-                if (stateScope == LeadDistributor.AllScope)
-                {
-                    // No sheet team: split between the teams like every general lead
-                    var (generalId, generalTeam) = await LeadDistributor.NextForGeneralLeadAsync(db, ct);
-                    salesId = generalId;
-                    if (generalId != null && generalTeam != null) lead.TeamManagerId ??= generalTeam;
-                }
-                else
-                    salesId = await LeadDistributor.NextTeleSalesAsync(db, candidates, LeadDistributor.AllScope, stateScope, ct);
+                var salesId = await LeadDistributor.NextTeleSalesAsync(db, candidates, LeadDistributor.AllScope, stateScope, ct);
                 if (salesId == null)
                 {
                     _logger.LogWarning("No active TeleSales (or all paused) to receive lead {LeadId}", lead.Id);

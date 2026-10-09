@@ -210,9 +210,8 @@ namespace RecruitmentSaaS.Controllers
             }
 
             // No shared pool anymore: general-form leads go straight to the next TeleSales in rotation
-            Guid? generalTeam = null;
             if (teamForm == null && assignedSalesId == null)
-                (assignedSalesId, generalTeam) = await LeadDistributor.NextForGeneralLeadAsync(_context);
+                assignedSalesId = await LeadDistributor.NextTeleSalesAsync(_context, _context.Users, LeadDistributor.AllScope);
 
             // 5. Create Lead
             var leadId = Guid.NewGuid();
@@ -263,7 +262,7 @@ namespace RecruitmentSaaS.Controllers
                 InterestedJobTitle = interestedJobTitle,
                 Notes = notes?.Trim(),
                 AssignedSalesId = assignedSalesId, // ← TeleSales — null لو مفيش ref
-                TeamManagerId = teamForm?.ManagerId ?? generalTeam,
+                TeamManagerId = teamForm?.ManagerId,
                 CreatedAt = now
             });
 

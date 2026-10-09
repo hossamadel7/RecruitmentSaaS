@@ -243,14 +243,9 @@ namespace RecruitmentSaaS.Services
             Guid? agentId = lead.AssignedSalesId;
             if (agentId == null && toRotation)
             {
-                if (team != null)
-                    agentId = await LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => u.ManagerId == team), LeadDistributor.TeamScope(team.Value), ct);
-                else
-                {
-                    Guid? generalTeam;
-                    (agentId, generalTeam) = await LeadDistributor.NextForGeneralLeadAsync(_context, ct);
-                    if (agentId != null && generalTeam != null) lead.TeamManagerId ??= generalTeam;
-                }
+                agentId = team != null
+                    ? await LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => u.ManagerId == team), LeadDistributor.TeamScope(team.Value), ct)
+                    : await LeadDistributor.NextTeleSalesAsync(_context, _context.Users, LeadDistributor.AllScope, ct);
             }
 
             conversation.IntakeStatus = (byte)IntakeStatus.Completed;

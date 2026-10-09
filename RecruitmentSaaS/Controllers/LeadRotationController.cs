@@ -58,13 +58,6 @@ namespace RecruitmentSaaS.Controllers
             }
             ViewBag.Scope = key;
             ViewBag.ScopeTitle = title;
-            if (IsAdmin && key == LeadDistributor.AllScope)
-            {
-                var teamSplit = await LeadDistributor.TeamRotationAsync(_context);
-                var teamState = await _context.LeadRotationStates.AsNoTracking().FirstOrDefaultAsync(s => s.ScopeKey == LeadDistributor.TeamsScope);
-                ViewBag.TeamSplit = teamSplit;
-                ViewBag.TeamSplitCurrent = teamSplit.FirstOrDefault(t => t.UserId == teamState?.CurrentUserId)?.Name;
-            }
             ViewBag.IsAdmin = IsAdmin;
             ViewBag.IsTeam = LeadDistributor.ManagerOfScope(key) != null;
             ViewBag.MaxShare = MaxShare;
@@ -130,36 +123,6 @@ namespace RecruitmentSaaS.Controllers
             await _context.LeadRotationStates.Where(s => s.ScopeKey == key).ExecuteDeleteAsync();
             TempData["Success"] = "الدورة هتبدأ من أول واحد في القائمة";
             return RedirectToAction("Index", new { scope = key });
-        }
-
-        // ── POST /LeadRotation/SaveTeams ── how general leads are split between teams ──
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SaveTeams(List<Guid> teamIds, List<short> shares)
-        {
-            if (!IsAdmin) return Forbid();
-            var allowed = (await LeadDistributor.TeamRotationAsync(_context)).Select(t => t.UserId).ToHashSet();
-            if (teamIds.Count != shares.Count || teamIds.Count != teamIds.Distinct().Count() || teamIds.Any(id => !allowed.Contains(id)))
-            {
-                TempData["Error"] = "قائمة الفرق اتغيرت أثناء التعديل — حدّث الصفحة وحاول تاني";
-                return RedirectToAction("Index", new { scope = LeadDistributor.AllScope });
-            }
-            if (shares.Any(s => s < 0 || s > MaxShare))
-            {
-                TempData["Error"] = $"عدد الليدز لكل فريق لازم يكون من 0 لـ {MaxShare}";
-                return RedirectToAction("Index", new { scope = LeadDistributor.AllScope });
-            }
-
-            await _context.LeadRotationMembers.Where(m => m.ScopeKey == LeadDistributor.TeamsScope).ExecuteDeleteAsync();
-            for (var i = 0; i < teamIds.Count; i++)
-                _context.LeadRotationMembers.Add(new LeadRotationMember { ScopeKey = LeadDistributor.TeamsScope, UserId = teamIds[i], Position = i, Share = shares[i] });
-            await _context.SaveChangesAsync();
-            await _context.LeadRotationStates.Where(s => s.ScopeKey == LeadDistributor.TeamsScope).ExecuteDeleteAsync();
-
-            TempData["Success"] = shares.Any(s => s > 0)
-                ? "تم الحفظ ✅ الليدز العامة هتتقسم على الفرق، وكل فريق يوزّع نصيبه بتوزيع الفريق"
-                : "تم الحفظ — مفيش تقسيم على الفرق، الليدز العامة بتتوزع بالتوزيع العام تحت";
-            return RedirectToAction("Index", new { scope = LeadDistributor.AllScope });
         }
 
         /// <summary>
