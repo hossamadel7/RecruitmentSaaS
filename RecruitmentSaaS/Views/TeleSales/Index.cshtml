@@ -8,6 +8,8 @@
     DateTime egyptToday = ViewBag.EgyptToday;
     var followUps = ViewBag.ChatFollowUps as List<RecruitmentSaaS.Controllers.TeleSalesController.ChatFollowUpItem> ?? new();
     var appointments = ViewBag.Appointments as List<RecruitmentSaaS.Controllers.TeleSalesController.OfficeAppointmentItem> ?? new();
+    var myBookings = ViewBag.MyBookings as List<RecruitmentSaaS.Controllers.TeleSalesController.MyBookingItem> ?? new();
+    string Iso(DateTime d) => d.ToString("yyyy-MM-dd");
     var ar = new System.Globalization.CultureInfo("ar-EG");
 }
 
@@ -17,6 +19,13 @@
     .ts-name { font-size: 13.5px; font-weight: 600; }
     .ts-sub { font-size: 12px; color: var(--text-muted); }
     @@media (max-width: 576px) { .ts-row { flex-wrap: wrap; } }
+    .day-filter { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid #F1F5F9; overflow-x: auto; scrollbar-width: none; align-items: center; }
+    .day-filter::-webkit-scrollbar { display: none; }
+    .day-chip { flex-shrink: 0; border: 1px solid var(--border); background: #fff; border-radius: 99px; padding: 4px 12px; font-size: 12.5px; font-weight: 600; color: #475569; white-space: nowrap; }
+    .day-chip.active { background: #2563EB; border-color: #2563EB; color: #fff; }
+    .day-pick { width: auto; min-width: 130px; flex-shrink: 0; }
+    .day-empty { padding: 18px; text-align: center; color: var(--text-muted); font-size: 13px; }
+    .day-count { margin-inline-start: auto; font-size: 12px; color: var(--text-muted); font-weight: 600; }
 </style>
 
 <!-- Stat Cards -->
@@ -130,6 +139,16 @@
                     <i class="bi bi-building-check"></i>
                 </div>
                 مواعيد المكتب
+                <span class="day-count" id="appt-count"></span>
+            </div>
+            <div class="day-filter" data-target="appt">
+                <button type="button" class="day-chip active" data-day="today">النهارده</button>
+                <button type="button" class="day-chip" data-day="tomorrow">بكره</button>
+                <button type="button" class="day-chip" data-day="after">بعد بكره</button>
+                <button type="button" class="day-chip" data-day="week">الأسبوع ده</button>
+                <button type="button" class="day-chip" data-day="late">فات ميعاده</button>
+                <button type="button" class="day-chip" data-day="all">الكل</button>
+                <input type="date" class="form-control form-control-sm day-pick" title="اختار يوم" />
             </div>
             @if (!appointments.Any())
             {
@@ -145,7 +164,7 @@
                     {
                         var late = a.At.Date < egyptToday;
                         var isToday = a.At.Date == egyptToday;
-                        <div class="ts-row">
+                        <div class="ts-row" data-appt="@Iso(a.At.Date)">
                             <div class="ts-icon" style="background:@(late ? "#FEF2F2" : "#EFF6FF");color:@(late ? "#DC2626" : "#2563EB")"><i class="bi bi-building"></i></div>
                             <div style="flex:1;min-width:0">
                                 <div class="ts-name">@a.Name</div>
@@ -165,11 +184,111 @@
                             }
                         </div>
                     }
+                    <div class="day-empty" id="appt-empty" hidden>مفيش مواعيد في اليوم ده</div>
                 </div>
             }
         </div>
     </div>
 </div>
+
+<!-- حجوزاتي: bookings I made, by the day I made them -->
+<div class="row g-3 mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="header-icon" style="background:#F0FDF4;color:#16A34A">
+                    <i class="bi bi-calendar-check"></i>
+                </div>
+                حجوزاتي
+                <span class="day-count" id="bk-count"></span>
+            </div>
+            <div class="day-filter" data-target="bk">
+                <button type="button" class="day-chip active" data-day="today">النهارده</button>
+                <button type="button" class="day-chip" data-day="yesterday">امبارح</button>
+                <button type="button" class="day-chip" data-day="week">آخر 7 أيام</button>
+                <button type="button" class="day-chip" data-day="all">آخر 30 يوم</button>
+                <input type="date" class="form-control form-control-sm day-pick" title="اختار يوم" />
+            </div>
+            <div class="card-body p-0">
+                @foreach (var b in myBookings)
+                {
+                    var came = b.Status == 6 || b.Status == 7;
+                    <div class="ts-row" data-bk="@Iso(b.BookedOn.Date)">
+                        <div class="ts-icon" style="background:@(came ? "#F0FDF4" : "#EFF6FF");color:@(came ? "#16A34A" : "#2563EB")"><i class="bi @(came ? "bi-person-check-fill" : "bi-building-check")"></i></div>
+                        <div style="flex:1;min-width:0">
+                            <div class="ts-name">@b.Name</div>
+                            <div class="ts-sub">
+                                اتحجز @(b.BookedOn.Date == egyptToday ? "النهارده" : b.BookedOn.ToString("dddd d/M", ar))
+                                @if (b.At != null) { <span>· الميعاد @b.At.Value.ToString("dddd d/M", ar) الساعة @b.At.Value.ToString("h:mm tt", ar)</span> }
+                                @if (came) { <span class="badge" style="background:#DCFCE7;color:#15803D">حضر</span> }
+                                else if (b.Status == 8) { <span class="badge" style="background:#FEE2E2;color:#B91C1C">خسارة</span> }
+                            </div>
+                        </div>
+                        @if (b.ConversationId != null)
+                        {
+                            <a href="/Inbox/Index?c=@b.ConversationId" class="btn btn-sm btn-success"><i class="bi bi-whatsapp"></i> افتح</a>
+                        }
+                        else
+                        {
+                            <a href="/TeleSales/LeadDetail/@b.LeadId" class="btn btn-sm btn-primary">عرض</a>
+                        }
+                    </div>
+                }
+                <div class="day-empty" id="bk-empty" hidden>مفيش حجوزات في الفترة دي</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Day filters for مواعيد المكتب and حجوزاتي (Egypt dates come from the server as yyyy-MM-dd)
+    (function () {
+        var today = '@Iso(egyptToday)';
+        function addDays(iso, n) { var d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+        function matches(day, key, picked) {
+            if (picked) return day === picked;
+            switch (key) {
+                case 'today': return day === today;
+                case 'tomorrow': return day === addDays(today, 1);
+                case 'after': return day === addDays(today, 2);
+                case 'yesterday': return day === addDays(today, -1);
+                case 'week': return key && (day >= addDays(today, -6) && day <= today);
+                case 'late': return day < today;
+                default: return true;
+            }
+        }
+        function apply(bar, key, picked) {
+            var target = bar.dataset.target, shown = 0;
+            document.querySelectorAll('[data-' + target + ']').forEach(function (row) {
+                var day = row.getAttribute('data-' + target);
+                var ok = target === 'appt' && key === 'week' && !picked
+                    ? day >= today && day <= addDays(today, 6)       // appointments: the coming 7 days
+                    : matches(day, key, picked);
+                row.style.display = ok ? '' : 'none';
+                if (ok) shown++;
+            });
+            var empty = document.getElementById(target + '-empty');
+            if (empty) empty.hidden = shown > 0;
+            var count = document.getElementById(target + '-count');
+            if (count) count.textContent = shown + (target === 'bk' ? ' حجز' : ' ميعاد');
+        }
+        document.querySelectorAll('.day-filter').forEach(function (bar) {
+            var pick = bar.querySelector('.day-pick');
+            bar.querySelectorAll('.day-chip').forEach(function (chip) {
+                chip.addEventListener('click', function () {
+                    bar.querySelectorAll('.day-chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
+                    pick.value = '';
+                    apply(bar, chip.dataset.day, null);
+                });
+            });
+            pick.addEventListener('change', function () {
+                bar.querySelectorAll('.day-chip').forEach(function (c) { c.classList.remove('active'); });
+                apply(bar, null, pick.value || null);
+            });
+            apply(bar, 'today', null);
+        });
+    })();
+</script>
 
 <div class="row g-3">
     <!-- Recent Leads -->

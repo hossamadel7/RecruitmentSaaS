@@ -114,8 +114,8 @@ namespace RecruitmentSaaS.Controllers
                 .Select(f => new ChatFollowUpItem(f.Id, f.ConversationId, f.Name, f.Phone, EgyptTime.FromUtc(f.DueAt), f.DueAt < DateTime.UtcNow, f.Notes))
                 .ToList();
 
-            var apptFrom = egyptToday.AddDays(-14);
-            var apptTo = egyptToday.AddDays(8);
+            var apptFrom = egyptToday.AddDays(-30);
+            var apptTo = egyptToday.AddDays(31);
             var appts = await _context.Leads.AsNoTracking()
                 .Where(l => l.AssignedSalesId == userId && l.Status == 5 && l.AppointmentDate != null
                          && l.AppointmentDate >= apptFrom && l.AppointmentDate < apptTo)
@@ -132,11 +132,29 @@ namespace RecruitmentSaaS.Controllers
                 .ToList();
             ViewBag.EgyptToday = egyptToday;
 
+            // حجوزاتي: the bookings I made in the last 30 days (by the day I made them)
+            var since = EgyptTime.ToUtc(egyptToday.AddDays(-30));
+            var made = await _context.LeadFunnelHistories.AsNoTracking()
+                .Where(h => h.ToStatus == 5 && h.ChangedById == userId && h.CreatedAt >= since)
+                .OrderByDescending(h => h.CreatedAt)
+                .Select(h => new { h.LeadId, h.CreatedAt, h.Lead.FullName, h.Lead.AppointmentDate, h.Lead.Status })
+                .ToListAsync();
+            var madeIds = made.Select(m => m.LeadId).Distinct().ToList();
+            var madeChats = await _context.WhatsAppConversations.AsNoTracking()
+                .Where(c => c.LeadId != null && madeIds.Contains(c.LeadId.Value))
+                .Select(c => new { LeadId = c.LeadId!.Value, c.Id }).ToListAsync();
+            ViewBag.MyBookings = made
+                .Select(m => new MyBookingItem(m.LeadId, m.FullName, EgyptTime.FromUtc(m.CreatedAt), m.AppointmentDate, m.Status,
+                                               madeChats.FirstOrDefault(c => c.LeadId == m.LeadId)?.Id))
+                .GroupBy(m => (m.LeadId, m.BookedOn.Date)).Select(g => g.First())   // re-booked the same day = once
+                .ToList();
+
             return View(dto);
         }
 
         public sealed record ChatFollowUpItem(Guid Id, Guid ConversationId, string Name, string Phone, DateTime DueLocal, bool Overdue, string? Notes);
         public sealed record OfficeAppointmentItem(Guid LeadId, string Name, string Phone, DateTime At, Guid? ConversationId);
+        public sealed record MyBookingItem(Guid LeadId, string Name, DateTime BookedOn, DateTime? At, byte Status, Guid? ConversationId);
 
         // ── POST /TeleSales/CompleteChatFollowUp ─────────────────────────────
         [HttpPost]
