@@ -820,6 +820,20 @@ namespace RecruitmentSaaS.Controllers.Api
             return usable;
         }
 
+        // Which {{n}} are the booking's day / time (taken from the حجز, not typed)
+        private static List<bool> BookingParams(string body, int count)
+        {
+            var flags = new List<bool>();
+            for (var n = 1; n <= count; n++)
+            {
+                var at = body.IndexOf("{{" + n + "}}", StringComparison.Ordinal);
+                var before = at < 0 ? "" : body[Math.Max(0, at - 14)..at];
+                flags.Add(!before.Contains("معاك") && !before.Contains("أ/") && !before.Contains("ا/")
+                          && (before.Contains("يوم") || before.Contains("الساعة") || before.Contains("الساعه")));
+            }
+            return flags;
+        }
+
         // Pre-fill each {{n}} from the words just before it
         private static List<string> SuggestParams(string body, int count, string? clientName, string? agentName, DateTime? appointment)
         {
@@ -858,14 +872,22 @@ namespace RecruitmentSaaS.Controllers.Api
             var agentName = conversation.AssignedSalesAgent?.DisplayNameAr
                 ?? await _context.Users.Where(u => u.Id == CurrentUserId).Select(u => u.FullNameAr ?? u.FullName).FirstOrDefaultAsync();
             var clientName = conversation.Lead?.FullName ?? conversation.IntakeName;
-            return Ok(templates.Select(t => new
+            var booking = conversation.Lead?.Status == 5 ? conversation.Lead.AppointmentDate : null;
+            return Ok(templates.Select(t =>
             {
-                t.Name,
-                t.Language,
-                t.Body,
-                t.ParamCount,
-                t.Buttons,
-                Suggested = SuggestParams(t.Body, t.ParamCount, clientName, agentName, conversation.Lead?.AppointmentDate)
+                var fromBooking = BookingParams(t.Body, t.ParamCount);
+                return new
+                {
+                    t.Name,
+                    t.Language,
+                    t.Body,
+                    t.ParamCount,
+                    t.Buttons,
+                    Suggested = SuggestParams(t.Body, t.ParamCount, clientName, agentName, booking),
+                    FromBooking = fromBooking,
+                    // The booking confirmation needs a حجز with its day and time
+                    NeedsBooking = fromBooking.Any(f => f) && booking == null
+                };
             }));
         }
 
@@ -886,6 +908,17 @@ namespace RecruitmentSaaS.Controllers.Api
             var values = (dto.Params ?? new List<string>()).Select(v => (v ?? "").Trim()).ToList();
             if (values.Count != template.ParamCount || values.Any(v => v.Length == 0 || v.Length > 200))
                 return BadRequest(new { error = "املى كل الخانات قبل الإرسال" });
+
+            // The booking's day / time always come from the حجز itself
+            var fromBooking = BookingParams(template.Body, template.ParamCount);
+            if (fromBooking.Any(f => f))
+            {
+                var lead = conversation.LeadId == null ? null : await _context.Leads.AsNoTracking().FirstOrDefaultAsync(l => l.Id == conversation.LeadId);
+                var booking = lead?.Status == 5 ? lead.AppointmentDate : null;
+                if (booking == null) return BadRequest(new { error = "اعمل حجز الأول (🏢 حجز) عشان اليوم والساعة يتاخدوا منه" });
+                var fromLead = SuggestParams(template.Body, template.ParamCount, null, null, booking);
+                for (var n = 0; n < values.Count; n++) if (fromBooking[n]) values[n] = fromLead[n];
+            }
 
             var text = template.Body;
             for (var n = 0; n < values.Count; n++) text = text.Replace("{{" + (n + 1) + "}}", values[n]);

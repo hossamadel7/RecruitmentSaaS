@@ -407,16 +407,19 @@
             var preview = esc(t.body).replace(/\{\{(\d+)\}\}/g, '<mark class="tpl-var">{{$1}}</mark>').replace(/\n/g, '<br>');
             var fields = '';
             for (var n = 1; n <= t.paramCount; n++) {
+                var locked = t.fromBooking && t.fromBooking[n - 1];
                 fields += '<label class="tpl-field"><span>{{' + n + '}}</span>' +
-                    '<input type="text" class="form-control form-control-sm" maxlength="200" data-tpl="' + i + '" data-n="' + n + '" value="' + esc(t.suggested[n - 1] || '') + '" /></label>';
+                    '<input type="text" class="form-control form-control-sm" maxlength="200" data-tpl="' + i + '" data-n="' + n + '" value="' + esc(t.suggested[n - 1] || '') + '"' +
+                    (locked ? ' readonly title="من الحجز — لتغييره غيّر الحجز"' : '') + ' />' +
+                    (locked ? '<i class="bi bi-building-check tpl-lock" title="من الحجز"></i>' : '') + '</label>';
             }
             var buttons = (t.buttons || []).map(function (b) { return '<span class="tpl-btn-chip">' + esc(b) + '</span>'; }).join('');
             return '<div class="tpl-card" data-i="' + i + '">' +
                 '<div class="tpl-body">' + preview + '</div>' +
                 (buttons ? '<div class="tpl-btns">' + buttons + '</div>' : '') +
-                fields +
+                (t.needsBooking ? '<div class="tpl-needs"><i class="bi bi-building-exclamation"></i> اعمل حجز الأول (🏢 حجز) — اليوم والساعة بيتاخدوا منه</div>' : fields) +
                 '<div class="tpl-error" hidden></div>' +
-                '<button type="button" class="btn btn-success btn-sm w-100 tpl-send" data-i="' + i + '"><i class="bi bi-send-fill"></i> إرسال</button>' +
+                '<button type="button" class="btn btn-success btn-sm w-100 tpl-send" data-i="' + i + '"' + (t.needsBooking ? ' disabled' : '') + '><i class="bi bi-send-fill"></i> إرسال</button>' +
                 '</div>';
         }).join('');
 

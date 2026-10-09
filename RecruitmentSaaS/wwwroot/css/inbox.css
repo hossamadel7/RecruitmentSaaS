@@ -1494,3 +1494,6 @@
 .tpl-field span { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #92400e; background: #fef3c7; border-radius: 6px; padding: 2px 6px; }
 .tpl-error { color: #b91c1c; font-size: 13px; font-weight: 600; margin: 6px 0; }
 .tpl-error[hidden] { display: none; }
+.tpl-field input[readonly] { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+.tpl-lock { color: #2563eb; }
+.tpl-needs { background: #fff7ed; color: #9a3412; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
