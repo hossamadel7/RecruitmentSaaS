@@ -322,6 +322,16 @@ namespace RecruitmentSaaS.Services
         private async Task SendAsync(WhatsAppConversation conversation, string text, CancellationToken ct)
         {
             var now = DateTime.UtcNow;
+            // WhatsApp only allows free text within 24 hours of the customer's last message (even for ad chats);
+            // after that (e.g. the "no age after 48 hours" hand-off) Meta rejects it, so stay silent and just hand over
+            var lastCustomer = await _context.WhatsAppMessages.AsNoTracking()
+                .Where(m => m.ConversationId == conversation.Id && m.Direction == (byte)MessageDirection.Incoming)
+                .MaxAsync(m => (DateTime?)m.WhatsAppTimestamp, ct);
+            if (lastCustomer == null || lastCustomer < now.AddHours(-24).AddMinutes(5))
+            {
+                _logger.LogInformation("Assistant message not sent to {ConversationId}: the 24-hour window is closed", conversation.Id);
+                return;
+            }
             var message = new WhatsAppMessage
             {
                 Id = Guid.NewGuid(),
