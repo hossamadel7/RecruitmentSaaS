@@ -58,6 +58,22 @@ namespace RecruitmentSaaS.Services
         Task<WhatsAppMediaFile?> DownloadMediaAsync(string mediaId, CancellationToken ct = default);
 
         Task<string?> ResolveMediaUrlAsync(string mediaId, CancellationToken ct = default);
+
+        /// <summary>The message templates of a WhatsApp Business Account (null when Meta couldn't be reached).</summary>
+        Task<List<WhatsAppTemplateInfo>?> ListTemplatesAsync(string wabaId, CancellationToken ct = default);
+    }
+
+    /// <summary>One approved (or pending) message template, as WhatsApp Manager shows it.</summary>
+    public sealed class WhatsAppTemplateInfo
+    {
+        public string Name { get; set; } = "";
+        public string Language { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string Body { get; set; } = "";
+        /// <summary>How many {{n}} variables the body has.</summary>
+        public int ParamCount { get; set; }
+        public List<string> Buttons { get; set; } = new();
     }
 
     public class WhatsAppCloudApiService : IWhatsAppCloudApiService
@@ -173,6 +189,45 @@ namespace RecruitmentSaaS.Services
                 {
                     _logger.LogError(ex, "Exception downloading WhatsApp media {MediaId}", mediaId);
                 }
+            }
+            return null;
+        }
+
+        public async Task<List<WhatsAppTemplateInfo>?> ListTemplatesAsync(string wabaId, CancellationToken ct = default)
+        {
+            var url = $"https://graph.facebook.com/{_apiVersion}/{wabaId}/message_templates?fields=name,status,category,language,components&limit=200";
+            foreach (var accessToken in await _credentialStore.GetAccessTokensAsync(ct))
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                var client = _httpClientFactory.CreateClient();
+                using var response = await client.SendAsync(request, ct);
+                var raw = await response.Content.ReadAsStringAsync(ct);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Listing templates of WABA {WabaId} failed with one token: {Status}", wabaId, (int)response.StatusCode);
+                    continue;
+                }
+                var list = new List<WhatsAppTemplateInfo>();
+                foreach (var t in (JObject.Parse(raw)["data"] as JArray) ?? new JArray())
+                {
+                    var components = t["components"] as JArray ?? new JArray();
+                    var body = components.FirstOrDefault(c => (string?)c["type"] == "BODY")?["text"]?.ToString() ?? "";
+                    var buttons = components.Where(c => (string?)c["type"] == "BUTTONS")
+                        .SelectMany(c => (c["buttons"] as JArray ?? new JArray()).Select(b => b["text"]?.ToString() ?? ""))
+                        .Where(b => b.Length > 0).ToList();
+                    list.Add(new WhatsAppTemplateInfo
+                    {
+                        Name = t["name"]?.ToString() ?? "",
+                        Language = t["language"]?.ToString() ?? "",
+                        Category = t["category"]?.ToString() ?? "",
+                        Status = t["status"]?.ToString() ?? "",
+                        Body = body,
+                        ParamCount = System.Text.RegularExpressions.Regex.Matches(body, @"\{\{\d+\}\}").Select(m => m.Value).Distinct().Count(),
+                        Buttons = buttons
+                    });
+                }
+                return list;
             }
             return null;
         }

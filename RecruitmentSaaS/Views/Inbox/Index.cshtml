@@ -83,7 +83,10 @@
 
                 @* WhatsApp's 24-hour rule: shown instead of a usable composer when the customer hasn't written *@
                 <div class="chat-window-closed" id="chat-window-closed" hidden>
-                    <a class="window-call-btn" id="window-call-btn" href="#"><i class="bi bi-telephone-fill"></i> اتصال <span dir="ltr" id="window-call-number"></span></a>
+                    <div class="window-actions">
+                        <button type="button" class="window-template-btn" id="window-template-btn"><i class="bi bi-chat-square-text-fill"></i> ابعت رسالة جاهزة</button>
+                        <a class="window-call-btn" id="window-call-btn" href="#"><i class="bi bi-telephone-fill"></i> اتصال <span dir="ltr" id="window-call-number"></span></a>
+                    </div>
                     <div class="window-closed-text"><i class="bi bi-lock-fill"></i> العميل لسه ما ردش — واتساب مش هيسمح بالرسائل العادية لحد ما يرد</div>
                 </div>
                 <div class="chat-composer" id="chat-composer">
@@ -132,6 +135,22 @@
         </section>
 
         @* Forward a message into another chat (anyone who can see both chats) *@
+        @* Ready-made WhatsApp templates: the only thing WhatsApp accepts once a chat is closed *@
+        <div class="modal fade" id="templateModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-chat-square-text-fill me-2"></i>رسالة جاهزة</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="template-list"></div>
+                        <div class="transfer-note"><i class="bi bi-info-circle"></i> دي الرسايل المتوافق عليها من واتساب للرقم ده. لما العميل يرد، المحادثة بتتفتح تاني 24 ساعة.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="modal fade" id="forwardModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
                 <div class="modal-content">

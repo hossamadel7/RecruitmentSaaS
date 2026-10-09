@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using RecruitmentSaaS.Data;
 using RecruitmentSaaS.Models.DTOs;
 using RecruitmentSaaS.Models.Entities;
@@ -799,6 +800,129 @@ namespace RecruitmentSaaS.Controllers.Api
             return result.Success
                 ? Ok(new { conversationId = result.ConversationId, templateSent = result.TemplateSent })
                 : BadRequest(new { error = result.Error, conversationId = result.ConversationId });
+        }
+
+        // ── Ready-made messages (templates) for a closed chat ─────────────────
+        // WhatsApp only takes an approved template once 24 hours passed since the customer wrote.
+        // The list is the number's own approved templates in WhatsApp Manager; the variables come pre-filled
+        // (client name, the booking's day and time, the agent's name) and the TeleSales can edit them.
+
+        private const string ClosedOnlyError = "المحادثة لسه مفتوحة — اكتب للعميل عادي";
+
+        private async Task<List<WhatsAppTemplateInfo>?> ApprovedTemplatesAsync(WhatsAppAccount account, Microsoft.Extensions.Caching.Memory.IMemoryCache cache)
+        {
+            var key = "wa-templates-" + account.WabaId;
+            if (cache.TryGetValue(key, out List<WhatsAppTemplateInfo>? cached)) return cached;
+            var all = await _cloudApi.ListTemplatesAsync(account.WabaId);
+            if (all == null) return null;
+            var usable = all.Where(t => t.Status == "APPROVED" && t.Name != "hello_world").OrderBy(t => t.Name).ToList();
+            cache.Set(key, usable, TimeSpan.FromMinutes(5));
+            return usable;
+        }
+
+        // Pre-fill each {{n}} from the words just before it
+        private static List<string> SuggestParams(string body, int count, string? clientName, string? agentName, DateTime? appointment)
+        {
+            var ar = new System.Globalization.CultureInfo("ar-EG");
+            var first = string.IsNullOrWhiteSpace(clientName) ? "" : clientName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
+            if (first.Any(char.IsDigit)) first = "";
+            var values = new List<string>();
+            for (var n = 1; n <= count; n++)
+            {
+                var at = body.IndexOf("{{" + n + "}}", StringComparison.Ordinal);
+                var before = at < 0 ? "" : body[Math.Max(0, at - 14)..at];
+                values.Add(
+                    before.Contains("معاك") ? (agentName ?? "")
+                    : before.Contains("أ/") || before.Contains("ا/") ? first
+                    : before.Contains("يوم") ? (appointment?.ToString("dddd d/M", ar) ?? "")
+                    : before.Contains("الساعة") || before.Contains("الساعه") ? (appointment?.ToString("h:mm tt", ar) ?? "")
+                    : "");
+            }
+            return values;
+        }
+
+        // ── GET /api/conversations/{id}/templates ─────────────────────────────
+        [HttpGet("{id:guid}/templates")]
+        public async Task<IActionResult> Templates(Guid id, [FromServices] Microsoft.Extensions.Caching.Memory.IMemoryCache cache)
+        {
+            var conversation = await _context.WhatsAppConversations.AsNoTracking()
+                .Include(c => c.WhatsAppAccount).Include(c => c.Lead).Include(c => c.AssignedSalesAgent)
+                .FirstOrDefaultAsync(c => c.Id == id);
+            if (conversation == null) return NotFound();
+            if (!await CanSeeAsync(conversation)) return Forbid();
+            if (await WindowClosesAtAsync(conversation.Id) != null) return BadRequest(new { error = ClosedOnlyError });
+
+            var templates = await ApprovedTemplatesAsync(conversation.WhatsAppAccount, cache);
+            if (templates == null) return StatusCode(502, new { error = "تعذر جلب الرسائل الجاهزة من واتساب — جرّب تاني" });
+
+            var agentName = conversation.AssignedSalesAgent?.DisplayNameAr
+                ?? await _context.Users.Where(u => u.Id == CurrentUserId).Select(u => u.FullNameAr ?? u.FullName).FirstOrDefaultAsync();
+            var clientName = conversation.Lead?.FullName ?? conversation.IntakeName;
+            return Ok(templates.Select(t => new
+            {
+                t.Name,
+                t.Language,
+                t.Body,
+                t.ParamCount,
+                t.Buttons,
+                Suggested = SuggestParams(t.Body, t.ParamCount, clientName, agentName, conversation.Lead?.AppointmentDate)
+            }));
+        }
+
+        // ── POST /api/conversations/{id}/template ─────────────────────────────
+        [HttpPost("{id:guid}/template")]
+        public async Task<IActionResult> SendTemplate(Guid id, [FromBody] SendTemplateDto dto, [FromServices] Microsoft.Extensions.Caching.Memory.IMemoryCache cache)
+        {
+            var conversation = await _context.WhatsAppConversations
+                .Include(c => c.WhatsAppAccount).Include(c => c.Contact)
+                .FirstOrDefaultAsync(c => c.Id == id);
+            if (conversation == null) return NotFound();
+            if (!await CanSeeAsync(conversation)) return Forbid();
+            if (await WindowClosesAtAsync(conversation.Id) != null) return BadRequest(new { error = ClosedOnlyError });
+
+            var templates = await ApprovedTemplatesAsync(conversation.WhatsAppAccount, cache);
+            var template = templates?.FirstOrDefault(t => t.Name == dto.Name && t.Language == dto.Language);
+            if (template == null) return BadRequest(new { error = "الرسالة دي مش موجودة أو مش متوافق عليها على الرقم ده" });
+            var values = (dto.Params ?? new List<string>()).Select(v => (v ?? "").Trim()).ToList();
+            if (values.Count != template.ParamCount || values.Any(v => v.Length == 0 || v.Length > 200))
+                return BadRequest(new { error = "املى كل الخانات قبل الإرسال" });
+
+            var text = template.Body;
+            for (var n = 0; n < values.Count; n++) text = text.Replace("{{" + (n + 1) + "}}", values[n]);
+
+            if (conversation.IntakeStatus == (byte)IntakeStatus.Collecting)
+                conversation.IntakeStatus = (byte)IntakeStatus.StoppedByStaff;   // a person took over from the AI assistant
+            var now = DateTime.UtcNow;
+            var message = new WhatsAppMessage
+            {
+                Id = Guid.NewGuid(),
+                ConversationId = conversation.Id,
+                WhatsAppAccountId = conversation.WhatsAppAccountId,
+                Direction = (byte)MessageDirection.Outgoing,
+                MessageType = (byte)WhatsAppMessageType.Text,
+                MessageSource = (byte)MessageSource.CloudApi,
+                TextBody = text.Length > 4000 ? text[..4000] : text,
+                SenderUserId = CurrentUserId,
+                Status = (byte)MessageStatus.Queued,
+                WhatsAppTimestamp = now,
+                CreatedAt = now
+            };
+            _context.WhatsAppMessages.Add(message);
+            conversation.LastMessageAt = now;
+            conversation.UpdatedAt = now;
+            await _context.SaveChangesAsync();
+
+            var result = await _cloudApi.SendTemplateMessageAsync(conversation.WhatsAppAccount.PhoneNumberId,
+                conversation.Contact.WhatsAppPhoneNumber, template.Name, template.Language, values);
+            message.Status = result.Success ? (byte)MessageStatus.Sent : (byte)MessageStatus.Failed;
+            message.WhatsAppMessageId = result.WhatsAppMessageId;
+            message.ErrorCode = result.ErrorCode;
+            message.ErrorMessage = result.ErrorMessage;
+            await _context.SaveChangesAsync();
+            await _notifier.NewMessageAsync(message, conversation.AssignedSalesAgentId, CurrentUserName);
+
+            if (!result.Success) return BadRequest(new { error = result.ErrorMessage ?? "واتساب رفض الرسالة", messageId = message.Id });
+            return Ok(new { success = true, messageId = message.Id });
         }
 
         // ── POST /api/conversations/{id}/outcome ──────────────────────────────

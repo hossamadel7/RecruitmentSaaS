@@ -71,6 +71,14 @@ namespace RecruitmentSaaS.Models.DTOs
         public DateTime? NextFollowUpAt { get; set; }
     }
 
+    public class SendTemplateDto
+    {
+        public string Name { get; set; } = "";
+        public string Language { get; set; } = "";
+        /// <summary>Values for {{1}}, {{2}}… in order.</summary>
+        public List<string> Params { get; set; } = new();
+    }
+
     public class SetOutcomeDto
     {
         public string Outcome { get; set; } = "";

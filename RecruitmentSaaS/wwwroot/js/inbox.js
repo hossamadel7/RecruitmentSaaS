@@ -383,6 +383,68 @@
         }
     }
 
+    // ── Ready-made messages (WhatsApp templates) — only for a closed chat ──
+    async function openTemplates() {
+        var c = state.selectedConversation;
+        if (!c) return;
+        var modalEl = document.getElementById('templateModal');
+        if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+        var list = document.getElementById('template-list');
+        list.innerHTML = '<div class="inbox-empty-state"><i class="bi bi-hourglass-split"></i></div>';
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+
+        var templates;
+        try { templates = await api('/api/conversations/' + c.id + '/templates'); }
+        catch (e) {
+            list.innerHTML = '<div class="tpl-error">' + esc((e.body && e.body.error) || 'تعذر تحميل الرسايل الجاهزة') + '</div>';
+            return;
+        }
+        if (!templates.length) {
+            list.innerHTML = '<div class="tpl-error">مفيش رسايل جاهزة متوافق عليها للرقم ده في واتساب.</div>';
+            return;
+        }
+        list.innerHTML = templates.map(function (t, i) {
+            var preview = esc(t.body).replace(/\{\{(\d+)\}\}/g, '<mark class="tpl-var">{{$1}}</mark>').replace(/\n/g, '<br>');
+            var fields = '';
+            for (var n = 1; n <= t.paramCount; n++) {
+                fields += '<label class="tpl-field"><span>{{' + n + '}}</span>' +
+                    '<input type="text" class="form-control form-control-sm" maxlength="200" data-tpl="' + i + '" data-n="' + n + '" value="' + esc(t.suggested[n - 1] || '') + '" /></label>';
+            }
+            var buttons = (t.buttons || []).map(function (b) { return '<span class="tpl-btn-chip">' + esc(b) + '</span>'; }).join('');
+            return '<div class="tpl-card" data-i="' + i + '">' +
+                '<div class="tpl-body">' + preview + '</div>' +
+                (buttons ? '<div class="tpl-btns">' + buttons + '</div>' : '') +
+                fields +
+                '<div class="tpl-error" hidden></div>' +
+                '<button type="button" class="btn btn-success btn-sm w-100 tpl-send" data-i="' + i + '"><i class="bi bi-send-fill"></i> إرسال</button>' +
+                '</div>';
+        }).join('');
+
+        list.querySelectorAll('.tpl-send').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                var i = Number(btn.dataset.i), t = templates[i];
+                var card = btn.closest('.tpl-card'), err = card.querySelector('.tpl-error');
+                var params = Array.prototype.map.call(card.querySelectorAll('input[data-tpl]'), function (inp) { return inp.value.trim(); });
+                if (params.some(function (v) { return !v; })) { err.hidden = false; err.textContent = 'املى كل الخانات الأول'; return; }
+                err.hidden = true;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جارٍ الإرسال...';
+                try {
+                    await api('/api/conversations/' + c.id + '/template', { method: 'POST', body: JSON.stringify({ name: t.name, language: t.language, params: params }) });
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                    loadMessages(true);
+                    loadConversations();
+                } catch (e) {
+                    err.hidden = false;
+                    err.textContent = failureText((e.body && e.body.error) || 'واتساب رفض الرسالة');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-send-fill"></i> إرسال';
+                    if (e.body && e.body.messageId) loadMessages(true);
+                }
+            });
+        });
+    }
+
     function renderChatHeader(c) {
         document.getElementById('chat-avatar').textContent = initials(c.contactName);
         document.getElementById('chat-header-name').textContent = c.contactName;
@@ -1432,6 +1494,7 @@
         document.getElementById('recorder-cancel').addEventListener('click', function () { stopRecording(true); });
         document.getElementById('recorder-send').addEventListener('click', function () { stopRecording(false); });
         document.getElementById('recorder-pause').addEventListener('click', togglePauseRecording);
+        document.getElementById('window-template-btn').addEventListener('click', openTemplates);
         document.getElementById('recorder-play').addEventListener('click', toggleRecordPreview);
         // Leaving the page (another menu item, closing the tab) stops the microphone
         window.addEventListener('pagehide', function () { if (recorder) stopRecording(true); });
