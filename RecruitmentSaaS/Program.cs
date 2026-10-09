@@ -89,6 +89,10 @@ app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
     {
+        // Versioned files (asp-append-version adds ?v=<hash>) never change under the same URL:
+        // browsers and Cloudflare keep them for a year instead of re-asking the server every 4 hours
+        if (ctx.Context.Request.Query.ContainsKey("v"))
+            ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
         if (!ctx.Context.Request.Path.StartsWithSegments("/uploads")) return;
         var headers = ctx.Context.Response.Headers;
         headers["X-Content-Type-Options"] = "nosniff";

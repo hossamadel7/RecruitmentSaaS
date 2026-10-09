@@ -346,12 +346,15 @@
         if (isNewSelection || currentScreen() === 'list') showScreen('chat');
 
         try {
+            // The chat's details and its messages load at the same time (one trip to the server instead of two)
+            var messagesLoaded = loadMessages(true);
             var detail = await api('/api/conversations/' + id);
+            if (id !== state.selectedConversationId) return; // another chat was opened meanwhile
             state.selectedConversation = detail;
             renderChatHeader(detail);
             renderCustomerPanel(detail);
             applyWindowState(detail);
-            await loadMessages(true);
+            await messagesLoaded;
             markRead(id);
             watchConversation(id);
         } catch (e) {
