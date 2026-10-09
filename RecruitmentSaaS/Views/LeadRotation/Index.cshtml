@@ -13,6 +13,9 @@
     var teams = ViewBag.Teams as List<(string Scope, string Name)> ?? new();
     var upcoming = ViewBag.Upcoming as List<string> ?? new();
     string? currentName = ViewBag.CurrentName;
+    var teamSplit = ViewBag.TeamSplit as List<LeadDistributor.RotationSlot>;
+    string? teamSplitCurrent = ViewBag.TeamSplitCurrent;
+    var splitOn = teamSplit != null && teamSplit.Any(t => t.Share > 0);
     int currentGiven = ViewBag.CurrentGiven;
     int currentShare = ViewBag.CurrentShare;
 }
@@ -57,6 +60,64 @@
                 </select>
             </div>
         </div>
+    }
+
+    @if (teamSplit != null)
+    {
+        <form asp-action="SaveTeams" method="post" class="card mb-3">
+            @Html.AntiForgeryToken()
+            <div class="card-body p-4">
+                <div style="font-weight:800;font-size:16px;margin-bottom:6px"><i class="bi bi-diagram-3"></i> تقسيم الليدز العامة على الفرق</div>
+                <div class="rr-help" style="margin-bottom:10px">
+                    الليدز العامة (فورم الموقع الرئيسي، أرقام واتساب مش مربوطة بفريق، فيسبوك / Google Sheets) بتتقسم على الفرق بالأرقام دي،
+                    وكل فريق بيوزّع نصيبه على التيلي سيلز بتوعه حسب <strong>توزيع الفريق</strong>.
+                    <br />• مثال: Bakar 2 و sherif 1 = ليدين لفريق Bakar وبعدين ليد لفريق sherif… وهكذا.
+                    <br />• كل الفرق 0 = مفيش تقسيم، والليدز بتتوزع بالتوزيع العام تحت (بالأشخاص).
+                </div>
+                @if (!teamSplit.Any())
+                {
+                    <div class="text-muted" style="font-size:13px">مفيش فرق فيها تيلي سيلز نشطين.</div>
+                }
+                @foreach (var t in teamSplit)
+                {
+                    <div class="rr-row @(t.Share == 0 ? "paused" : "")">
+                        <input type="hidden" name="teamIds" value="@t.UserId" />
+                        <div class="rr-name">فريق @t.Name</div>
+                        <div class="rr-share">
+                            <button type="button" class="ts-dec">−</button>
+                            <input type="number" name="shares" class="form-control" min="0" max="@maxShare" value="@t.Share" />
+                            <button type="button" class="ts-inc">+</button>
+                        </div>
+                        <a class="btn btn-sm btn-outline-secondary" href="/LeadRotation/Index?scope=@Uri.EscapeDataString(LeadDistributor.TeamScope(t.UserId))">توزيع الفريق</a>
+                    </div>
+                }
+                @if (splitOn)
+                {
+                    <div class="rr-help mt-2">
+                        <i class="bi bi-check-circle-fill" style="color:#16a34a"></i> التقسيم على الفرق شغال
+                        @if (teamSplitCurrent != null) { <span>— آخر ليد عام راح لفريق <strong>@teamSplitCurrent</strong></span> }
+                    </div>
+                }
+                @if (teamSplit.Any())
+                {
+                    <button type="submit" class="btn btn-primary mt-3"><i class="bi bi-check-lg"></i> حفظ التقسيم</button>
+                }
+            </div>
+        </form>
+        <script>
+            document.querySelectorAll('.ts-dec, .ts-inc').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var input = b.parentElement.querySelector('input');
+                    var v = Math.max(0, Math.min(@maxShare, (parseInt(input.value, 10) || 0) + (b.classList.contains('ts-inc') ? 1 : -1)));
+                    input.value = v;
+                    b.closest('.rr-row').classList.toggle('paused', v === 0);
+                });
+            });
+        </script>
+        @if (splitOn)
+        {
+            <div class="alert alert-info" style="font-size:13px"><i class="bi bi-info-circle-fill"></i> التوزيع العام بالأشخاص تحت بيتستخدم بس لو الفريق اللي عليه الدور مفيهوش حد متاح.</div>
+        }
     }
 
     <div class="card mb-3">

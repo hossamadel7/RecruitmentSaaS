@@ -243,7 +243,7 @@ namespace RecruitmentSaaS.Services
 
                 var agentId = teamLeaderId != null
                     ? await LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => u.ManagerId == teamLeaderId), LeadDistributor.TeamScope(teamLeaderId.Value), ct)
-                    : await LeadDistributor.NextTeleSalesAsync(_context, _context.Users, LeadDistributor.AllScope, ct);
+                    : (await LeadDistributor.NextForGeneralLeadAsync(_context, ct)).SalesId;
                 if (agentId == null) return;
 
                 conversation.AssignedSalesAgentId = agentId;
