@@ -106,7 +106,9 @@ namespace RecruitmentSaaS.Services
         public Task<WhatsAppSendResult> SendTextMessageAsync(string phoneNumberId, string toWaId, string text, CancellationToken ct = default)
         {
             var payload = NewMessagePayload(toWaId, "text");
-            payload["text"] = new JObject { ["preview_url"] = false, ["body"] = text };
+            // A link in the message (e.g. the office on Google Maps) shows its preview card on the customer's phone
+            var hasLink = text.Contains("http://", StringComparison.OrdinalIgnoreCase) || text.Contains("https://", StringComparison.OrdinalIgnoreCase);
+            payload["text"] = new JObject { ["preview_url"] = hasLink, ["body"] = text };
             return PostMessageAsync(phoneNumberId, payload, ct);
         }
 

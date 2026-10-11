@@ -493,6 +493,15 @@
         if (state.pendingReset) loadMessages(true);
     }
 
+    // Links in a message are clickable; a Google Maps link gets a pin so it reads as a location
+    function linkify(text) {
+        return esc(text).replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, function (url) {
+            var isMap = /maps\.google|google\.[a-z.]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(url);
+            return '<a class="bubble-link' + (isMap ? ' bubble-link-map' : '') + '" href="' + url + '" target="_blank" rel="noopener noreferrer">' +
+                (isMap ? '<i class="bi bi-geo-alt-fill"></i> اللوكيشن على الخريطة' : url) + '</a>';
+        });
+    }
+
     function buildMessagesHtml(messages) {
         var html = '';
         var lastDate = null;
@@ -579,7 +588,7 @@
         return '<div class="chat-bubble-row ' + (isOut ? 'outgoing' : 'incoming') + '" data-message-id="' + m.id + '"' +
             (isOut && m.senderUserName ? ' data-sender="' + esc(m.senderUserName) + '"' : '') + '>' +
             '<div class="' + classes + '" dir="' + (text && !hasMediaShown ? textDir(text) : 'rtl') + '">' + sender + media +
-            (text ? '<span class="bubble-text">' + esc(text) + '</span>' : '') +
+            (text ? '<span class="bubble-text">' + linkify(text) + '</span>' : '') +
             meta + failure +
             '</div>' +
             (m.id && m.status !== 6 && m.status !== 2 && (text || hasMediaShown)

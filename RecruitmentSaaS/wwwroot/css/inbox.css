@@ -1497,3 +1497,7 @@
 .tpl-field input[readonly] { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
 .tpl-lock { color: #2563eb; }
 .tpl-needs { background: #fff7ed; color: #9a3412; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+
+/* Links inside messages */
+.bubble-link { color: #027eb5; text-decoration: underline; word-break: break-all; }
+.bubble-link-map { display: inline-flex; align-items: center; gap: 5px; background: #e7f3ff; color: #1d4ed8; border-radius: 8px; padding: 4px 10px; font-weight: 700; text-decoration: none; word-break: normal; }
