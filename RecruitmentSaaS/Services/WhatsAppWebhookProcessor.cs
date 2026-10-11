@@ -690,11 +690,17 @@ namespace RecruitmentSaaS.Services
             {
                 var info = await _context.WhatsAppConversations.AsNoTracking()
                     .Where(c => c.Id == conversationId && c.Lead != null)
-                    .Select(c => new { c.Lead!.Id, c.Lead.FullName, c.Lead.Phone, Agent = c.Lead.AssignedSalesId ?? c.AssignedSalesAgentId })
+                    .Select(c => new
+                    {
+                        c.Lead!.Id, c.Lead.FullName, c.Lead.Phone, Agent = c.Lead.AssignedSalesId ?? c.AssignedSalesAgentId,
+                        // Wrote to us before = they do have WhatsApp: blocked us, or switched it off
+                        WroteBefore = c.WhatsAppMessages.Any(m => m.Direction == (byte)MessageDirection.Incoming)
+                    })
                     .FirstOrDefaultAsync(ct);
                 if (info?.Agent == null) return;
 
-                await _notifications.SendAsync(info.Agent.Value, "عميل مش على واتساب — كلّمه تليفون",
+                await _notifications.SendAsync(info.Agent.Value,
+                    info.WroteBefore ? "واتساب ما وصّلش رسالتك للعميل (ممكن بلوك) — كلّمه تليفون" : "عميل مش على واتساب — كلّمه تليفون",
                     $"{info.FullName} — {info.Phone}", link: $"/TeleSales/LeadDetail/{info.Id}");
             }
             catch (Exception ex)
