@@ -435,7 +435,7 @@ namespace RecruitmentSaaS.Controllers
                 {1, 1}, {2, 2}, {4, 3}, {5, 4}, {7, 5}
             };
 
-            if (!new byte[] { 2, 4, 5, 8 }.Contains(newStatus))
+            if (!new byte[] { 2, 4, 5, 8, 9 }.Contains(newStatus))   // 9 = متواجد في تركيا
             {
                 TempData["Error"] = "غير مسموح بهذه الحالة";
                 return RedirectToAction("LeadDetail", new { id = leadId });
@@ -459,7 +459,7 @@ namespace RecruitmentSaaS.Controllers
             var oldStatus = lead.Status;
 
             // Block going backwards (except خسارة which is allowed from any stage)
-            if (newStatus != 8 &&
+            if (newStatus != 8 && newStatus != 9 &&
                 funnelOrder.TryGetValue(newStatus, out int newOrder) &&
                 funnelOrder.TryGetValue(oldStatus, out int oldOrder) &&
                 newOrder <= oldOrder)
@@ -502,7 +502,7 @@ namespace RecruitmentSaaS.Controllers
             {
                 {1,"جديد"},{2,"تم التواصل"},
                 {4,"مهتم"},{5,"موعد مجدول"},{6,"زار المكتب"},
-                {7,"تم التحويل"},{8,"خسارة"}
+                {7,"تم التحويل"},{8,"خسارة"},{9,"متواجد في تركيا"}
             };
 
             // Build intermediate steps for funnel tracking
@@ -510,7 +510,7 @@ namespace RecruitmentSaaS.Controllers
             var funnelSteps = new List<byte> { 1, 2, 4, 5 }; // ordered funnel statuses
             var stepsToLog = new List<(byte from, byte to)>();
 
-            if (newStatus != 8) // خسارة logs directly without intermediates
+            if (newStatus != 8 && newStatus != 9) // خسارة / متواجد في تركيا log directly without intermediates
             {
                 var fromIdx = funnelSteps.IndexOf(oldStatus);
                 var toIdx = funnelSteps.IndexOf(newStatus);

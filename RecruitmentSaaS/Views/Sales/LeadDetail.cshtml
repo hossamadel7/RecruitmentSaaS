@@ -5,7 +5,7 @@
     var statusName = Model.Status switch {
         1 => "جديد", 2 => "تم التواصل", 3 => "استجاب",
         4 => "مهتم", 5 => "موعد مجدول", 6 => "زار المكتب",
-        7 => "تم التحويل", 8 => "خسارة", _ => "غير معروف"
+        7 => "تم التحويل", 8 => "خسارة", 9 => "متواجد في تركيا", _ => "غير معروف"
     };
     var jobPackages = ViewBag.JobPackages as List<RecruitmentSaaS.Models.DTOs.JobPackageListItemDto>
                      ?? new List<RecruitmentSaaS.Models.DTOs.JobPackageListItemDto>();

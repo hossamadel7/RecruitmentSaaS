@@ -41,14 +41,16 @@ namespace RecruitmentSaaS.Services
         public const string Booked = "booked";
         public const string Visited = "visited";
         public const string Lost = "lost";
+        /// <summary>The client is in Turkey right now (can't come to the office).</summary>
+        public const string InTurkey = "turkey";
 
-        private const byte LeadInterested = 4, LeadBooked = 5, LeadVisited = 6, LeadConverted = 7, LeadLost = 8;
+        private const byte LeadInterested = 4, LeadBooked = 5, LeadVisited = 6, LeadConverted = 7, LeadLost = 8, LeadInTurkey = 9;
         private const byte LeadSourceWhatsApp = 5;
 
         private static readonly Dictionary<byte, string> LeadStatusNames = new()
         {
             { 1, "جديد" }, { 2, "تم التواصل" }, { 3, "استجاب" }, { 4, "مهتم" }, { 5, "موعد مجدول" },
-            { 6, "زار المكتب" }, { 7, "تم التحويل" }, { 8, "خسارة" }
+            { 6, "زار المكتب" }, { 7, "تم التحويل" }, { 8, "خسارة" }, { 9, "متواجد في تركيا" }
         };
 
         private readonly RecruitmentCrmContext _context;
@@ -62,6 +64,7 @@ namespace RecruitmentSaaS.Services
         public static string Current(WhatsAppConversation c, Lead? lead)
         {
             if (lead?.Status == LeadLost || c.LeadStage == (byte)LeadStage.Lost) return Lost;
+            if (lead?.Status == LeadInTurkey) return InTurkey;
             if (lead?.Status is LeadVisited or LeadConverted) return Visited;
             if (lead?.Status == LeadBooked) return Booked;
             if (c.Status == (byte)ConversationStatus.FollowUp) return FollowUp;
@@ -78,7 +81,7 @@ namespace RecruitmentSaaS.Services
             reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
             if (reason?.Length > 500) reason = reason[..500];
 
-            if (outcome is Waiting or FollowUp or Booked or Visited or Lost)
+            if (outcome is Waiting or FollowUp or Booked or Visited or Lost or InTurkey)
             {
                 // A new choice settles the chat's open follow-up (a new متابعة replaces it)
                 var open = await _context.ConversationFollowUps
@@ -162,6 +165,18 @@ namespace RecruitmentSaaS.Services
                     conversation.Status = (byte)ConversationStatus.Open;
                     conversation.LeadStage = (byte)LeadStage.Qualified;
                     conversation.LostReason = null;
+                    break;
+                }
+
+                case InTurkey:
+                {
+                    var lead = await LeadOfAsync(conversation, create: true);
+                    if (lead == null) return "مش قادر أسجل العميل كليد (مفيش فرع أو أدمن نشط)";
+                    if (lead.Status != LeadInTurkey)
+                        ChangeLeadStatus(lead, LeadInTurkey, actorId, actorName, reason, now);
+                    conversation.Status = (byte)ConversationStatus.Open;
+                    conversation.LostReason = null;
+                    if (conversation.LeadStage == (byte)LeadStage.Lost) conversation.LeadStage = (byte)LeadStage.Contacted;
                     break;
                 }
 

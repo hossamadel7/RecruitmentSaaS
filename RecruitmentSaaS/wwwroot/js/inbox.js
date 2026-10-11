@@ -12,6 +12,7 @@
         { key: 'followup', icon: 'bi-calendar-event', label: 'متابعة', needsTime: true, timeLabel: 'يوم ووقت المتابعة' },
         { key: 'booked', icon: 'bi-building-check', label: 'حجز', needsTime: true, timeLabel: 'يوم ووقت الحجز في المكتب' },
         { key: 'visited', icon: 'bi-person-check-fill', label: 'حضر للمكتب' },
+        { key: 'turkey', icon: 'bi-geo-alt-fill', label: 'متواجد في تركيا' },
         { key: 'lost', icon: 'bi-x-circle', label: 'خسارة', needsReason: true }
     ];
     function outcomeOf(key) { return OUTCOMES.filter(function (o) { return o.key === key; })[0] || null; }
@@ -151,7 +152,7 @@
 
         switch (state.currentFilter) {
             case 'unread': params.set('unreadOnly', 'true'); break;
-            case 'waiting': case 'followup': case 'booked': case 'visited': case 'lost':
+            case 'waiting': case 'followup': case 'booked': case 'visited': case 'turkey': case 'lost':
                 params.set('outcome', state.currentFilter); break;
         }
 

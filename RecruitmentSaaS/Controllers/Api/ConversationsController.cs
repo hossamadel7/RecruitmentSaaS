@@ -96,6 +96,9 @@ namespace RecruitmentSaaS.Controllers.Api
                 case CustomerOutcomeService.Lost:
                     query = query.Where(c => c.LeadStage == (byte)LeadStage.Lost || (c.Lead != null && c.Lead.Status == 8));
                     break;
+                case CustomerOutcomeService.InTurkey:
+                    query = query.Where(c => c.LeadStage != (byte)LeadStage.Lost && c.Lead != null && c.Lead.Status == 9);
+                    break;
                 case CustomerOutcomeService.Visited:
                     query = query.Where(c => c.LeadStage != (byte)LeadStage.Lost && c.Lead != null && (c.Lead.Status == 6 || c.Lead.Status == 7));
                     break;

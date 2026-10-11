@@ -1466,6 +1466,7 @@
 .outcome-chip.outcome-followup.active { background: #d97706; }
 .outcome-chip.outcome-booked.active { background: #2563eb; }
 .outcome-chip.outcome-visited.active { background: #16a34a; }
+.outcome-chip.outcome-turkey.active { background: #0d9488; }
 .outcome-chip.outcome-lost.active { background: #dc2626; }
 .outcome-extra { margin-top: 8px; }
 .outcome-extra[hidden], #cp-outcome-reason[hidden] { display: none !important; }

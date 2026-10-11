@@ -26,16 +26,16 @@
     var funnelLabels = new Dictionary<int, string>
     {
         {1,"عميل جديد"},{2,"تم التواصل"},{4,"مهتم"},
-        {5,"موعد مجدول"},{8,"خسارة"},{7,"تحويل"}
+        {5,"موعد مجدول"},{9,"متواجد في تركيا"},{8,"خسارة"},{7,"تحويل"}
     };
     var funnelColors = new Dictionary<int, string>
     {
         {1,"#3b82f6"},{2,"#8b5cf6"},{4,"#0ea5e9"},
-        {5,"#22c55e"},{8,"#dc2626"},{7,"#6366f1"}
+        {5,"#22c55e"},{9,"#0d9488"},{8,"#dc2626"},{7,"#6366f1"}
     };
 
-    string[] allStatusLabels = { "", "عميل جديد", "تم التواصل", "استجاب", "مهتم", "موعد مجدول", "زار المكتب", "تحويل", "خسارة" };
-    string[] allStatusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626" };
+    string[] allStatusLabels = { "", "عميل جديد", "تم التواصل", "استجاب", "مهتم", "موعد مجدول", "زار المكتب", "تحويل", "خسارة", "متواجد في تركيا" };
+    string[] allStatusColors = { "", "#3b82f6", "#8b5cf6", "#0ea5e9", "#f59e0b", "#22c55e", "#ec4899", "#6366f1", "#dc2626", "#0d9488" };
 
     var monthName = new System.Globalization.CultureInfo("ar-EG").DateTimeFormat.GetMonthName(selMonth);
     var visitDateParsed = DateTime.TryParse(visitDate, out var vd) ? vd : DateTime.Now;

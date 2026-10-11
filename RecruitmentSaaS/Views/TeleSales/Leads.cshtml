@@ -38,6 +38,7 @@
             <a href="@Link(3)" class="filter-btn @(currentStatus == 3 ? "active" : "")">استجاب</a>
             <a href="@Link(4)" class="filter-btn @(currentStatus == 4 ? "active" : "")">مهتم</a>
             <a href="@Link(5)" class="filter-btn @(currentStatus == 5 ? "active" : "")">موعد مجدول</a>
+            <a href="@Link(9)" class="filter-btn @(currentStatus == 9 ? "active" : "")">متواجد في تركيا</a>
             <a href="@Link(8)" class="filter-btn @(currentStatus == 8 ? "active" : "")">خسارة</a>
             @if (needCallCount > 0 || needCall)
             {
@@ -102,6 +103,7 @@
                             6 => ("badge-status-6", "زار المكتب"),
                             7 => ("badge-status-7", "تم التحويل"),
                             8 => ("badge-status-8", "خسارة"),
+                            9 => ("badge-status-9", "متواجد في تركيا"),
                             _ => ("badge-status-1", "غير معروف")
                         };
                         <tr>

@@ -5,7 +5,7 @@
     var statusName = Model.Status switch {
         1 => "جديد", 2 => "تم التواصل", 3 => "استجاب",
         4 => "مهتم", 5 => "موعد مجدول", 6 => "زار المكتب",
-        7 => "تم التحويل", 8 => "خسارة", _ => "غير معروف"
+        7 => "تم التحويل", 8 => "خسارة", 9 => "متواجد في تركيا", _ => "غير معروف"
     };
     bool isAssignedToMe = ViewBag.IsAssignedToMe == true;
 }
@@ -119,12 +119,13 @@
                                     (val: "2", label: "تم التواصل", st: (byte)2),
                                     (val: "4", label: "مهتم",       st: (byte)4),
                                     (val: "5", label: "موعد مجدول", st: (byte)5),
+                                    (val: "9", label: "متواجد في تركيا", st: (byte)9),
                                     (val: "8", label: "خسارة",      st: (byte)8),
                                 };
                                 var currentOrder = funnelOrder.GetValueOrDefault(Model.Status, 0);
                                 // Filter: only show statuses strictly ahead OR خسارة
                                 var visibleOpts = allOpts.Where(o =>
-                                    o.st == 8 ||
+                                    o.st == 8 || (o.st == 9 && Model.Status != 9) ||
                                     (funnelOrder.TryGetValue(o.st, out var oOrder) && oOrder > currentOrder)
                                 ).ToList();
                             }
