@@ -16,8 +16,18 @@ namespace RecruitmentSaaS.Services
 
         public static string TeamScope(Guid managerId) => "team:" + managerId.ToString("N");
 
+        /// <summary>
+        /// A team's second rotation, for clients UNDER the age on the form. Nobody has a share until the
+        /// team sets one, so by default those clients keep waiting with the team leader.
+        /// </summary>
+        public static string TeamUnderAgeScope(Guid managerId) => "teamu:" + managerId.ToString("N");
+
+        public static bool IsUnderAgeScope(string? scope) => scope != null && scope.StartsWith("teamu:");
+
         public static Guid? ManagerOfScope(string? scope) =>
-            scope != null && scope.StartsWith("team:") && Guid.TryParse(scope[5..], out var id) ? id : null;
+            scope != null && scope.StartsWith("team:") && Guid.TryParse(scope[5..], out var id) ? id
+            : scope != null && scope.StartsWith("teamu:") && Guid.TryParse(scope[6..], out var underId) ? underId
+            : null;
 
         public record RotationSlot(Guid UserId, string Name, short Share);
 
@@ -27,6 +37,8 @@ namespace RecruitmentSaaS.Services
         /// <summary>The active TeleSales among <paramref name="candidates"/>, in rotation order with their shares.</summary>
         public static async Task<List<RotationSlot>> RotationAsync(RecruitmentCrmContext db, IQueryable<User> candidates, string configScope, CancellationToken ct = default)
         {
+            // Someone not configured yet takes 1 lead per turn — except in an under-age rotation, where they take none
+            var defaultShare = IsUnderAgeScope(configScope) ? (short)0 : (short)1;
             var users = await candidates
                 .Where(u => (u.Role == 3 || u.Role == 8) && u.IsActive)   // 8 = head TeleSales, also takes leads
                 .Select(u => new { u.Id, Name = u.FullNameAr != null && u.FullNameAr != "" ? u.FullNameAr : u.FullName })
@@ -41,9 +53,17 @@ namespace RecruitmentSaaS.Services
             return users
                 .OrderBy(u => config.TryGetValue(u.Id, out var m) ? m.Position : int.MaxValue)
                 .ThenBy(u => u.Name).ThenBy(u => u.Id)
-                .Select(u => new RotationSlot(u.Id, u.Name, config.TryGetValue(u.Id, out var m) ? m.Share : (short)1))
+                .Select(u => new RotationSlot(u.Id, u.Name, config.TryGetValue(u.Id, out var m) ? m.Share : defaultShare))
                 .ToList();
         }
+
+        /// <summary>
+        /// Who takes a team's lead: the main rotation for clients at/above the age, the under-age rotation
+        /// otherwise (null = nobody set for under-age clients, they wait with the team leader).
+        /// </summary>
+        public static Task<Guid?> NextInTeamAsync(RecruitmentCrmContext db, Guid managerId, bool atOrAboveAge, CancellationToken ct = default) =>
+            NextTeleSalesAsync(db, db.Users.Where(u => u.ManagerId == managerId),
+                atOrAboveAge ? TeamScope(managerId) : TeamUnderAgeScope(managerId), ct);
 
         public static Task<Guid?> NextTeleSalesAsync(RecruitmentCrmContext db, IQueryable<User> candidates, string scope, CancellationToken ct = default) =>
             NextTeleSalesAsync(db, candidates, scope, scope, ct);

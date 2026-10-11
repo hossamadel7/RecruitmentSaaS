@@ -189,8 +189,8 @@ namespace RecruitmentSaaS.Controllers
             {
                 // فورم الفريق: الكبار (>= السن المحدد) يتوزعوا بالدور على تيلي سيلز الفريق،
                 // والباقي يفضلوا مع مدير الفريق بس (مش في الـ Pool)
-                if (isSenior)
-                    assignedSalesId = await NextTeamMemberAsync(teamForm.ManagerId);
+                // Under the age: the team's "أقل من السن" rotation; nobody set there = waits with the team leader
+                assignedSalesId = await LeadDistributor.NextInTeamAsync(_context, teamForm.ManagerId, isSenior);
                 Response.Cookies.Delete("sales_ref");
             }
             else if (Request.Cookies.TryGetValue("sales_ref", out var refCookie)

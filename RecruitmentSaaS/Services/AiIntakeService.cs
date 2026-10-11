@@ -236,11 +236,15 @@ namespace RecruitmentSaaS.Services
             conversation.LeadId = lead.Id;
 
             var threshold = settings.SeniorAgeThreshold == 0 ? (byte)45 : settings.SeniorAgeThreshold;
+            var atOrAboveAge = conversation.IntakeAge != null && conversation.IntakeAge >= threshold;
             var toRotation = lead.AssignedSalesId == null
                 && conversation.IntakeAge != null
-                && (conversation.IntakeAge >= threshold || settings.AiUnderAgeToRotation);
+                && (atOrAboveAge || settings.AiUnderAgeToRotation);
 
             Guid? agentId = lead.AssignedSalesId;
+            // Under the age on a team's number: that team's "أقل من السن" rotation, when the team set one
+            if (agentId == null && conversation.IntakeAge != null && !atOrAboveAge && team != null)
+                agentId = await LeadDistributor.NextInTeamAsync(_context, team.Value, atOrAboveAge: false, ct);
             if (agentId == null && toRotation)
             {
                 agentId = team != null

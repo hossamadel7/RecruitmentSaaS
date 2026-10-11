@@ -30,9 +30,9 @@ namespace RecruitmentSaaS.Controllers
         private bool IsAdmin => User.IsInRole("1");
 
         // ── GET /LeadRotation/Index?scope=all|team:{managerId} ───────────────
-        public async Task<IActionResult> Index(string? scope)
+        public async Task<IActionResult> Index(string? scope, bool under = false)
         {
-            var resolved = await ResolveScopeAsync(scope);
+            var resolved = await ResolveScopeAsync(scope, under);
             if (resolved == null) return RedirectToAction("Index", new { scope = (string?)null });
             var (key, candidates, title) = resolved.Value;
 
@@ -60,6 +60,13 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.ScopeTitle = title;
             ViewBag.IsAdmin = IsAdmin;
             ViewBag.IsTeam = LeadDistributor.ManagerOfScope(key) != null;
+            // A team has two rotations: clients at/above the form's age, and clients under it
+            var teamManagerId = LeadDistributor.ManagerOfScope(key);
+            ViewBag.IsUnder = LeadDistributor.IsUnderAgeScope(key);
+            ViewBag.MainScope = teamManagerId == null ? null : LeadDistributor.TeamScope(teamManagerId.Value);
+            ViewBag.UnderScope = teamManagerId == null ? null : LeadDistributor.TeamUnderAgeScope(teamManagerId.Value);
+            var ageSetting = await _context.LeadFormSettings.AsNoTracking().Select(s => (byte?)s.SeniorAgeThreshold).FirstOrDefaultAsync();
+            ViewBag.Age = ageSetting is null or 0 ? HomeController.DefaultSeniorAgeThreshold : ageSetting.Value;
             ViewBag.MaxShare = MaxShare;
 
             return View(rotation);
@@ -87,7 +94,8 @@ namespace RecruitmentSaaS.Controllers
                 TempData["Error"] = $"عدد الليدز لكل دور لازم يكون من 0 لـ {MaxShare}";
                 return RedirectToAction("Index", new { scope = key });
             }
-            if (shares.Count > 0 && shares.All(s => s == 0))
+            // An under-age rotation may be all 0: those clients then wait with the team leader
+            if (shares.Count > 0 && shares.All(s => s == 0) && !LeadDistributor.IsUnderAgeScope(key))
             {
                 TempData["Error"] = "لازم شخص واحد على الأقل ياخد ليدز — مينفعش توقف الكل";
                 return RedirectToAction("Index", new { scope = key });
@@ -129,12 +137,13 @@ namespace RecruitmentSaaS.Controllers
         /// The rotation this user may see/edit. Managers are always pinned to their own team;
         /// admins get the general rotation by default or any active manager's team.
         /// </summary>
-        private async Task<(string Key, IQueryable<User> Candidates, string Title)?> ResolveScopeAsync(string? scope)
+        private async Task<(string Key, IQueryable<User> Candidates, string Title)?> ResolveScopeAsync(string? scope, bool under = false)
         {
+            under = under || LeadDistributor.IsUnderAgeScope(scope);
             if (!IsAdmin)
             {
                 var me = CurrentUserId;
-                return (LeadDistributor.TeamScope(me), _context.Users.Where(u => u.ManagerId == me), "فريقي");
+                return (under ? LeadDistributor.TeamUnderAgeScope(me) : LeadDistributor.TeamScope(me), _context.Users.Where(u => u.ManagerId == me), "فريقي");
             }
 
             if (string.IsNullOrEmpty(scope) || scope == LeadDistributor.AllScope)
@@ -146,7 +155,8 @@ namespace RecruitmentSaaS.Controllers
                 .FirstOrDefaultAsync(u => u.Id == managerId && u.Role == 7 && u.IsActive);
             if (manager == null) return null;
 
-            return (LeadDistributor.TeamScope(manager.Id), _context.Users.Where(u => u.ManagerId == manager.Id), "فريق " + manager.FullName);
+            return (under ? LeadDistributor.TeamUnderAgeScope(manager.Id) : LeadDistributor.TeamScope(manager.Id),
+                    _context.Users.Where(u => u.ManagerId == manager.Id), "فريق " + manager.FullName);
         }
     }
 }

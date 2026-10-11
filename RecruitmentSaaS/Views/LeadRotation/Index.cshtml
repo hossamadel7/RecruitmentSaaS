@@ -13,6 +13,10 @@
     var teams = ViewBag.Teams as List<(string Scope, string Name)> ?? new();
     var upcoming = ViewBag.Upcoming as List<string> ?? new();
     string? currentName = ViewBag.CurrentName;
+    bool isUnder = ViewBag.IsUnder ?? false;
+    string? mainScope = ViewBag.MainScope;
+    string? underScope = ViewBag.UnderScope;
+    byte ageLimit = ViewBag.Age;
     int currentGiven = ViewBag.CurrentGiven;
     int currentShare = ViewBag.CurrentShare;
 }
@@ -52,18 +56,31 @@
                     <option value="@LeadDistributor.AllScope" selected="@(scope == LeadDistributor.AllScope)">التوزيع العام — كل التيلي سيلز (الموقع، فيسبوك، Google Sheets)</option>
                     @foreach (var t in teams)
                     {
-                        <option value="@t.Scope" selected="@(scope == t.Scope)">فريق @t.Name — ليدز فورم الفريق</option>
+                        <option value="@t.Scope" selected="@(scope == t.Scope || mainScope == t.Scope)">فريق @t.Name — ليدز فورم الفريق</option>
                     }
                 </select>
             </div>
         </div>
     }
 
+    @if (isTeam)
+    {
+        <ul class="nav nav-pills mb-3" style="gap:6px">
+            <li class="nav-item"><a class="nav-link @(!isUnder ? "active" : "")" href="/LeadRotation/Index?scope=@Uri.EscapeDataString(mainScope ?? "")">السن @ageLimit وأكبر</a></li>
+            <li class="nav-item"><a class="nav-link @(isUnder ? "active" : "")" href="/LeadRotation/Index?scope=@Uri.EscapeDataString(underScope ?? "")">أقل من @ageLimit</a></li>
+        </ul>
+    }
+
     <div class="card mb-3">
         <div class="card-body p-4">
-            <div style="font-weight:800;font-size:16px;margin-bottom:6px">@scopeTitle</div>
+            <div style="font-weight:800;font-size:16px;margin-bottom:6px">@scopeTitle @(isTeam ? (isUnder ? $"— أقل من {ageLimit} سنة" : $"— {ageLimit} سنة وأكبر") : "")</div>
             <div class="rr-help">
-                @if (isTeam)
+                @if (isTeam && isUnder)
+                {
+                    <span>العملاء اللي سنهم <strong>أقل من @ageLimit</strong> (من فورم الفريق أو رقم واتساب الفريق) بيتوزعوا بالترتيب ده.
+                    <br />• <strong>لو الكل 0</strong>: مش بيتوزعوا، وبيفضلوا مستنيين مدير الفريق يوزعهم (ده الوضع لحد ما تحط أرقام).</span>
+                }
+                else if (isTeam)
                 {
                     <span>الليدز اللي سنها يساوي أو أكبر من السن المحدد في فورم الفريق بتتوزع على الفريق بالترتيب ده.</span>
                 }
@@ -181,7 +198,7 @@
             });
             cycle.innerHTML = html.length
                 ? html.join('<span class="rr-arrow"><i class="bi bi-arrow-left"></i></span>') + '<span class="rr-arrow"><i class="bi bi-arrow-repeat"></i> وترجع من الأول</span>'
-                : '<span style="color:#dc2626;font-size:13px">الكل موقوف — لازم شخص واحد على الأقل ياخد ليدز</span>';
+                : '@(isUnder ? Html.Raw("<span style=\"color:#64748B;font-size:13px\">الكل 0 — العملاء دول مش بيتوزعوا وبيفضلوا مستنيين مدير الفريق</span>") : Html.Raw("<span style=\"color:#dc2626;font-size:13px\">الكل موقوف — لازم شخص واحد على الأقل ياخد ليدز</span>"))';
         }
 
         list.addEventListener('click', function (e) {
