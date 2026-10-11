@@ -680,11 +680,11 @@ namespace RecruitmentSaaS.Services
             await _notifier.MessageStatusUpdatedAsync(message.Id, message.ConversationId, message.Status, message.ErrorMessage);
 
             if (newStatus == MessageStatus.Failed && message.ErrorCode == PhoneNumbers.NotOnWhatsAppErrorCode)
-                await NotifyNotOnWhatsAppAsync(message.ConversationId, ct);
+                await NotifyNotOnWhatsAppAsync(message.ConversationId, message.CreatedAt, ct);
         }
 
         // The customer's number can't get WhatsApp messages — tell their salesperson to call instead
-        private async Task NotifyNotOnWhatsAppAsync(Guid conversationId, CancellationToken ct)
+        private async Task NotifyNotOnWhatsAppAsync(Guid conversationId, DateTime sentAt, CancellationToken ct)
         {
             try
             {
@@ -694,13 +694,18 @@ namespace RecruitmentSaaS.Services
                     {
                         c.Lead!.Id, c.Lead.FullName, c.Lead.Phone, Agent = c.Lead.AssignedSalesId ?? c.AssignedSalesAgentId,
                         // Wrote to us before = they do have WhatsApp: blocked us, or switched it off
-                        WroteBefore = c.WhatsAppMessages.Any(m => m.Direction == (byte)MessageDirection.Incoming)
+                        LastWrote = c.WhatsAppMessages.Where(m => m.Direction == (byte)MessageDirection.Incoming && m.WhatsAppTimestamp < sentAt)
+                                                      .Max(m => (DateTime?)m.WhatsAppTimestamp)
                     })
                     .FirstOrDefaultAsync(ct);
                 if (info?.Agent == null) return;
 
-                await _notifications.SendAsync(info.Agent.Value,
-                    info.WroteBefore ? "واتساب ما وصّلش رسالتك للعميل (ممكن بلوك) — كلّمه تليفون" : "عميل مش على واتساب — كلّمه تليفون",
+                // More than 24 hours after the client's last message only a ready-made message (template) can be sent
+                var wasTemplate = info.LastWrote != null && info.LastWrote < sentAt.AddHours(-24);
+                var title = info.LastWrote == null ? "عميل مش على واتساب — كلّمه تليفون"
+                    : wasTemplate ? "الرسالة الجاهزة ما وصلتش للعميل (ممكن عمل بلوك أو قفل واتساب) — كلّمه تليفون"
+                    : "واتساب ما وصّلش رسالتك للعميل (ممكن بلوك) — كلّمه تليفون";
+                await _notifications.SendAsync(info.Agent.Value, title,
                     $"{info.FullName} — {info.Phone}", link: $"/TeleSales/LeadDetail/{info.Id}");
             }
             catch (Exception ex)
