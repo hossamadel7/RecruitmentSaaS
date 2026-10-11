@@ -493,12 +493,22 @@
         if (state.pendingReset) loadMessages(true);
     }
 
-    // Links in a message are clickable; a Google Maps link gets a pin so it reads as a location
+    // Links in a message look like WhatsApp: a preview card for the first link (site name + address),
+    // then the link itself, clickable
+    var LINK_RE = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g;
     function linkify(text) {
-        return esc(text).replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, function (url) {
-            var isMap = /maps\.google|google\.[a-z.]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(url);
-            return '<a class="bubble-link' + (isMap ? ' bubble-link-map' : '') + '" href="' + url + '" target="_blank" rel="noopener noreferrer">' +
-                (isMap ? '<i class="bi bi-geo-alt-fill"></i> اللوكيشن على الخريطة' : url) + '</a>';
+        var escaped = esc(text);
+        var first = escaped.match(LINK_RE);
+        var card = '';
+        if (first) {
+            var url = first[0], host = url.replace(/^https?:\/\//, '').split(/[\/?#]/)[0];
+            card = '<a class="link-card" href="' + url + '" target="_blank" rel="noopener noreferrer">' +
+                '<span class="link-card-title">' + host + '</span>' +
+                '<span class="link-card-url">' + url + '</span>' +
+                '<span class="link-card-host">' + host + '</span></a>';
+        }
+        return card + escaped.replace(LINK_RE, function (u) {
+            return '<a class="bubble-link" href="' + u + '" target="_blank" rel="noopener noreferrer">' + u + '</a>';
         });
     }
 

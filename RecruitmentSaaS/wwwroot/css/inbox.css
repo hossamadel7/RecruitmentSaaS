@@ -1500,4 +1500,7 @@
 
 /* Links inside messages */
 .bubble-link { color: #027eb5; text-decoration: underline; word-break: break-all; }
-.bubble-link-map { display: inline-flex; align-items: center; gap: 5px; background: #e7f3ff; color: #1d4ed8; border-radius: 8px; padding: 4px 10px; font-weight: 700; text-decoration: none; word-break: normal; }
+/* WhatsApp-style preview card above a message that has a link */
+.link-card { display: flex; flex-direction: column; gap: 2px; background: rgba(0, 0, 0, .06); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; text-decoration: none; direction: ltr; text-align: left; }
+.link-card-title { font-weight: 700; font-size: 13.5px; color: #111b21; }
+.link-card-url, .link-card-host { font-size: 12px; color: #667781; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
