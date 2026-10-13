@@ -138,42 +138,64 @@ namespace RecruitmentSaaS.Services
             var asked = IntakeScript.IsQuestion(norm);
             string reply;
 
+            // What we asked last (nothing yet on the first message)
+            var slot = isFirstReply ? IntakeSlot.None
+                : conversation.IntakeName == null ? IntakeSlot.Name
+                : conversation.IntakeAge == null ? IntakeSlot.Age
+                : IntakeSlot.Job;
+
+            // People often answer something else, or everything at once ("محمد علي 47 سنه نجار") — in their
+            // first message too. Keep whatever is in there, then only ask for what is still missing.
+            var facts = IntakeScript.Extract(said, slot, asked);
+            if (facts.Age != null && conversation.IntakeAge == null)
+            {
+                conversation.IntakeAge = (byte)facts.Age.Value;
+                conversation.IntakeAgeAt = DateTime.UtcNow;
+            }
+            if (facts.Job != null && conversation.IntakeJob == null) conversation.IntakeJob = Cut(facts.Job, 200);
+            // "اسمي طارق" also corrects a name we got wrong earlier
+            if (facts.Name != null && (conversation.IntakeName == null || facts.NameIsLabelled)) conversation.IntakeName = Cut(facts.Name, 200);
+
+            // Asked for the name twice and still no name: carry on with the WhatsApp profile name, don't keep asking
+            if (slot == IntakeSlot.Name && conversation.IntakeName == null && lastOut?.TextBody != null
+                && lastOut.TextBody.TrimEnd().EndsWith(AiMessages.Get(settings, AiMessages.AskNameAgain).TrimEnd(), StringComparison.Ordinal))
+            {
+                var profile = (conversation.Contact.Name ?? "").Trim();
+                conversation.IntakeName = Cut(profile.Any(char.IsLetter) ? profile : conversation.Contact.WhatsAppPhoneNumber, 200);
+            }
+
+            var complete = conversation.IntakeName != null && conversation.IntakeAge != null && conversation.IntakeJob != null;
+            if (complete && !isFirstReply)
+            {
+                await CompleteAsync(conversation, settings, ct);
+                return;
+            }
+
+            // Ask again (differently) only when they didn't answer the thing we had just asked
+            var missing = conversation.IntakeName == null ? IntakeSlot.Name
+                : conversation.IntakeAge == null ? IntakeSlot.Age
+                : IntakeSlot.Job;
+            var again = missing == slot;
+            var next = missing == IntakeSlot.Name ? (again ? AiMessages.AskNameAgain : AiMessages.AskName)
+                : missing == IntakeSlot.Age ? (again ? AiMessages.AskAgeAgain : AiMessages.AskAge)
+                : (again ? AiMessages.AskJobAgain : AiMessages.AskJob);
+
             if (isFirstReply)
             {
-                // Their first message is usually "السلام عليكم" or a question — greet, then ask the name
-                reply = greeting + "\n\n" + AiMessages.Get(settings, AiMessages.AskName);
-            }
-            else
-            {
-                // Read the answer to whatever we asked last: name → age → job
-                var ok = false;
-                if (conversation.IntakeName == null)
+                if (complete)
                 {
-                    var name = asked ? null : IntakeScript.ParseName(said);
-                    if (name != null) { conversation.IntakeName = Cut(name, 200); ok = true; }
-                }
-                else if (conversation.IntakeAge == null)
-                {
-                    var age = IntakeScript.ParseAge(said);
-                    if (age != null) { conversation.IntakeAge = (byte)age.Value; conversation.IntakeAgeAt = DateTime.UtcNow; ok = true; }
-                }
-                else if (conversation.IntakeJob == null)
-                {
-                    var job = asked ? null : IntakeScript.ParseJob(said);
-                    if (job != null) { conversation.IntakeJob = Cut(job, 200); ok = true; }
-                }
-
-                if (conversation.IntakeName != null && conversation.IntakeAge != null && conversation.IntakeJob != null)
-                {
+                    // Everything was in their first message: greet, then hand over
+                    conversation.IntakeTurns++;
+                    await SendAsync(conversation, greeting, ct);
                     await CompleteAsync(conversation, settings, ct);
                     return;
                 }
-
+                reply = greeting + "\n\n" + AiMessages.Get(settings, next);
+            }
+            else
+            {
                 var prefix = asked ? AiMessages.Get(settings, AiMessages.ConsultantWillExplain) + "\n\n" : "";
-                var next = conversation.IntakeName == null ? (ok ? AiMessages.AskName : AiMessages.AskNameAgain)
-                    : conversation.IntakeAge == null ? (ok ? AiMessages.AskAge : AiMessages.AskAgeAgain)
-                    : (ok ? AiMessages.AskJob : AiMessages.AskJobAgain);
-                reply = prefix + AiMessages.Get(settings, next, conversation.IntakeName);
+                reply = prefix + AiMessages.Get(settings, next);
             }
 
             conversation.IntakeTurns++;
@@ -272,7 +294,7 @@ namespace RecruitmentSaaS.Services
                 });
                 await _context.SaveChangesAsync(ct);
 
-                await SendAsync(conversation, AiMessages.Get(settings, AiMessages.DoneAssigned, conversation.IntakeName, agent.DisplayNameAr), ct);
+                await SendAsync(conversation, AiMessages.Get(settings, AiMessages.DoneAssigned, agent.DisplayNameAr), ct);
 
                 await NotifyAsync(agent.Id, "عميل جديد من واتساب (المساعد الآلي)",
                     $"{lead.FullName} — السن {conversation.IntakeAge?.ToString() ?? "؟"} — {conversation.IntakeJob ?? ""}", $"/Inbox/Index?c={conversation.Id}");
@@ -283,7 +305,7 @@ namespace RecruitmentSaaS.Services
                 // Under the age (or no salesperson available): waits with the team leader, like the form
                 conversation.PendingTeamManagerId = team;
                 await _context.SaveChangesAsync(ct);
-                await SendAsync(conversation, AiMessages.Get(settings, AiMessages.DoneWaiting, conversation.IntakeName), ct);
+                await SendAsync(conversation, AiMessages.Get(settings, AiMessages.DoneWaiting), ct);
                 await NotifyTeamLeaderAsync(team, "عميل جديد من واتساب في انتظار التعيين",
                     $"{lead.FullName} — السن {conversation.IntakeAge?.ToString() ?? "؟"} — {conversation.IntakeJob ?? ""}", conversation.Id, ct);
                 await _notifier.ConversationAssignedAsync(conversation.Id, conversation.WhatsAppAccountId, null, null);
@@ -494,6 +516,12 @@ namespace RecruitmentSaaS.Services
 
 namespace RecruitmentSaaS.Services
 {
+    /// <summary>What the assistant asked last.</summary>
+    public enum IntakeSlot { None, Name, Age, Job }
+
+    /// <summary>What one customer message told us. NameIsLabelled: they wrote "اسمي …" / "الاسم …".</summary>
+    public sealed record IntakeFacts(string? Name, int? Age, string? Job, bool NameIsLabelled);
+
     /// <summary>
     /// The rules for reading the customer's answers (the texts it sends are in AiMessages) (Egyptian Arabic, free text).
     /// No AI: digits / common number words for the age, simple keyword lists for "I want a person" etc.
@@ -516,7 +544,7 @@ namespace RecruitmentSaaS.Services
                     >= '۰' and <= '۹' => (char)('0' + (ch - '۰')),
                     _ => ch
                 };
-                if (c is >= '\u064B' and <= '\u0652') continue;   // tashkeel
+                if (c is >= 'ً' and <= 'ْ') continue;   // tashkeel
                 if (c == 'ـ') continue;                           // tatweel
                 sb.Append(c);
             }
@@ -543,45 +571,140 @@ namespace RecruitmentSaaS.Services
         public static bool IsQuestion(string norm) => QuestionWords.Any(w => norm.Contains(Normalize(w)));
 
         private static readonly string[] GreetingOnly =
-            { "السلام عليكم ورحمه الله وبركاته", "السلام عليكم ورحمه الله", "السلام عليكم", "سلام عليكم", "السلام", "اهلا وسهلا", "اهلا",
+            { "السلام عليكم ورحمه الله وبركاته", "السلام عليكم ورحمه الله", "السلام عليكم", "سلام عليكم", "السلام", "اهلا وسهلا بكم", "اهلا وسهلا", "اهلا",
               "مرحبا", "صباح الخير", "صباح النور", "صباح الفل", "مساء الخير", "مساء النور", "مساء الفل", "هاي", "hi", "hello",
               "ازيك", "ازيكم", "تمام", "ok", "اوك", "ايوه", "نعم", "حاضر", "شكرا", "يا جماعه", "يا فندم" };
 
-        /// <summary>A name: letters only, 2–5 words, not just a greeting. "انا اسمي محمد احمد" → "محمد احمد".</summary>
-        public static string? ParseName(string? said)
+        // ── Words ───────────────────────────────────────────────────────────
+
+        private static readonly System.Text.RegularExpressions.Regex Separators = new(@"[,،.!؛;:\-_/\\|()\[\]«»""'…~*؟?=+]+");
+        private static readonly System.Text.RegularExpressions.Regex Spaces = new(@"\s+");
+
+        /// <summary>The message as words, punctuation dropped ("على.صلاح.انا.حداد" → 4 words).</summary>
+        private static string[] Words(string? text) =>
+            Spaces.Replace(Separators.Replace(text ?? "", " "), " ").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        private static bool In(HashSet<string> set, string normWord) =>
+            set.Contains(normWord) || (normWord.Length > 2 && normWord[0] == 'و' && set.Contains(normWord[1..]));
+
+        private static HashSet<string> Set(params string[] words) => new(words.Select(Normalize));
+
+        // Jobs people write. Prefix = any word starting with it ("كهرب" → كهربائي، كهربا); Exact = that word only
+        // ("مساعد" but not "مساعده", "مدرس" but not "مدرسه").
+        private static readonly string[] JobPrefixes =
         {
-            // Punctuation → spaces so "السلام عليكم، أنا…" matches "السلام عليكم"
-            var text = System.Text.RegularExpressions.Regex.Replace(said ?? "", @"[,،.!؛;:\-]+", " ");
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
-            // "السلام عليكم انا محمد" → drop the greeting(s) first and keep what follows
+            "نجار", "نقاش", "حداد", "سباك", "كهرب", "لحام", "سواق", "سائق", "مبلط", "بلاط", "مبيض", "دهان", "مهندس", "طباخ",
+            "محاسب", "ميكانيك", "سيراميك", "سراميك", "مندوب", "خياط", "ترزي", "جزار", "حلاق", "صنايعي", "استورجي", "محاره",
+            "تبريد", "تكييف", "تكيف", "الوميتال", "جبس", "رخام", "مشغل", "ونش", "لودر", "حفار", "كاشير", "ممرض", "صيدل",
+            "مزارع", "خراط", "سمكري", "نحات", "كوافير", "مبرمج", "خباز", "حلواني", "ويتر", "باريستا", "نظافه", "تمريض", "دليفري"
+        };
+        private static readonly HashSet<string> JobExact = Set("فني", "شيف", "عامل", "عمال", "مساعد", "مدرس", "حارس", "بائع", "مشرف", "مدير", "موظف", "دكتور", "طبيب", "محامي", "طيار", "امن", "ضابط");
+
+        private static string JobCore(string normWord)
+        {
+            var w = normWord.Length > 3 && normWord[0] == 'و' ? normWord[1..] : normWord;
+            return w.Length > 4 && w.StartsWith("ال") ? w[2..] : w;
+        }
+        private static bool HasArticle(string normWord) => (normWord.Length > 3 && normWord[0] == 'و' ? normWord[1..] : normWord).StartsWith("ال");
+        private static bool IsJobWord(string normWord)
+        {
+            var w = JobCore(normWord);
+            return JobExact.Contains(w) || JobPrefixes.Any(p => w.StartsWith(p));
+        }
+
+        // A name stops at any of these ("محمد طه خبره في…" → "محمد طه"); a "name" that starts with one isn't a name
+        private static readonly HashSet<string> NotNameWords = Set(
+            "ممكن", "تفاصيل", "التفاصيل", "تفصيل", "السن", "سن", "سني", "سنه", "عمري", "العمر", "ايه", "اي", "ايش", "اسم", "اسمي", "الاسم",
+            "في", "عاوز", "عايز", "عايزه", "عاوزه", "عندي", "شغال", "شغلتي", "مهنتي", "المهنه", "مهنه", "الوظيفه", "وظيفه", "وظيفتي",
+            "مطلوب", "المطلوب", "متاح", "السفر", "سفر", "اسافر", "للسفر", "تركيا", "شغل", "الشغل", "مع", "مفيش", "مش", "حضرتك", "حضرتكم",
+            "هل", "كام", "بكام", "الراتب", "المرتب", "راتب", "مرتب", "انا", "من", "خبره", "دبلوم", "بكالوريوس", "ليسانس", "مؤهل", "مخلص", "جيش",
+            "محافظه", "رقم", "تليفون", "موبايل", "لو", "بس", "يا", "فندم", "والله", "طيب", "تمام", "اوك", "نعم", "ايوه", "لا", "مهتم",
+            "اريد", "ابغي", "محتاج", "فرصه", "عمل", "العمل", "للعمل", "اعمل", "بشتغل", "اشتغل", "التكلفه", "تكلفه", "السعر", "سعر",
+            "الشروط", "شروط", "الاوراق", "اوراق", "اجراءات", "الاجراءات", "معايا", "معي", "معاك", "معك", "فيه", "هو", "هي", "ده", "دي", "كنت",
+            "ازاي", "امتي", "فين", "ليه", "جاهز", "الكلام", "كلام", "علي", "عن", "ما", "هذا", "حول", "مرحبا", "السلام", "سلام", "عليكم",
+            "شكرا", "حاضر", "مواليد", "موليد", "متزوج", "اعزب", "عام", "عاما", "سنين", "مصر", "القاهره", "الجيزه", "اسكندريه", "الاسكندريه");
+
+        // "علي" is a stop word above only as "على" (on); as a first name it comes through the exception below
+        private static readonly HashSet<string> NameLabels = Set("الاسم", "اسمي", "اسم", "معك", "معاك");
+        private static readonly HashSet<string> JobLabels = Set("المهنه", "مهنتي", "مهنه", "الوظيفه", "وظيفتي", "شغلتي", "صنعتي", "شغال", "بشتغل");
+        private static readonly HashSet<string> WeakJobLabels = Set("انا", "شغل", "اشتغل", "اعمل", "عملي", "الشغل");
+        private static readonly HashSet<string> JobStops = Set(
+            "السن", "سني", "سن", "عمري", "العمر", "الاسم", "اسمي", "اسم", "عندي", "ايه", "المطلوب", "مطلوب", "كام", "بكام", "هل", "ممكن",
+            "عايز", "عاوز", "تفاصيل", "التفاصيل", "جاهز", "معايا", "معي", "تليفون", "رقم", "محافظه", "خبره", "من", "لو", "هو", "ابحث",
+            "محتاج", "اريد", "مواليد", "موليد", "متزوج", "اعزب", "انا", "تم", "دبلوم", "جواز");
+        // "دبلوم صنايع", "معهد فني": schooling, not a job
+        private static readonly HashSet<string> Schooling = Set("دبلوم", "معهد", "بكالوريوس", "ليسانس", "مؤهل", "ثانوي", "ثانويه", "مدرسه", "كليه");
+
+        private static bool HasDigit(string w) => w.Any(char.IsDigit);
+        private static bool AllLetters(string w) => w.Length > 0 && w.All(char.IsLetter);
+
+        /// <summary>Name words from position <paramref name="start"/>: letters only, until a digit, a job or a word that can't be in a name.</summary>
+        private static string? NameFrom(string[] words, int start)
+        {
+            var taken = new List<string>();
+            for (var i = start; i < words.Length && taken.Count < 5; i++)
+            {
+                var w = words[i];
+                var n = Normalize(w);
+                if (!AllLetters(w)) break;
+                // "علي" is a name when it starts or follows a name ("محمد علي حسن")
+                if (n != "علي" && In(NotNameWords, n)) break;
+                // "محمد النجار": a family name. "محمد نجار" / first word "نجار": a job.
+                if (IsJobWord(n) && !(HasArticle(n) && taken.Count > 0)) break;
+                taken.Add(w);
+            }
+            if (taken.Count == 0 || taken.Sum(t => t.Length) < 2) return null;
+            if (taken.Count == 1 && Normalize(taken[0]) == "علي" && start == 0 && words.Length > 2) return null;   // "على كام…"
+            return string.Join(" ", taken);
+        }
+
+        private static string[] WithoutGreeting(string? said)
+        {
+            var text = Spaces.Replace(Separators.Replace(said ?? "", " "), " ").Trim();
             for (var stripped = true; stripped;)
             {
                 stripped = false;
-                text = text.Trim(' ', ',', '،', '.', '!', '-');
                 var normText = Normalize(text);
                 foreach (var g in GreetingOnly.OrderByDescending(x => x.Length))
                 {
                     var ng = Normalize(g);
                     if (normText.StartsWith(ng + " ") || normText == ng)
                     {
-                        text = text.Length > ng.Length ? text[ng.Length..] : "";
+                        text = text.Length > ng.Length ? text[ng.Length..].Trim() : "";
                         stripped = true;
                         break;
                     }
                 }
             }
-            text = text.Trim(' ', ',', '،', '.', '!', '-');
-            foreach (var lead in new[] { "انا اسمي", "أنا اسمي", "اسمي", "انا", "أنا", "الاسم", "إسمي" })
-                if (text.StartsWith(lead + " ")) { text = text[(lead.Length + 1)..].Trim(); break; }
-            text = new string(text.Where(c => char.IsLetter(c) || c == ' ').ToArray()).Trim();
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
-            if (text.Count(char.IsLetter) < 2) return null;
-            var norm = Normalize(text);
-            if (GreetingOnly.Any(g => norm == Normalize(g) || norm.StartsWith(Normalize(g) + " "))) return null;   // "مساء الخير يا جماعة" isn't a name
-            var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (words.Length > 6) return null;   // a sentence, not a name
-            return text;
+            return text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         }
+
+        /// <summary>"اسمي محمد ثروت …", "الاسم: احمد السيد علي السن 23" → the name after the label.</summary>
+        public static string? LabelledName(string? said)
+        {
+            var words = Words(said);
+            for (var i = 0; i < words.Length - 1; i++)
+            {
+                var n = Normalize(words[i]);
+                if (!In(NameLabels, n)) continue;
+                var j = i + 1;
+                if (Normalize(words[j]) == "حضرتك") return null;   // quoting our own question
+                return NameFrom(words, j);
+            }
+            return null;
+        }
+
+        /// <summary>The answer to "اسم حضرتك إيه؟": the leading name words, or null when it isn't a name (a job, a question, a greeting).</summary>
+        public static string? ParseName(string? said)
+        {
+            var labelled = LabelledName(said);
+            if (labelled != null) return labelled;
+            var words = WithoutGreeting(said);
+            var start = words.Length > 1 && Normalize(words[0]) == "انا" ? 1 : 0;
+            return NameFrom(words, start);
+        }
+
+        // ── Age ─────────────────────────────────────────────────────────────
 
         private static readonly (string Word, int Value)[] Units =
         {
@@ -590,20 +713,66 @@ namespace RecruitmentSaaS.Services
             ("تمانيه", 8), ("ثمانيه", 8), ("تمن", 8), ("تمان", 8), ("تسعه", 9), ("تسع", 9)
         };
         private static readonly (string Word, int Value)[] Tens =
-            { ("عشرين", 20), ("تلاتين", 30), ("ثلاثين", 30), ("اربعين", 40), ("خمسين", 50), ("ستين", 60) };
+            { ("عشرين", 20), ("تلاتين", 30), ("ثلاثين", 30), ("اربعين", 40), ("خمسين", 50), ("ستين", 60), ("سبعين", 70) };
         private static readonly (string Word, int Value)[] Teens =
             { ("تمنتاشر", 18), ("ثمانتاشر", 18), ("ثمانيه عشر", 18), ("تسعتاشر", 19), ("تسعه عشر", 19) };
 
-        /// <summary>An exact age 18–65 from "45", "٤٥", "عندي 47 سنه", "خمسه واربعين"… null when unclear.</summary>
-        public static int? ParseAge(string? said)
+        private const int MinAge = 16, MaxAge = 80;
+        private static int? InRange(int age, int min = MinAge, int max = MaxAge) => age >= min && age <= max ? age : null;
+
+        private static System.Text.RegularExpressions.Regex Rx(string pattern) => new(pattern, System.Text.RegularExpressions.RegexOptions.Compiled);
+        private static readonly System.Text.RegularExpressions.Regex Phone = Rx(@"\d{5,}");
+        private static readonly System.Text.RegularExpressions.Regex Birth = Rx(@"(?:مواليد|موليد|مواليدي|اتولدت|تاريخ الميلاد)\D{0,8}((?:\d{1,4}[\s./\\\-]*){1,3})");
+        private static readonly System.Text.RegularExpressions.Regex Months = Rx(@"و?\s*\d{1,2}\s*(?:شهور|شهر|اشهر)");
+        private static readonly System.Text.RegularExpressions.Regex Experience = Rx(@"(?:(?:خبره|خبرتي)\s*(?:(?!و?(?:ال)?(?:سن|عمر))\p{L}+\s+){0,2}|(?:بقالي|منذ|لمده|عملت|اشتغلت|شغال من)\s*)\d{1,2}\s*(?:سنه|سنين|سنوات|عاما|عام)?");
+        private static readonly System.Text.RegularExpressions.Regex Counted = Rx(@"\d+\s*(?:الف|الاف|جنيه|دولار|ليره|يورو|ريال|عمال|عامل|افراد|فرد|انفار|نفر|ساعه|ساعات|يوم|ايام|اولاد|عيال|اطفال)");
+        private static readonly System.Text.RegularExpressions.Regex Decimal = Rx(@"(\d{2})[.,]\d(?!\d)");
+        private static readonly System.Text.RegularExpressions.Regex AgeAfterLabel = Rx(@"(?<!\p{L})و?(?:ال)?(?:سن|عمر)ي?(?!\p{L})\s*(?:انا\s*)?[^\d\p{L}]{0,4}\s*(\d{1,2})(?!\d)");
+        private static readonly System.Text.RegularExpressions.Regex AgeBeforeUnit = Rx(@"(?<!\d)(\d{1,2})\s*(?:سنه|سنين|سنوات|عاما|عام|سن)(?!\p{L})");
+        private static readonly System.Text.RegularExpressions.Regex AgeAfterHave = Rx(@"عندي\s*(\d{1,2})(?!\d)");
+        private static readonly System.Text.RegularExpressions.Regex Number = Rx(@"\d+");
+
+        private static int? FromBirthYear(int year)
         {
-            var norm = Normalize(said);
-            var numbers = System.Text.RegularExpressions.Regex.Matches(norm, @"\d{1,3}").Select(m => int.Parse(m.Value)).ToList();
-            if (numbers.Count == 1) return numbers[0] is >= 18 and <= 65 ? numbers[0] : null;
+            if (year < 100) year += year <= 15 ? 2000 : 1900;   // "مواليد 81" → 1981
+            return year is >= 1940 and <= 2012 ? InRange(DateTime.UtcNow.Year - year) : null;
+        }
+
+        /// <summary>
+        /// The age in a message: "45", "٤٥", "السن 50", "عندي 47 سنه", "44 و9 شهور", "مواليد 1981", "خمسه واربعين"…
+        /// <paramref name="askedAge"/>: we had just asked for it, so a bare number is the age. null when unclear.
+        /// </summary>
+        public static int? ParseAge(string? said, bool askedAge = true)
+        {
+            var norm = Phone.Replace(Normalize(said), " ");
+
+            var birth = Birth.Match(norm);
+            if (birth.Success)
+            {
+                var parts = Number.Matches(birth.Groups[1].Value).Select(m => int.Parse(m.Value)).ToList();
+                if (parts.Count > 0 && FromBirthYear(parts[^1]) is int fromBirth) return fromBirth;
+            }
+
+            norm = Decimal.Replace(Counted.Replace(Experience.Replace(Months.Replace(norm, " "), " "), " "), "$1");
+
+            foreach (var rx in new[] { AgeAfterLabel, AgeBeforeUnit, AgeAfterHave })
+            {
+                var m = rx.Match(norm);
+                if (m.Success && InRange(int.Parse(m.Groups[1].Value)) is int labelled) return labelled;
+            }
+
+            var numbers = Number.Matches(norm).Select(m => m.Value).Where(v => v.Length <= 4).Select(int.Parse).Distinct().ToList();
+            if (numbers.Count == 1)
+            {
+                var n = numbers[0];
+                if (n >= 1940) return askedAge ? FromBirthYear(n) : null;   // "1982"
+                // Unasked, only a clear working age counts ("نقاش 38"), never "لحام سي 2"
+                return askedAge ? InRange(n) : InRange(n, 18, 65);
+            }
             if (numbers.Count > 1) return null;   // "من 40 ل 50" — not an exact age
 
             foreach (var (w, v) in Teens) if (norm.Contains(w)) return v;
-            var words = norm.Split(new[] { ' ', 'و', ',', '،', '.' }, StringSplitOptions.RemoveEmptyEntries);
+            var words = norm.Split(new[] { ' ', ',', '،', '.' }, StringSplitOptions.RemoveEmptyEntries);
             int? tens = null, units = null;
             foreach (var word in words)
             {
@@ -613,20 +782,82 @@ namespace RecruitmentSaaS.Services
                 if (u.Word != null && units == null) units = u.Value;
             }
             if (tens == null) return null;
-            var age = tens.Value + (units ?? 0);
-            return age is >= 18 and <= 65 ? age : null;
+            return InRange(tens.Value + (units ?? 0));
         }
 
-        /// <summary>A job: some letters, not a greeting, not a long story.</summary>
+        // ── Job ─────────────────────────────────────────────────────────────
+
+        /// <summary>A job written anywhere in the message: after "المهنه / شغال / انا …" or a known job word ("نجار موبيليا").</summary>
+        public static string? FindJob(string? said)
+        {
+            var words = Words(said);
+            var norms = words.Select(Normalize).ToArray();
+            var start = -1;
+            for (var i = 0; i < words.Length && start < 0; i++)
+            {
+                var n = norms[i];
+                var next = i + 1 < words.Length ? norms[i + 1] : null;
+                if (In(JobLabels, n))
+                {
+                    if (next != null && !HasDigit(next) && !In(JobStops, next) && next != "ايه" && next != "حضرتك") start = i + 1;
+                }
+                else if (In(WeakJobLabels, n))
+                {
+                    if (next != null && IsJobWord(next)) start = i + 1;
+                }
+                // "محمد النجار" is a family name; "النجار موبيليا" at the start is a job
+                else if (IsJobWord(n) && !(HasArticle(n) && i > 0) && !(i > 0 && In(Schooling, norms[i - 1]))) start = i;
+            }
+            if (start < 0) return null;
+
+            var taken = new List<string>();
+            for (var i = start; i < words.Length && taken.Count < 6; i++)
+            {
+                if (HasDigit(words[i]) || (i > start && In(JobStops, norms[i]))) break;
+                taken.Add(words[i]);
+            }
+            while (taken.Count > 0 && Normalize(taken[^1]) is "و" or "في" or "مع") taken.RemoveAt(taken.Count - 1);
+            var job = string.Join(" ", taken);
+            return job.Count(char.IsLetter) < 2 ? null : job;
+        }
+
+        /// <summary>The answer to "مهنة حضرتك إيه؟": some letters, not a greeting, not a long story.</summary>
         public static string? ParseJob(string? said)
         {
+            var found = FindJob(said);
+            if (found != null) return found;
             var text = (said ?? "").Trim();
             foreach (var lead in new[] { "عايز اشتغل", "عاوز اشتغل", "عايز أشتغل", "عاوز أشتغل", "انا", "أنا", "شغال" })
                 if (text.StartsWith(lead + " ")) { text = text[(lead.Length + 1)..].Trim(); break; }
             if (text.Count(char.IsLetter) < 2) return null;
             var norm = Normalize(text);
             if (GreetingOnly.Any(g => norm == Normalize(g))) return null;
+            // A long reply: keep its start, up to the first number
+            var head = Words(text).TakeWhile(w => !HasDigit(w)).Take(8).ToArray();
+            if (head.Length > 0 && Words(text).Length > head.Length) text = string.Join(" ", head);
             return text.Length > 200 ? text[..200] : text;
+        }
+
+        // ── Everything a message says ───────────────────────────────────────
+
+        /// <summary>
+        /// Name, age and job found in one message, whatever was asked. What was asked decides how freely the
+        /// rest is read: a bare number is an age only after the age question, bare words are a name only
+        /// after the name question (and never when the message is a question).
+        /// </summary>
+        public static IntakeFacts Extract(string? said, IntakeSlot asked, bool isQuestion)
+        {
+            var age = ParseAge(said, askedAge: asked == IntakeSlot.Age);
+            var name = LabelledName(said);
+            var labelled = name != null;
+            if (name == null && asked == IntakeSlot.Name && !isQuestion) name = ParseName(said);
+            var job = FindJob(said);
+            if (job == null && asked == IntakeSlot.Job && !isQuestion) job = ParseJob(said);
+            // "احمد محمد فريد السن 24 المهنه نقاش" without being asked: a clear introduction, so the
+            // leading words are the name — only with two words or more, a single word is too risky
+            if (name == null && asked != IntakeSlot.Name && (age != null || job != null)
+                && ParseName(said) is string intro && intro.Contains(' ')) name = intro;
+            return new IntakeFacts(name, age, job, labelled);
         }
     }
 }
