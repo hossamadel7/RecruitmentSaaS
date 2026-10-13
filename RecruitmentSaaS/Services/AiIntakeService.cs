@@ -622,7 +622,8 @@ namespace RecruitmentSaaS.Services
             "اريد", "ابغي", "محتاج", "فرصه", "عمل", "العمل", "للعمل", "اعمل", "بشتغل", "اشتغل", "التكلفه", "تكلفه", "السعر", "سعر",
             "الشروط", "شروط", "الاوراق", "اوراق", "اجراءات", "الاجراءات", "معايا", "معي", "معاك", "معك", "فيه", "هو", "هي", "ده", "دي", "كنت",
             "ازاي", "امتي", "فين", "ليه", "جاهز", "الكلام", "كلام", "علي", "عن", "ما", "هذا", "حول", "مرحبا", "السلام", "سلام", "عليكم",
-            "شكرا", "حاضر", "مواليد", "موليد", "متزوج", "اعزب", "عام", "عاما", "سنين", "مصر", "القاهره", "الجيزه", "اسكندريه", "الاسكندريه");
+            "شكرا", "حاضر", "ماله", "مين", "محدش", "حد", "بيرد", "اقل", "اكبر", "اكتر", "اكثر", "فوق", "تحت", "ابني", "ابن", "بنتي", "زوجي", "جوزي",
+            "عنده", "نفسي", "ينفع", "باقي", "كمان", "لازم", "لزم", "بخصوص", "بكلم", "بسال", "ارجو", "حابب", "عاوزين", "عايزين", "احنا", "هو انا", "مواليد", "موليد", "متزوج", "اعزب", "عام", "عاما", "سنين", "مصر", "القاهره", "الجيزه", "اسكندريه", "الاسكندريه");
 
         // "علي" is a stop word above only as "على" (on); as a first name it comes through the exception below
         private static readonly HashSet<string> NameLabels = Set("الاسم", "اسمي", "اسم", "معك", "معاك");
@@ -731,6 +732,10 @@ namespace RecruitmentSaaS.Services
         private static readonly System.Text.RegularExpressions.Regex AgeBeforeUnit = Rx(@"(?<!\d)(\d{1,2})\s*(?:سنه|سنين|سنوات|عاما|عام|سن)(?!\p{L})");
         private static readonly System.Text.RegularExpressions.Regex AgeAfterHave = Rx(@"عندي\s*(\d{1,2})(?!\d)");
         private static readonly System.Text.RegularExpressions.Regex Number = Rx(@"\d+");
+        // "لازم 45؟", "اقل من 45 ينفع": the age we ask for, not theirs
+        private static readonly System.Text.RegularExpressions.Regex Requirement = Rx(@"(?:لازم|لزم|شرط|اقل من|اكبر من|اصغر من|اكتر من|اكثر من|فوق|تحت|اقصي|حد)\s*(?:ال)?\s*(?:سن\s*)?(?:ال\s*)?\d{1,2}");
+        // "ابني عنده 19 سنه": someone else's age — only believed as the answer to our age question
+        private static readonly System.Text.RegularExpressions.Regex SomeoneElse = Rx(@"(?<!\p{L})(?:ابني|ابن|بنتي|زوجي|جوزي|اخويا|اخي|اخو|والدي|ابويا)(?!\p{L})");
 
         private static int? FromBirthYear(int year)
         {
@@ -742,25 +747,36 @@ namespace RecruitmentSaaS.Services
         /// The age in a message: "45", "٤٥", "السن 50", "عندي 47 سنه", "44 و9 شهور", "مواليد 1981", "خمسه واربعين"…
         /// <paramref name="askedAge"/>: we had just asked for it, so a bare number is the age. null when unclear.
         /// </summary>
-        public static int? ParseAge(string? said, bool askedAge = true)
+        public static int? ParseAge(string? said, bool askedAge = true, bool bareNumberOk = true)
         {
             var norm = Phone.Replace(Normalize(said), " ");
+            if (!askedAge && SomeoneElse.IsMatch(norm)) return null;
+
+            // "فوق 45" answers our question; unasked it is usually about the age we require
+            var cleaned = Experience.Replace(Months.Replace(norm, " "), " ");
+            if (!askedAge) cleaned = Requirement.Replace(cleaned, " ");
+
+            // A stated age wins over a birth date in the same message ("السن 47 مواليد 79/10/2")
+            foreach (var rx in new[] { AgeAfterLabel, AgeBeforeUnit, AgeAfterHave })
+            {
+                var m = rx.Match(cleaned);
+                if (m.Success && InRange(int.Parse(m.Groups[1].Value)) is int labelled) return labelled;
+            }
 
             var birth = Birth.Match(norm);
             if (birth.Success)
             {
+                // "مواليد 1980", "10/12/81", "79/10/2", "81" — a full year wins, then the part that can only be a year
                 var parts = Number.Matches(birth.Groups[1].Value).Select(m => int.Parse(m.Value)).ToList();
-                if (parts.Count > 0 && FromBirthYear(parts[^1]) is int fromBirth) return fromBirth;
+                var year = parts.Where(y => y is >= 1940 and <= 2012).Select(y => (int?)y).FirstOrDefault()
+                           ?? (parts.Count == 3 ? parts.Where(y => y is >= 40 and <= 99).Select(y => (int?)y).LastOrDefault()
+                               : parts.Count == 1 || (parts.Count == 2 && parts[0] >= 100) ? parts[^1] : null);
+                if (year is int y4 && FromBirthYear(y4) is int fromBirth) return fromBirth;
             }
+            norm = cleaned;
+            if (!askedAge && !bareNumberOk) return null;
 
-            norm = Decimal.Replace(Counted.Replace(Experience.Replace(Months.Replace(norm, " "), " "), " "), "$1");
-
-            foreach (var rx in new[] { AgeAfterLabel, AgeBeforeUnit, AgeAfterHave })
-            {
-                var m = rx.Match(norm);
-                if (m.Success && InRange(int.Parse(m.Groups[1].Value)) is int labelled) return labelled;
-            }
-
+            norm = Decimal.Replace(Counted.Replace(norm, " "), "$1");
             var numbers = Number.Matches(norm).Select(m => m.Value).Where(v => v.Length <= 4).Select(int.Parse).Distinct().ToList();
             if (numbers.Count == 1)
             {
@@ -829,9 +845,8 @@ namespace RecruitmentSaaS.Services
             var text = (said ?? "").Trim();
             foreach (var lead in new[] { "عايز اشتغل", "عاوز اشتغل", "عايز أشتغل", "عاوز أشتغل", "انا", "أنا", "شغال" })
                 if (text.StartsWith(lead + " ")) { text = text[(lead.Length + 1)..].Trim(); break; }
+            text = string.Join(" ", WithoutGreeting(text));   // "تمام يا فندم" isn't a job
             if (text.Count(char.IsLetter) < 2) return null;
-            var norm = Normalize(text);
-            if (GreetingOnly.Any(g => norm == Normalize(g))) return null;
             // A long reply: keep its start, up to the first number
             var head = Words(text).TakeWhile(w => !HasDigit(w)).Take(8).ToArray();
             if (head.Length > 0 && Words(text).Length > head.Length) text = string.Join(" ", head);
@@ -847,7 +862,7 @@ namespace RecruitmentSaaS.Services
         /// </summary>
         public static IntakeFacts Extract(string? said, IntakeSlot asked, bool isQuestion)
         {
-            var age = ParseAge(said, askedAge: asked == IntakeSlot.Age);
+            var age = ParseAge(said, askedAge: asked == IntakeSlot.Age, bareNumberOk: !isQuestion);
             var name = LabelledName(said);
             var labelled = name != null;
             if (name == null && asked == IntakeSlot.Name && !isQuestion) name = ParseName(said);
