@@ -56,6 +56,9 @@ namespace RecruitmentSaaS.Models.DTOs
         public string? LostReason { get; set; }
         public Guid? LeadId { get; set; }
         public string? LeadFullName { get; set; }
+        /// <summary>The client's age and job: from the lead, else what the assistant collected in this chat.</summary>
+        public byte? Age { get; set; }
+        public string? Job { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime OpenedAt { get; set; }
         /// <summary>The customer wrote within 24 hours, so normal (non-template) messages are allowed.</summary>

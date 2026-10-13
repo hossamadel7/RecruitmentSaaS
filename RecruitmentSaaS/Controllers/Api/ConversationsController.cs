@@ -218,6 +218,8 @@ namespace RecruitmentSaaS.Controllers.Api
                 LeadId = conversation.LeadId,
                 LeadFullName = conversation.Lead?.FullName,
                 LeadCode = conversation.Lead?.LeadCode,
+                Age = conversation.Lead?.Age ?? conversation.IntakeAge,
+                Job = !string.IsNullOrWhiteSpace(conversation.Lead?.InterestedJobTitle) ? conversation.Lead!.InterestedJobTitle : conversation.IntakeJob,
                 CreatedAt = conversation.CreatedAt,
                 OpenedAt = conversation.OpenedAt,
                 IntakeStatus = conversation.IntakeStatus,
