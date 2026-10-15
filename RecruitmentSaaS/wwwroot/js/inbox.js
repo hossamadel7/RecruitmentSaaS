@@ -757,6 +757,8 @@
             else tempRow.outerHTML = renderBubble(message);
             afterRender(container);
         } catch (e) {
+            // Not sent: sending it again is the right thing, don't warn about it
+            if (lastSent[conversationId] && lastSent[conversationId].text === text) delete lastSent[conversationId];
             if (!tempRow.isConnected) return;
             tempRow.outerHTML = renderBubble({
                 id: tempId, direction: 2, status: 6, textBody: text, senderUserName: USER.name,
