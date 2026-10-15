@@ -20,10 +20,12 @@ namespace RecruitmentSaaS.Controllers
         private const int MaxDays = 62;
 
         private readonly RecruitmentCrmContext _context;
+        private readonly AiSalesControlService _aiControls;
 
-        public ReservationsController(RecruitmentCrmContext context)
+        public ReservationsController(RecruitmentCrmContext context, AiSalesControlService aiControls)
         {
             _context = context;
+            _aiControls = aiControls;
         }
 
         private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -31,6 +33,8 @@ namespace RecruitmentSaaS.Controllers
 
         public sealed record AgentRow(Guid Id, string Name, string? Team, int Today, int Total, int Came, Dictionary<DateTime, int> PerDay);
         public sealed record Appointment(Guid LeadId, string? LeadCode, string Name, string Phone, DateTime At, string? Agent, byte Status);
+        public sealed record AiBookingRow(Guid Id, string LeadName, string AgentName, string BranchName, DateTime ArrivalLocal,
+            RecruitmentSaaS.Models.Entities.AiOfficeBookingStatus Status, Guid? VerifiedVisitId);
 
         // ── GET /Reservations/Index?from=yyyy-MM-dd&to=yyyy-MM-dd&team={leaderId} ──
         public async Task<IActionResult> Index(DateTime? from, DateTime? to, Guid? team)
@@ -73,7 +77,8 @@ namespace RecruitmentSaaS.Controllers
             var toUtc = EgyptTime.ToUtc(toDay.AddDays(1));
 
             var bookings = await _context.LeadFunnelHistories.AsNoTracking()
-                .Where(h => h.ToStatus == Booked && ids.Contains(h.ChangedById) && h.CreatedAt >= fromUtc && h.CreatedAt < toUtc)
+                .Where(h => h.ToStatus == Booked && ids.Contains(h.ChangedById) && h.CreatedAt >= fromUtc && h.CreatedAt < toUtc &&
+                    !_context.AiOfficeBookingEvents.Any(e => e.FunnelHistoryId == h.Id))
                 .Select(h => new { h.LeadId, h.ChangedById, h.CreatedAt, LeadStatus = h.Lead.Status })
                 .ToListAsync();
             // Re-booking the same customer on the same day counts once
@@ -122,6 +127,13 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.IsAdmin = IsAdmin;
             ViewBag.Teams = teams;
             ViewBag.Team = team;
+            var visibleChats = _context.WhatsAppConversations.ApplyVisibility(await WhatsAppScope.ForUserAsync(_context, User.FindFirstValue(ClaimTypes.Role), CurrentUserId));
+            var aiQuery = _context.AiOfficeBookings.AsNoTracking().Where(b => b.TenantId == _aiControls.Options.TenantId && b.CreatedAt >= fromUtc && b.CreatedAt < toUtc && visibleChats.Any(c => c.Id == b.ConversationId));
+            if (IsAdmin && team != null) aiQuery = aiQuery.Where(b => b.TeamManagerId == team);
+            ViewBag.AiBookings = await aiQuery.OrderByDescending(b => b.ArrivalLocal).Take(500).Join(_context.Leads, b => b.LeadId, l => l.Id, (b, l) => new { b, l.FullName })
+                .Join(_context.AiSalesAgents, x => x.b.AgentId, a => a.Id, (x, a) => new { x.b, x.FullName, a.DisplayName })
+                .Join(_context.Branches, x => x.b.BranchId, br => br.Id, (x, br) => new AiBookingRow(x.b.Id, x.FullName, x.DisplayName, br.Name,
+                    x.b.ArrivalLocal, x.b.Status, x.b.VerifiedVisitId)).ToListAsync();
             return View();
         }
     }

@@ -281,6 +281,26 @@ public partial class RecruitmentCrmContext
         ConfigureLeadForm(modelBuilder);
         ConfigureLeadRotation(modelBuilder);
 
+        ConfigureAiSales(modelBuilder);
+        ConfigureAiSalesEngine(modelBuilder);
+        ConfigureAiVoice(modelBuilder);
+        ConfigureAiOfficeBooking(modelBuilder);
+        ConfigureAiChatLearning(modelBuilder);
         ApplyPostgresConventions(modelBuilder);   // last, so it covers every entity above
+        modelBuilder.Entity<AiCustomerMemory>().Property(x => x.ReviewedDetailsJson).HasColumnType("jsonb");
+        modelBuilder.Entity<AiChatFactCandidate>().Property(x => x.SourceFingerprint).HasColumnType("text");
+        // Opaque operation keys are case-sensitive; never inherit the legacy citext convention.
+        modelBuilder.Entity<AiControlRequest>().Property(x => x.Key).HasColumnType("text");
+        modelBuilder.Entity<AiControlRequest>().Property(x => x.Fingerprint).HasColumnType("text");
+        modelBuilder.Entity<DurableWorkItem>().Property(x => x.DeduplicationKey).HasColumnType("text");
+        modelBuilder.Entity<DurableWorkItem>().Property(x => x.Payload).HasColumnType("text");
+        modelBuilder.Entity<AiOutboundIntent>().Property(x => x.OperationKey).HasColumnType("text");
+        modelBuilder.Entity<AiSalesDraft>().Property(x => x.RequestKey).HasColumnType("text");
+        modelBuilder.Entity<AiSalesDraft>().Property(x => x.ContextFingerprint).HasColumnType("text");
+        modelBuilder.Entity<AiSalesDraft>().Property(x => x.KnowledgeSnapshotJson).HasColumnType("text");
+        modelBuilder.Entity<AiSalesDraft>().Property(x => x.SourceIdsJson).HasColumnType("text");
+        modelBuilder.Entity<AiVoicePart>().Property(x => x.MediaSha256).HasColumnType("text");
+        modelBuilder.Entity<AiOfficeBooking>().Property(x => x.ConfirmationFingerprint).HasColumnType("text");
+        modelBuilder.Entity<AiOfficeBookingEvent>().Property(x => x.ConfirmationFingerprint).HasColumnType("text");
     }
 }

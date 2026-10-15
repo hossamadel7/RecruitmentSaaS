@@ -20,6 +20,7 @@ namespace RecruitmentSaaS.Models.DTOs
         public int UnreadCount { get; set; }
         public DateTime? LastMessageAt { get; set; }
         public Guid? AssignedSalesAgentId { get; set; }
+        public Guid? AssignedAiSalesAgentId { get; set; }
         public string? AssignedSalesAgentName { get; set; }
     }
 
@@ -31,6 +32,7 @@ namespace RecruitmentSaaS.Models.DTOs
         public Guid WhatsAppAccountId { get; set; }
         public string WhatsAppAccountName { get; set; } = string.Empty;
         public Guid? AssignedSalesAgentId { get; set; }
+        public Guid? AssignedAiSalesAgentId { get; set; }
         public string? AssignedSalesAgentName { get; set; }
         public byte Status { get; set; }
         public byte LeadStage { get; set; }
@@ -56,6 +58,9 @@ namespace RecruitmentSaaS.Models.DTOs
         public string? LostReason { get; set; }
         public Guid? LeadId { get; set; }
         public string? LeadFullName { get; set; }
+        /// <summary>The client's age and job: from the lead, else what the assistant collected in this chat.</summary>
+        public byte? Age { get; set; }
+        public string? Job { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime OpenedAt { get; set; }
         /// <summary>The customer wrote within 24 hours, so normal (non-template) messages are allowed.</summary>
@@ -101,6 +106,7 @@ namespace RecruitmentSaaS.Models.DTOs
         public byte Status { get; set; }
         public string? ErrorMessage { get; set; }
         public Guid? SenderUserId { get; set; }
+        public Guid? SenderAiSalesAgentId { get; set; }
         public string? SenderUserName { get; set; }
         public Guid? ReplyToMessageId { get; set; }
         public DateTime WhatsAppTimestamp { get; set; }

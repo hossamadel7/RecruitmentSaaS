@@ -99,9 +99,11 @@
         return d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' });
     }
 
+    function csrfHeaders() { return { 'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value }; }
+
     async function api(url, options) {
         options = options || {};
-        options.headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+        options.headers = Object.assign({ 'Content-Type': 'application/json' }, csrfHeaders(), options.headers || {});
         var res = await fetch(url, options);
         if (!res.ok) {
             var body = null;
@@ -312,6 +314,7 @@
 
     // What the AI assistant has collected (and whether it's still talking)
     function intakeBox(c) {
+        if (c.assignedAiSalesAgentId) return '<div class="intake-box"><strong>🤖 المبيعات الافتراضية — مراقبة فقط</strong><p>أي رد منك يوقف تحكم المساعد.</p><a href="/AiSalesAdmin?conversationId=' + encodeURIComponent(c.id) + '">إدارة التحكم</a></div>';
         if (!c.intakeStatus) return '';
         var state = { 1: '🤖 المساعد الآلي بيجمع البيانات', 2: '✅ المساعد الآلي جمع البيانات', 3: '⚠️ المساعد الآلي حوّل المحادثة', 4: '👤 موظف استلم المحادثة من المساعد' }[c.intakeStatus] || '';
         function row(label, v) { return '<div class="intake-row"><span>' + label + '</span><strong>' + (v != null && v !== '' ? esc(v) : '<span class="intake-missing">لسه</span>') + '</strong></div>'; }
@@ -756,7 +759,7 @@
             var bg = new FormData();
             bg.append('file', blob, fileName);
             if (caption) bg.append('caption', caption);
-            fetch('/api/conversations/' + conversationId + '/media', { method: 'POST', body: bg }).catch(function () { });
+            fetch('/api/conversations/' + conversationId + '/media', { method: 'POST', body: bg, headers: csrfHeaders() }).catch(function () { });
             return;
         }
 
@@ -783,7 +786,7 @@
         if (caption) form.append('caption', caption);
 
         try {
-            var res = await fetch('/api/conversations/' + conversationId + '/media', { method: 'POST', body: form });
+            var res = await fetch('/api/conversations/' + conversationId + '/media', { method: 'POST', body: form, headers: csrfHeaders() });
             var message = await res.json().catch(function () { return null; });
             if (!res.ok) throw { body: message };
             if (!tempRow.isConnected) {
@@ -931,6 +934,85 @@
         };
     }
 
+    // The mic is read on the audio thread (AudioWorklet), so a busy page can't drop pieces of the sound —
+    // dropped pieces are what made a voice note cut out or sound sped up. Blocks of 4096 samples go
+    // straight to the Ogg/Opus encoder worker; nothing is lost if the page is slow, it only arrives later.
+    var CAPTURE_BLOCK = 4096, captureModuleUrl = null;
+    var CAPTURE_PROCESSOR =
+        'class VoiceCapture extends AudioWorkletProcessor {' +
+        '  constructor() { super(); this.buf = new Float32Array(' + CAPTURE_BLOCK + '); this.n = 0; this.on = true; this.ended = false;' +
+        '    this.port.onmessage = (e) => {' +
+        '      if (e.data === "pause") this.on = false;' +
+        '      else if (e.data === "resume") this.on = true;' +
+        '      else if (e.data === "stop" && !this.ended) { this.ended = true; if (this.n) this.port.postMessage(this.buf); this.port.postMessage("end"); }' +
+        '    }; }' +
+        '  process(inputs) {' +
+        '    if (this.ended) return false;' +
+        '    var ch = inputs[0] && inputs[0][0];' +
+        '    if (ch && this.on) for (var i = 0; i < ch.length; i++) {' +
+        '      this.buf[this.n++] = ch[i];' +
+        '      if (this.n === ' + CAPTURE_BLOCK + ') { this.port.postMessage(this.buf); this.buf = new Float32Array(' + CAPTURE_BLOCK + '); this.n = 0; }' +
+        '    }' +
+        '    return true; } }' +
+        'registerProcessor("voice-capture", VoiceCapture);';
+
+    // Records `stream` to an Ogg/Opus file. Resolves once recording has really started.
+    async function startOpusCapture(stream, workerUrl, onFile) {
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx || typeof AudioWorkletNode === 'undefined') throw new Error('no audio worklet');
+        var ctx = new Ctx(), worker = null;
+        try {
+            if (!ctx.audioWorklet) throw new Error('no audio worklet');
+            if (!captureModuleUrl) captureModuleUrl = URL.createObjectURL(new Blob([CAPTURE_PROCESSOR], { type: 'application/javascript' }));
+            await ctx.audioWorklet.addModule(captureModuleUrl);
+            if (ctx.state === 'suspended') await ctx.resume();
+
+            worker = new Worker(workerUrl);
+            var pages = [], finished = false;
+            var finish = function () {
+                if (finished) return;
+                finished = true;
+                try { worker.terminate(); } catch (e) { }
+                try { ctx.close(); } catch (e) { }
+                onFile(new Blob(pages, { type: 'audio/ogg' }));
+            };
+            await new Promise(function (resolve, reject) {
+                var timer = setTimeout(function () { reject(new Error('encoder timeout')); }, 8000);
+                worker.onerror = function () { clearTimeout(timer); reject(new Error('encoder failed')); };
+                worker.onmessage = function (e) {
+                    var m = e.data && e.data.message;
+                    if (m === 'ready') { clearTimeout(timer); resolve(); }
+                    else if (m === 'page') pages.push(e.data.page);
+                    else if (m === 'done') finish();
+                };
+                worker.postMessage({
+                    command: 'init', originalSampleRate: ctx.sampleRate, wavSampleRate: ctx.sampleRate,
+                    numberOfChannels: 1, encoderSampleRate: 48000, encoderApplication: 2049, encoderFrameSize: 20,
+                    maxFramesPerPage: 40, resampleQuality: 3, bufferLength: CAPTURE_BLOCK, streamPages: true
+                });
+            });
+            worker.postMessage({ command: 'getHeaderPages' });
+
+            var source = ctx.createMediaStreamSource(stream);
+            var node = new AudioWorkletNode(ctx, 'voice-capture', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1, channelCountMode: 'explicit' });
+            node.port.onmessage = function (e) {
+                if (e.data === 'end') { worker.postMessage({ command: 'done' }); setTimeout(finish, 5000); }
+                else worker.postMessage({ command: 'encode', buffers: [e.data] });
+            };
+            var silent = ctx.createGain(); silent.gain.value = 0;   // keeps the graph running without playing the mic back
+            source.connect(node); node.connect(silent); silent.connect(ctx.destination);
+            return {
+                pause: function () { node.port.postMessage('pause'); },
+                resume: function () { node.port.postMessage('resume'); },
+                stop: function () { node.port.postMessage('stop'); }
+            };
+        } catch (err) {
+            if (worker) try { worker.terminate(); } catch (e) { }
+            try { ctx.close(); } catch (e) { }
+            throw err;
+        }
+    }
+
     function pickPreviewType() {
         if (typeof MediaRecorder === 'undefined') return null;
         var types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/webm'];
@@ -981,6 +1063,39 @@
         var conversationId = state.selectedConversationId;
         var session = { cancelled: false };
         var previewMime = pickPreviewType();
+        var micStream = null;
+        try {
+            var captureWorkerUrl = await loadOpusRecorder();
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            var capturePreview = null;
+            var capture = await startOpusCapture(micStream, captureWorkerUrl, function (blob) {
+                var done = function () { finishRecording(blob, 'ogg', conversationId, session); };
+                if (capturePreview) capturePreview.stop().then(done, done);
+                else { micStream.getTracks().forEach(function (t) { t.stop(); }); done(); }
+            });
+            // the same microphone stream, recorded plainly, only for listening while paused
+            if (previewMime !== null) {
+                try { capturePreview = chunkRecorder(micStream, previewMime); } catch (e) { capturePreview = null; }
+            }
+            recorder = {
+                session: session, conversationId: conversationId, paused: false,
+                pause: function () { capture.pause(); if (capturePreview) capturePreview.pause(); },
+                resume: function () { capture.resume(); if (capturePreview) capturePreview.resume(); },
+                listen: function () { return capturePreview ? capturePreview.snapshot() : Promise.resolve(null); },
+                stop: function () { capture.stop(); }
+            };
+            if (conversationId !== state.selectedConversationId) { session.cancelled = true; recorder.stop(); recorder = null; return; } // left while the mic was opening
+            showRecorderBar(true);
+            return;
+        } catch (e) {
+            // no microphone permission: nothing else will work either
+            if (e && (e.name === 'NotAllowedError' || e.name === 'NotFoundError' || e.name === 'SecurityError')) {
+                alert('لازم تسمح للموقع باستخدام الميكروفون عشان تسجل رسالة صوتية');
+                return;
+            }
+            if (micStream) micStream.getTracks().forEach(function (t) { t.stop(); });
+            /* older browser: fall back to the previous recorders below */
+        }
         try {
             var workerUrl = await loadOpusRecorder();
             if (!window.Recorder || !window.Recorder.isRecordingSupported()) throw new Error('opus unsupported');
@@ -1158,6 +1273,8 @@
             '<div style="text-align:center;color:var(--text-muted);font-size:12px;margin-bottom:6px">' + esc(c.contactPhone) + '</div>' +
 
             intakeBox(c) +
+            '<div class="customer-field"><span class="customer-field-label">السن</span><span class="customer-field-value">' + (c.age != null ? esc(c.age) + ' سنة' : 'غير معروف') + '</span></div>' +
+            (c.job ? '<div class="customer-field"><span class="customer-field-label">الوظيفة</span><span class="customer-field-value">' + esc(c.job) + '</span></div>' : '') +
             '<div class="customer-field"><span class="customer-field-label">رقم الواتساب المستقبِل</span><span class="customer-field-value">' + esc(c.whatsAppAccountName) + '</span></div>' +
             '<div class="customer-field"><span class="customer-field-label">المندوب المسؤول</span>' + agentField + '</div>' +
             '<div class="customer-field"><span class="customer-field-label">حالة العميل</span>' +

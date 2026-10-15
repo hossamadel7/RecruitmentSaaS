@@ -31,8 +31,6 @@ namespace RecruitmentSaaS.Services
 
         public record RotationSlot(Guid UserId, string Name, short Share);
 
-        // One pick at a time across the app, so two leads arriving together never get the same turn
-        private static readonly SemaphoreSlim Gate = new(1, 1);
 
         /// <summary>The active TeleSales among <paramref name="candidates"/>, in rotation order with their shares.</summary>
         public static async Task<List<RotationSlot>> RotationAsync(RecruitmentCrmContext db, IQueryable<User> candidates, string configScope, CancellationToken ct = default)
@@ -76,30 +74,24 @@ namespace RecruitmentSaaS.Services
         public static async Task<Guid?> NextTeleSalesAsync(RecruitmentCrmContext db, IQueryable<User> candidates,
             string configScope, string stateScope, CancellationToken ct = default)
         {
+            // Callers own the transaction that saves the lead/chat as well as the cursor.
+            await ConversationLock.LockTransactionAsync(db, "rotation:" + configScope, ct);
+            if (stateScope != configScope) await ConversationLock.LockTransactionAsync(db, "rotation:" + stateScope, ct);
             var rotation = await RotationAsync(db, candidates, configScope, ct);
             if (!rotation.Any(r => r.Share > 0)) return null;
-
-            await Gate.WaitAsync(ct);
-            try
+            var state = await db.LeadRotationStates.FirstOrDefaultAsync(s => s.ScopeKey == stateScope, ct);
+            if (state == null)
             {
-                var state = await db.LeadRotationStates.FirstOrDefaultAsync(s => s.ScopeKey == stateScope, ct);
-                if (state == null)
-                {
-                    state = new LeadRotationState { ScopeKey = stateScope };
-                    db.LeadRotationStates.Add(state);
-                }
-
-                var (userId, given) = Advance(rotation, state.CurrentUserId, state.GivenInTurn);
-                state.CurrentUserId = userId;
-                state.GivenInTurn = given;
-                state.UpdatedAt = DateTime.UtcNow;
-                await db.SaveChangesAsync(ct);
-                return userId;
+                state = new LeadRotationState { ScopeKey = stateScope };
+                db.LeadRotationStates.Add(state);
             }
-            finally
-            {
-                Gate.Release();
-            }
+            else await db.Entry(state).ReloadAsync(ct);
+            var (userId, given) = Advance(rotation, state.CurrentUserId, state.GivenInTurn);
+            state.CurrentUserId = userId;
+            state.GivenInTurn = given;
+            state.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+            return userId;
         }
 
         /// <summary>
@@ -193,7 +185,7 @@ namespace RecruitmentSaaS.Services
             var notifications = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
             var waiting = await db.Leads
-                .Where(l => l.AssignedSalesId == null
+                .Where(l => (l.AssignedSalesId == null && l.AssignedAiSalesAgentId == null)
                          && l.TeamManagerId == null       // team forms: the manager decides
                          && l.LeadSource != 3             // reception walk-ins go to office sales
                          && !l.IsConverted
@@ -206,6 +198,9 @@ namespace RecruitmentSaaS.Services
             var assigned = 0;
             foreach (var lead in waiting)
             {
+                await using var assignmentTransaction = await db.Database.BeginTransactionAsync(ct);
+                await db.Entry(lead).ReloadAsync(ct);
+                if (lead.AssignedSalesId != null || lead.AssignedAiSalesAgentId != null) continue;
                 var (candidates, stateScope) = await LeadDistributor.CandidatesForSheetAsync(db, lead.GoogleSheetId, ct);
                 var salesId = await LeadDistributor.NextTeleSalesAsync(db, candidates, LeadDistributor.AllScope, stateScope, ct);
                 if (salesId == null)
@@ -226,6 +221,7 @@ namespace RecruitmentSaaS.Services
                     CreatedAt = DateTime.UtcNow
                 });
                 await db.SaveChangesAsync(ct); // one at a time so the next pick sees this assignment
+                await assignmentTransaction.CommitAsync(ct);
                 assigned++;
 
                 try

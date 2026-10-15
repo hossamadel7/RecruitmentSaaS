@@ -18,20 +18,22 @@ namespace RecruitmentSaaS.Services
         private readonly IWhatsAppCloudApiService _cloudApi;
         private readonly IInboxRealtimeNotifier _notifier;
         private readonly IConfiguration _config;
+        private readonly AiSalesControlService _controls;
 
         public LeadChatStarter(RecruitmentCrmContext context, IWhatsAppCloudApiService cloudApi,
-                               IInboxRealtimeNotifier notifier, IConfiguration config)
+                               IInboxRealtimeNotifier notifier, IConfiguration config, AiSalesControlService controls)
         {
             _context = context;
             _cloudApi = cloudApi;
             _notifier = notifier;
             _config = config;
+            _controls = controls;
         }
 
         /// <param name="actorUserId">Who pressed the button; null for the automatic follow-up.</param>
         public async Task<LeadChatStartResult> StartAsync(Lead lead, Guid? actorUserId, string? actorName, CancellationToken ct = default)
         {
-            if (lead.AssignedSalesId == null)
+            if (lead.AssignedSalesId == null || lead.AssignedAiSalesAgentId != null)
                 return new(false, null, false, "العميل لسه مش متعيّن لموظف");
 
             var agent = await _context.Users.AsNoTracking().FirstAsync(u => u.Id == lead.AssignedSalesId, ct);
@@ -59,11 +61,18 @@ namespace RecruitmentSaaS.Services
 
             var conversation = await _context.WhatsAppConversations
                 .FirstOrDefaultAsync(c => c.ContactId == contact.Id && c.WhatsAppAccountId == account.Id, ct);
+            var lockedConversationId = conversation?.Id ?? Guid.NewGuid();
+            await using var chatGate = await ConversationLock.AcquireAsync(_context, "conversation:" + lockedConversationId, ct);
+            await _context.Entry(lead).ReloadAsync(ct);
+            if (conversation != null) await _context.Entry(conversation).ReloadAsync(ct);
+            if (lead.AssignedAiSalesAgentId != null || conversation?.AssignedAiSalesAgentId != null)
+                return new(false, conversation?.Id, false, "AI assignment requires explicit release before a human chat start.");
+            if (lead.AssignedSalesId != agent.Id) return new(false, conversation?.Id, false, "Assignment changed; refresh first.");
             if (conversation == null)
             {
                 conversation = new WhatsAppConversation
                 {
-                    Id = Guid.NewGuid(),
+                    Id = lockedConversationId,
                     ContactId = contact.Id,
                     WhatsAppAccountId = account.Id,
                     AssignedSalesAgentId = agent.Id,
@@ -78,6 +87,7 @@ namespace RecruitmentSaaS.Services
             }
             else
             {
+                if (actorUserId != null) await _controls.TakeOverLockedAsync(conversation, actorUserId, "Staff opened the lead chat.", ct);
                 conversation.LeadId ??= lead.Id;
                 if (conversation.IntakeStatus == (byte)IntakeStatus.Collecting)
                     conversation.IntakeStatus = (byte)IntakeStatus.StoppedByStaff;   // a person took over from the AI assistant

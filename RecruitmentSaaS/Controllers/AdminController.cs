@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using RecruitmentSaaS.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
@@ -226,7 +227,7 @@ namespace RecruitmentSaaS.Controllers
                 FullName = fullName,
                 FullNameAr = string.IsNullOrWhiteSpace(fullNameAr) ? null : fullNameAr.Trim(),
                 Email = email,
-                PasswordHash = password, // plain text for now
+                PasswordHash = PasswordSecurity.Hash(password),
                 Role = (byte)role,
                 BranchId = branchId ?? Guid.Parse("00000000-0000-0000-0000-000000000020"),
                 IsActive = true,
@@ -475,7 +476,7 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("Users");
             }
 
-            user.PasswordHash = newPassword; // plain text for now
+            user.PasswordHash = PasswordSecurity.Hash(newPassword);
             await _context.SaveChangesAsync();
 
             TempData["Success"] = $"تم تغيير كلمة المرور لـ {user.FullName}";

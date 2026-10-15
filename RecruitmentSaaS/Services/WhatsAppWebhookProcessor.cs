@@ -29,6 +29,8 @@ namespace RecruitmentSaaS.Services
         private readonly INotificationService _notifications;
         private readonly AiIntakeService _aiIntake;
         private readonly AiIntakeQueue _aiQueue;
+        private readonly AiSalesControlService _controls;
+        private readonly AiVoiceService _voice;
 
         public WhatsAppWebhookProcessor(
             RecruitmentCrmContext context,
@@ -37,11 +39,13 @@ namespace RecruitmentSaaS.Services
             IWhatsAppCloudApiService cloudApi,
             INotificationService notifications,
             AiIntakeService aiIntake,
-            AiIntakeQueue aiQueue)
+            AiIntakeQueue aiQueue, AiSalesControlService controls, AiVoiceService voice)
         {
             _notifications = notifications;
             _aiIntake = aiIntake;
             _aiQueue = aiQueue;
+            _controls = controls;
+            _voice = voice;
             _context = context;
             _notifier = notifier;
             _logger = logger;
@@ -146,10 +150,13 @@ namespace RecruitmentSaaS.Services
 
             var contact = await FindOrCreateContactAsync(fromWaId, profileName, now, ct);
             var (conversation, isNewConversation) = await FindOrCreateConversationAsync(contact, account, now, ct);
+            await using var chatGate = await ConversationLock.AcquireAsync(_context, "conversation:" + conversation.Id, ct);
+            if (!isNewConversation) await _context.Entry(conversation).ReloadAsync(ct);
+            await using var inboundTransaction = await _context.Database.BeginTransactionAsync(ct);
 
             var (messageType, textBody, mediaId) = ExtractContent(messageJ);
             if (messageType == WhatsAppMessageType.Unsupported)
-                _logger.LogWarning("WhatsApp message type not shown in the inbox ({Type}): {Payload}", rawType, messageJ.ToString(Newtonsoft.Json.Formatting.None));
+                _logger.LogWarning("WhatsApp message type not shown in the inbox ({Type})", rawType);
 
             Guid? replyToMessageId = null;
             // A reaction points at the message it reacts to
@@ -189,12 +196,22 @@ namespace RecruitmentSaaS.Services
             await TryConnectHandoffAsync(conversation, account, fromWaId, textBody, now, ct);
             await TryAssignDirectChatAsync(conversation, textBody, ct);
 
+            if (conversation.AssignedAiSalesAgentId != null && !string.IsNullOrWhiteSpace(textBody))
+            {
+                var normalized = IntakeScript.Normalize(textBody);
+                if (IntakeScript.WantsPerson(normalized) || IntakeScript.NotInterested(normalized))
+                    await _controls.TakeOverLockedAsync(conversation, null, "Customer requested a person or declined further assistance.", ct);
+            }
+
             // A new chat from someone who isn't a lead yet: the AI assistant collects name / age / job
             var aiOwnsChat = false;
             try { aiOwnsChat = await _aiIntake.ClaimAsync(conversation, account, fromWaId, ct); }
             catch (Exception ex) { _logger.LogWarning(ex, "AI assistant check failed for {ConversationId}", conversation.Id); }
 
+            if (aiOwnsChat) _aiQueue.Enqueue(conversation.Id, wamid);
             await _context.SaveChangesAsync(ct);
+            await _voice.QueueIncomingLockedAsync(conversation, message, ct);
+            await inboundTransaction.CommitAsync(ct);
 
             if (isNewConversation)
             {
@@ -215,10 +232,9 @@ namespace RecruitmentSaaS.Services
 
             if (aiOwnsChat)
             {
-                _aiQueue.Enqueue(conversation.Id);   // answered a few seconds later, off the webhook
                 return;
             }
-            await TrySendWelcomeAsync(conversation, account, ct);
+            if (conversation.AssignedAiSalesAgentId == null) await TrySendWelcomeAsync(conversation, account, ct);
         }
 
         // A chat started from the registration page's "كلمنا على واتساب مباشرة" button carries
@@ -418,6 +434,8 @@ namespace RecruitmentSaaS.Services
 
                 var contact = await FindOrCreateContactAsync(toWaId, null, now, ct);
                 var (conversation, isNewConversation) = await FindOrCreateConversationAsync(contact, account, now, ct);
+            await using var chatGate = await ConversationLock.AcquireAsync(_context, "conversation:" + conversation.Id, ct);
+            if (!isNewConversation) await _context.Entry(conversation).ReloadAsync(ct);
 
                 var (messageType, textBody, mediaId) = ExtractContent(echoJ);
                 var whatsAppTimestamp = ParseUnixTimestamp(echoJ["timestamp"]?.ToString()) ?? now;
@@ -439,6 +457,7 @@ namespace RecruitmentSaaS.Services
                 };
                 _context.WhatsAppMessages.Add(message);
 
+                await _controls.TakeOverLockedAsync(conversation, null, "Staff replied from the WhatsApp Business app.", ct);
                 conversation.LastMessageAt = whatsAppTimestamp;
                 conversation.UpdatedAt = now;
                 if (conversation.Status == (byte)ConversationStatus.New)
@@ -464,7 +483,8 @@ namespace RecruitmentSaaS.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing smb_message_echoes entry for account {AccountId}.", account.Id);
+                _logger.LogError("Error processing staff echo for account {AccountId} ({ErrorType})", account.Id, ex.GetType().Name);
+                throw;
             }
         }
 

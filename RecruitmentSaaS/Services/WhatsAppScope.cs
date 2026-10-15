@@ -97,15 +97,15 @@ namespace RecruitmentSaaS.Services
                 ? query.Where(c => c.AssignedSalesAgentId != null && agents.Contains(c.AssignedSalesAgentId.Value))
                 : query.Where(c => (c.AssignedSalesAgentId != null && agents.Contains(c.AssignedSalesAgentId.Value))
                                 || (c.AssignedSalesAgentId == null && c.PendingTeamManagerId == leader)
-                                || (c.AssignedSalesAgentId == null && c.PendingTeamManagerId == null && accounts.Contains(c.WhatsAppAccountId)));
+                                || (c.AssignedSalesAgentId == null && c.AssignedAiSalesAgentId == null && c.PendingTeamManagerId == null && accounts.Contains(c.WhatsAppAccountId)));
         }
 
-        public static bool CanSee(WhatsAppVisibility v, Guid? assignedAgentId, Guid? pendingTeamManagerId, Guid accountId)
+        public static bool CanSee(WhatsAppVisibility v, Guid? assignedAgentId, Guid? pendingTeamManagerId, Guid accountId, Guid? aiAgentId = null)
         {
             if (v.SeesAll || v.Agents == null) return true;
             if (assignedAgentId.HasValue) return v.Agents.Contains(assignedAgentId.Value);
             if (pendingTeamManagerId != null) return pendingTeamManagerId == v.TeamLeaderId;   // a team's waiting chat: that team only
-            return v.TeamLeaderId != null && v.TeamAccountIds.Contains(accountId);           // not taken yet: the number's team
+            return aiAgentId == null && v.TeamLeaderId != null && v.TeamAccountIds.Contains(accountId);           // not taken yet: the number's team
         }
 
         /// <summary>For agent-only checks (who a chat may be given to).</summary>

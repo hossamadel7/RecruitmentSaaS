@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -183,6 +183,8 @@ namespace RecruitmentSaaS.Controllers
                 return ThankYou(dupUrl);
             }
 
+            await using var assignmentTransaction = await _context.Database.BeginTransactionAsync();
+
             // 4. مين ياخد الـ Lead
             Guid? assignedSalesId = null;
             if (teamForm != null)
@@ -270,6 +272,7 @@ namespace RecruitmentSaaS.Controllers
                 _context.WhatsAppHandoffs.Add(handoff);
 
             await _context.SaveChangesAsync();
+            await assignmentTransaction.CommitAsync();
 
             if (teamForm != null)
                 await NotifyTeamAsync(teamForm.ManagerId, assignedSalesId, leadId, fullName, age.Value);

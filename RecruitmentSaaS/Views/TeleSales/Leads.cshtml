@@ -1,3 +1,4 @@
+@Html.AntiForgeryToken()
 @model List<RecruitmentSaaS.Models.DTOs.LeadListItemDto>
 @{
     ViewData["Title"] = "عملائي";
@@ -200,7 +201,7 @@
         var label = btn.innerHTML;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جارٍ الإرسال...';
         try {
-            var res = await fetch('/api/conversations/start-for-lead/' + btn.dataset.leadId, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+            var res = await fetch('/api/conversations/start-for-lead/' + btn.dataset.leadId, { method: 'POST', headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value } });
             var data = {};
             try { data = await res.json(); } catch (x) { }
             if (res.ok) { location.href = '/Inbox/Index?c=' + data.conversationId; return; }

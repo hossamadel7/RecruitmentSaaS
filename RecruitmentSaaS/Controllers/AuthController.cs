@@ -1,9 +1,10 @@
-﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using RecruitmentSaaS.Data;
 using RecruitmentSaaS.Models.DTOs;
 using System.Security.Claims;
+using RecruitmentSaaS.Services;
 
 namespace RecruitmentSaaS.Controllers
 {
@@ -34,12 +35,14 @@ namespace RecruitmentSaaS.Controllers
             var user = _context.Users
                 .FirstOrDefault(u => u.Email == dto.Email && u.IsActive == true);
 
-            if (user == null || user.PasswordHash != dto.Password)
+            var upgrade = false;
+            if (user == null || !PasswordSecurity.Verify(user.PasswordHash, dto.Password, out upgrade))
             {
                 ModelState.AddModelError("", "البريد الإلكتروني أو كلمة المرور غير صحيحة");
                 return View(dto);
             }
 
+            if (upgrade) user.PasswordHash = PasswordSecurity.Hash(dto.Password);
             user.LastLoginAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 

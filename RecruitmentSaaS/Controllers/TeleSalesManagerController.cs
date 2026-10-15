@@ -254,7 +254,7 @@ namespace RecruitmentSaaS.Controllers
 
             // Header counters + per-member counts (whole team, before filters)
             ViewBag.TotalCount = await scope.CountAsync();
-            ViewBag.UnassignedCount = await scope.CountAsync(l => l.AssignedSalesId == null);
+            ViewBag.UnassignedCount = await scope.CountAsync(l => (l.AssignedSalesId == null && l.AssignedAiSalesAgentId == null));
             ViewBag.ConvertedCount = await scope.CountAsync(l => l.IsConverted);
             ViewBag.MemberCounts = await scope.Where(l => l.AssignedSalesId != null)
                 .GroupBy(l => l.AssignedSalesId!.Value)
@@ -263,7 +263,7 @@ namespace RecruitmentSaaS.Controllers
 
             var query = scope;
             if (member == "unassigned")
-                query = query.Where(l => l.AssignedSalesId == null);
+                query = query.Where(l => (l.AssignedSalesId == null && l.AssignedAiSalesAgentId == null));
             else if (Guid.TryParse(member, out var memberId))
                 query = query.Where(l => l.AssignedSalesId == memberId);
 
@@ -340,7 +340,7 @@ namespace RecruitmentSaaS.Controllers
             var member = await TeamMembersQuery()
                 .FirstOrDefaultAsync(u => u.Id == salesUserId && u.IsActive);
 
-            if (lead == null || member == null)
+            if (lead == null || member == null || lead.AssignedAiSalesAgentId != null)
             {
                 TempData["Error"] = "هذا العميل غير متاح أو الموظف ليس في فريقك";
                 return Back();

@@ -1,0 +1,151 @@
+{
+  "preparedOn": "2026-10-14",
+  "status": "two_owner_selected_conversations_draft_pilot_active_sending_disabled",
+  "notAnImportOrDeploymentFile": true,
+  "productionChangesPerformed": true,
+  "accountSelection": "Bakar",
+  "teamManagerSelection": "bakar (current mapped team leader; existing role 7)",
+  "branchSelection": "الفرع الرئيسي — القاهرة (owner-confirmed Giza office: 103 مكرر شارع الهرم)",
+  "knowledgeApproverSelection": "CEO replies supplied by owner and explicitly confirmed as facts; no duplicate Farouk approval required",
+  "draftReviewerSelection": {
+    "teamLeader": "bakar",
+    "teamLeaderRole": 7,
+    "existingAdminRole": 1,
+    "existingAdminsAlsoReview": true,
+    "confirmedOn": "2026-10-14",
+    "newPermissionsGranted": false
+  },
+  "tenantSelection": "Reserved tenant configured on live server; all AI gates remain false",
+  "accountOptions": [
+    "Bakar",
+    "Mekky",
+    "Sherif"
+  ],
+  "excludedAccounts": [
+    "testttt"
+  ],
+  "agent": {
+    "displayName": "المساعد الافتراضي لشركة الفهد العربي",
+    "mode": "Shadow",
+    "pausedUntilPilotStarts": true,
+    "manualAssignmentsOnly": true,
+    "createsHumanLogin": false,
+    "maxActiveConversations": 5
+  },
+  "proposedLimits": {
+    "initialManuallySelectedConversations": 5,
+    "maxDraftsPerDay": 10,
+    "maxOutputTokens": 800,
+    "providerModel": "gpt-4.1-mini",
+    "voiceProcessingEnabled": false,
+    "historicalChatBulkUpload": false
+  },
+  "safeConfigurationUntilRelease": {
+    "AiSales": {
+      "Enabled": true
+    },
+    "AiSalesEngine": {
+      "DraftsEnabled": true,
+      "ExternalProcessingApproved": true
+    },
+    "AiSalesDispatch": {
+      "Enabled": false,
+      "ReleaseApproved": false,
+      "ApprovedAccountIds": []
+    },
+    "AiVoice": {
+      "Enabled": false,
+      "ExternalProcessingApproved": false
+    },
+    "AiChatLearning": {
+      "Enabled": false
+    },
+    "AiOfficeBooking": {
+      "Enabled": false
+    }
+  },
+  "knowledge": {
+    "packId": "alfahd-turkey-owner-v2",
+    "sourceStatus": "owner_confirmed_not_independently_verified",
+    "published": true,
+    "accountBranchReviewerAndValidityBindingsRequired": true,
+    "reviewIntervalDays": 7,
+    "unansweredHistoricalReviewItems": [
+      10,
+      19
+    ],
+    "customerMemorySeparateFromCompanyFacts": true,
+    "approvalBasis": "Owner-supplied CEO replies and explicit confirmation; duplicate approval waived by owner on 2026-10-14",
+    "duplicateHumanApprovalRequired": false,
+    "publishedOn": "2026-10-14"
+  },
+  "reviewRules": {
+    "reviewEveryDraft": true,
+    "localStopAndHandoffRequireStaffAction": true,
+    "sendCustomerMessagesDuringInitialPilot": false,
+    "stopOnIncorrectPriceVacancyGuaranteeBookingOrPrivacyIssue": true,
+    "staffTakeoverMustInvalidatePendingDrafts": true,
+    "automatedEmploymentEligibilityDecisions": false,
+    "requestedCustomerSendWorkflow": "Staff clicks Accept & Send to approve and immediately dispatch that draft; every message requires staff approval",
+    "acceptAndSendUiCompleted": false,
+    "customerSendingCurrentlyEnabled": false
+  },
+  "remainingBeforeActivation": [
+    "Staff generates and reviews actual drafts for the selected Bakar conversation",
+    "Connect and validate requested Accept & Send UI before any reviewed sending activation"
+  ],
+  "accountSelectionConfirmedOn": "2026-10-14",
+  "branchBindingStatus": "Owner confirmed current Bakar branch is the supplied Giza office on 2026-10-14",
+  "approvedProcessingScope": {
+    "approvedOn": "2026-10-14",
+    "account": "Bakar",
+    "manuallySelectedConversations": 5,
+    "recentMessagesPerConversation": 20,
+    "provider": "OpenAI",
+    "customerSending": false,
+    "bulkHistoryUpload": false
+  },
+  "installationCompletedOn": "2026-10-14",
+  "agentSetupCompletedOn": "2026-10-14",
+  "manualAssignmentEnabledOn": "2026-10-14",
+  "additionalAccountPreparation": {
+    "account": "Sherif",
+    "requestedClients": 1,
+    "mode": "Shadow",
+    "paused": false,
+    "maxActiveConversations": 1,
+    "CEOApprovedKnowledgePublished": true,
+    "existingAdminAccess": "All account clients; no role grants",
+    "externalProcessingScopeApproved": true,
+    "customerSendingEnabled": false
+  },
+  "activeDraftPilot": {
+    "account": "Sherif",
+    "leadCode": "LD-04043",
+    "selectedConversations": 1,
+    "exactConversationAllowlistConfigured": true,
+    "processingApproval": "Owner yes go, 2026-10-14",
+    "recentMessagesPerConversation": 20,
+    "reviewedContextIncluded": true,
+    "phoneAndEmailMasking": true,
+    "draftRequestsRequireStaffAction": true,
+    "customerSendingEnabled": false,
+    "draftCountAtVerification": 0,
+    "waitingForNewCustomerMessage": true
+  },
+  "activeDraftTests": [
+    {
+      "account": "Sherif",
+      "leadCode": "LD-04043",
+      "scope": "original selected conversation",
+      "sendingEnabled": false
+    },
+    {
+      "account": "Bakar",
+      "leadCode": "LD-03277",
+      "scope": "Bakar conversation only; shared human lead and other account conversations preserved",
+      "latestIncomingTextAvailable": true,
+      "sendingEnabled": false
+    }
+  ]
+}

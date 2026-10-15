@@ -12,6 +12,7 @@ namespace RecruitmentSaaS.Controllers.Api
 {
     [Route("api/conversations")]
     [ApiController]
+    [AutoValidateAntiforgeryToken]
     [Authorize(Roles = WhatsAppAuthorization.AllowedRoles)]
     public class ConversationsController : ControllerBase
     {
@@ -52,7 +53,7 @@ namespace RecruitmentSaaS.Controllers.Api
             _visibility ??= await WhatsAppScope.ForUserAsync(_context, CurrentRole, CurrentUserId);
 
         private async Task<bool> CanSeeAsync(WhatsAppConversation c) =>
-            WhatsAppScope.CanSee(await VisibilityAsync(), c.AssignedSalesAgentId, c.PendingTeamManagerId, c.WhatsAppAccountId);
+            WhatsAppScope.CanSee(await VisibilityAsync(), c.AssignedSalesAgentId, c.PendingTeamManagerId, c.WhatsAppAccountId, c.AssignedAiSalesAgentId);
 
         // May a chat be given to this person? (the TeleSales manager: only their team)
         private async Task<bool> CanSeeAgentAsync(Guid agentId) =>
@@ -120,7 +121,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 if (assigned == "me")
                     query = query.Where(c => c.AssignedSalesAgentId == userId);
                 else if (assigned == "unassigned")
-                    query = query.Where(c => c.AssignedSalesAgentId == null);
+                    query = query.Where(c => c.AssignedSalesAgentId == null && c.AssignedAiSalesAgentId == null);
                 else if (Guid.TryParse(assigned, out var agentId))
                     query = query.Where(c => c.AssignedSalesAgentId == agentId);
             }
@@ -152,6 +153,7 @@ namespace RecruitmentSaaS.Controllers.Api
                     WhatsAppAccountId = c.WhatsAppAccountId,
                     WhatsAppAccountName = c.WhatsAppAccount.Name,
                     AssignedSalesAgentId = c.AssignedSalesAgentId,
+                    AssignedAiSalesAgentId = c.AssignedAiSalesAgentId,
                     AssignedSalesAgentName = c.AssignedSalesAgent != null ? c.AssignedSalesAgent.FullName : null,
                     Status = c.Status,
                     LeadStage = c.LeadStage,
@@ -209,6 +211,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 WhatsAppAccountId = conversation.WhatsAppAccountId,
                 WhatsAppAccountName = conversation.WhatsAppAccount.Name,
                 AssignedSalesAgentId = conversation.AssignedSalesAgentId,
+                AssignedAiSalesAgentId = conversation.AssignedAiSalesAgentId,
                 AssignedSalesAgentName = conversation.AssignedSalesAgent?.FullName,
                 Status = conversation.Status,
                 LeadStage = conversation.LeadStage,
@@ -218,6 +221,8 @@ namespace RecruitmentSaaS.Controllers.Api
                 LeadId = conversation.LeadId,
                 LeadFullName = conversation.Lead?.FullName,
                 LeadCode = conversation.Lead?.LeadCode,
+                Age = conversation.Lead?.Age ?? conversation.IntakeAge,
+                Job = !string.IsNullOrWhiteSpace(conversation.Lead?.InterestedJobTitle) ? conversation.Lead!.InterestedJobTitle : conversation.IntakeJob,
                 CreatedAt = conversation.CreatedAt,
                 OpenedAt = conversation.OpenedAt,
                 IntakeStatus = conversation.IntakeStatus,
@@ -274,7 +279,8 @@ namespace RecruitmentSaaS.Controllers.Api
                     Status = m.Status,
                     ErrorMessage = m.ErrorMessage,
                     SenderUserId = m.SenderUserId,
-                    SenderUserName = m.SenderUser != null ? m.SenderUser.FullName : (m.MessageSource == (byte)MessageSource.System ? "🤖 تلقائي" : null),
+                    SenderAiSalesAgentId = m.SenderAiSalesAgentId,
+                    SenderUserName = m.SenderAiSalesAgentId != null ? "المساعد الافتراضي" : m.SenderUser != null ? m.SenderUser.FullName : (m.MessageSource == (byte)MessageSource.System ? "🤖 تلقائي" : null),
                     ReplyToMessageId = m.ReplyToMessageId,
                     WhatsAppTimestamp = m.WhatsAppTimestamp
                 })

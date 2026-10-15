@@ -201,7 +201,7 @@ namespace RecruitmentSaaS.Controllers
                                 ||
                                 // Leads مش معيّنة لحد + sheet rule
                                 // (ليدز فورم الفريق اللي مش معيّنة بتفضل مع مدير الفريق بس)
-                                (l.AssignedSalesId == null
+                                ((l.AssignedSalesId == null && l.AssignedAiSalesAgentId == null)
                                  && l.TeamManagerId == null
                                  && (l.GoogleSheetId == null
                                      || mySheetIds.Contains(l.GoogleSheetId.Value)))
@@ -252,7 +252,7 @@ namespace RecruitmentSaaS.Controllers
 
             var lead = await _context.Leads
                 .FirstOrDefaultAsync(l => l.Id == leadId
-                    && l.AssignedSalesId == null
+                    && (l.AssignedSalesId == null && l.AssignedAiSalesAgentId == null)
                     && l.TeamManagerId == null
                     && l.IsConverted == false);
 
@@ -359,7 +359,7 @@ namespace RecruitmentSaaS.Controllers
                 .Include(l => l.RegisteredBy)
                 .FirstOrDefaultAsync(l => l.Id == id
                     && (l.AssignedSalesId == userId
-                        || (l.AssignedSalesId == null && l.TeamManagerId == null)));
+                        || ((l.AssignedSalesId == null && l.AssignedAiSalesAgentId == null) && l.TeamManagerId == null)));
 
             if (lead == null) return NotFound();
 

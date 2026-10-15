@@ -27,6 +27,8 @@ namespace RecruitmentSaaS.Services
             TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), Zone);
 
         public static DateTime Today => FromUtc(DateTime.UtcNow).Date;
+        public static bool IsUnambiguousLocal(DateTime local) => !Zone.IsInvalidTime(DateTime.SpecifyKind(local, DateTimeKind.Unspecified)) &&
+            !Zone.IsAmbiguousTime(DateTime.SpecifyKind(local, DateTimeKind.Unspecified));
     }
 
     /// <summary>
@@ -78,6 +80,9 @@ namespace RecruitmentSaaS.Services
                                               Guid actorId, string actorName)
         {
             var now = DateTime.UtcNow;
+            if (conversation.LeadId != null && outcome is Booked or Visited or Lost or InTurkey &&
+                await _context.AiOfficeBookings.AnyAsync(b => b.LeadId == conversation.LeadId && b.Status == AiOfficeBookingStatus.Confirmed))
+                return "يوجد حجز استشارة للمساعد؛ استخدم مراجعة الحجز للإلغاء أو تغيير الموعد، والاستقبال لتأكيد الحضور";
             reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
             if (reason?.Length > 500) reason = reason[..500];
 

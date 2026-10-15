@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
 using RecruitmentSaaS.Models.DTOs;
 using RecruitmentSaaS.Models.Entities;
+using RecruitmentSaaS.Services;
 using System.Security.Claims;
 
 namespace RecruitmentSaaS.Controllers
@@ -27,7 +28,7 @@ namespace RecruitmentSaaS.Controllers
         // ── GET /Reception/Index ──────────────────────────────────────────────
         public async Task<IActionResult> Index()
         {
-            var today = DateTime.UtcNow.Date;
+            var today = EgyptTime.ToUtc(EgyptTime.Today);
 
             var todayVisits = await _context.LeadVisits
                 .Include(v => v.Lead)
@@ -112,14 +113,15 @@ namespace RecruitmentSaaS.Controllers
         // ── POST /Reception/CheckIn ───────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CheckIn(WalkInCheckInDto dto)
+        public async Task<IActionResult> CheckIn(WalkInCheckInDto dto, [FromServices] AiOfficeBookingService bookings)
         {
             var userId = CurrentUserId;
 
             var currentUser = await _context.Users.FindAsync(userId);
             if (currentUser == null) return Unauthorized();
 
-            var lead = await _context.Leads
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            var lead = await _context.Leads.FromSqlInterpolated($"SELECT * FROM demorecruitment.\"Leads\" WHERE \"Id\" = {dto.LeadId} FOR UPDATE")
                 .FirstOrDefaultAsync(l => l.Id == dto.LeadId);
 
             if (lead == null)
@@ -131,7 +133,7 @@ namespace RecruitmentSaaS.Controllers
             // Already at office today — just update assignment if changed
             var alreadyVisitedToday = await _context.LeadVisits
                 .AnyAsync(v => v.LeadId == dto.LeadId
-                    && v.VisitDateTime >= DateTime.UtcNow.Date);
+                    && v.VisitDateTime >= EgyptTime.ToUtc(EgyptTime.Today));
 
             if (alreadyVisitedToday)
             {
@@ -141,6 +143,7 @@ namespace RecruitmentSaaS.Controllers
                     lead.AssignedOfficeSalesId = dto.OfficeSalesId.Value;
                     lead.UpdatedAt = DateTime.UtcNow;
                     await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
                     TempData["Success"] = $"تم تحديث تعيين {lead.FullName}";
                 }
                 else
@@ -151,7 +154,7 @@ namespace RecruitmentSaaS.Controllers
             }
 
             // New visit — log it
-            _context.LeadVisits.Add(new LeadVisit
+            var visit = new LeadVisit
             {
                 Id = Guid.NewGuid(),
                 LeadId = dto.LeadId,
@@ -163,7 +166,8 @@ namespace RecruitmentSaaS.Controllers
                 MeetingOutcome = 1,
                 VisitDateTime = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow
-            });
+            };
+            _context.LeadVisits.Add(visit);
 
             var oldStatus = lead.Status;
             lead.Status = 6;
@@ -197,6 +201,9 @@ namespace RecruitmentSaaS.Controllers
             });
 
             await _context.SaveChangesAsync();
+            await bookings.AttachVisitLockedAsync(visit, default);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
             TempData["Success"] = $"تم تسجيل زيارة {lead.FullName} بنجاح";
             return RedirectToAction("Index");

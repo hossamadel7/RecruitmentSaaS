@@ -1,0 +1,41 @@
+@{ ViewData["Title"] = "مراجعة معلومات المحادثات"; }
+<main id="chat-fact-review" class="container py-4" dir="rtl">
+    @Html.AntiForgeryToken()
+    <h1 class="h3">تعلم المعلومات من المحادثات</h1>
+    <p>راجع سؤالًا واحدًا في كل مرة. كلام المحادثة اقتراح يحتاج تأكيدك؛ لا يُصبح معلومة معتمدة تلقائيًا.</p>
+    <p><a href="/AiSalesAdmin">الرجوع لإدارة المساعد الافتراضي</a></p>
+    <div class="card p-3 mb-3">
+        <label for="learning-account" class="form-label">حساب واتساب</label>
+        <select id="learning-account" class="form-select mb-2"></select>
+        <div class="d-flex gap-2 flex-wrap">
+            <button id="extract-chat-facts" class="btn btn-outline-primary" type="button">استخراج الدفعة التالية</button>
+            <button id="next-chat-fact" class="btn btn-outline-secondary" type="button">عرض السؤال التالي</button>
+        </div>
+        <p id="learning-progress" class="mt-2 mb-0" aria-live="polite"></p>
+    </div>
+    <p id="learning-status" role="status" aria-live="polite"></p>
+    <p id="learning-decision-status" role="status" aria-live="polite"></p>
+    <section id="learning-question" class="card p-3" hidden>
+        <h2 id="learning-topic" class="h5"></h2>
+        <p>ما المعلومة الصحيحة التي تريد أن يستخدمها المساعد بدلًا من هذا الكلام؟</p>
+        <blockquote id="learning-source" class="border-end border-3 pe-3" style="white-space:pre-wrap"></blockquote>
+        <p id="learning-source-info" class="text-muted"></p>
+        <h3 class="h6">معلومات معتمدة مرتبطة بالموضوع</h3>
+        <p>التطابق حسب الكلمات فقط، وليس حكمًا بأن المعلومات متناقضة. اختر لكل معلومة الاحتفاظ بها أو إيقافها. إيقاف معلومة تشمل عدة تفاصيل يوقفها بالكامل.</p>
+        <div id="learning-related"></div>
+        <label for="learning-title" class="form-label">عنوان المعلومة الصحيحة</label>
+        <input id="learning-title" class="form-control mb-2" maxlength="150" />
+        <label for="learning-corrected" class="form-label">المعلومة التي تؤكد صحتها الآن</label>
+        <textarea id="learning-corrected" class="form-control mb-2" rows="4" maxlength="4000"></textarea>
+        <label for="learning-days" class="form-label">مراجعة وتجديد المعلومة بعد عدد أيام</label>
+        <input id="learning-days" class="form-control mb-2" type="number" min="1" max="90" value="7" />
+        <label class="form-check mb-3"><input id="learning-privacy" class="form-check-input" type="checkbox" />
+            <span class="form-check-label">راجعت المعلومة وصحتها وحذفت بيانات العملاء الخاصة؛ تصلح كمعلومة عامة للشركة.</span></label>
+        <div class="d-flex gap-2 flex-wrap">
+            <button id="publish-chat-fact" class="btn btn-primary" type="button">اعتماد المعلومة وعرض السؤال التالي</button>
+            <button id="reject-chat-fact" class="btn btn-outline-danger" type="button">رفض الاقتراح وعرض السؤال التالي</button>
+        </div>
+    </section>
+    <p class="mt-3 text-muted">هذه مراجعة للمعرفة، وليست تدريبًا للنموذج أو إرسالًا للعميل. التسجيلات غير المفروغة والمراجعة تحتاج خطوة منفصلة.</p>
+</main>
+@section Scripts { <script src="~/js/ai-chat-facts.js" asp-append-version="true"></script> }

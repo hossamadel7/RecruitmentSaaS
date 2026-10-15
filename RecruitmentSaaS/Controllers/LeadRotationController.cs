@@ -81,6 +81,8 @@ namespace RecruitmentSaaS.Controllers
             var resolved = await ResolveScopeAsync(scope);
             if (resolved == null) return Forbid();
             var (key, candidates, _) = resolved.Value;
+            await using var tx = await _context.Database.BeginTransactionAsync();
+            await ConversationLock.LockTransactionAsync(_context, "rotation:" + key);
 
             var allowed = (await LeadDistributor.RotationAsync(_context, candidates, key)).Select(r => r.UserId).ToHashSet();
             if (userIds.Count != shares.Count || userIds.Count != userIds.Distinct().Count()
@@ -113,6 +115,7 @@ namespace RecruitmentSaaS.Controllers
                 });
             }
             await _context.SaveChangesAsync();
+            await tx.CommitAsync();
 
             TempData["Success"] = "تم حفظ طريقة التوزيع — هتتطبق على الليدز الجاية";
             return RedirectToAction("Index", new { scope = key });
@@ -127,8 +130,11 @@ namespace RecruitmentSaaS.Controllers
             var resolved = await ResolveScopeAsync(scope);
             if (resolved == null) return Forbid();
             var key = resolved.Value.Key;
+            await using var tx = await _context.Database.BeginTransactionAsync();
+            await ConversationLock.LockTransactionAsync(_context, "rotation:" + key);
 
             await _context.LeadRotationStates.Where(s => s.ScopeKey == key).ExecuteDeleteAsync();
+            await tx.CommitAsync();
             TempData["Success"] = "الدورة هتبدأ من أول واحد في القائمة";
             return RedirectToAction("Index", new { scope = key });
         }

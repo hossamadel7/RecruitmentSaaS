@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using RecruitmentSaaS.Data;
 using RecruitmentSaaS.Models.Entities;
@@ -19,15 +17,17 @@ namespace RecruitmentSaaS.Services
         private const string AssistantName = "المساعد الآلي";
 
         private readonly RecruitmentCrmContext _context;
+        private readonly AiSalesControlService _controls;
         private readonly IWhatsAppCloudApiService _cloudApi;
         private readonly IInboxRealtimeNotifier _notifier;
         private readonly INotificationService _notifications;
         private readonly ILogger<AiIntakeService> _logger;
 
         public AiIntakeService(RecruitmentCrmContext context, IWhatsAppCloudApiService cloudApi, IInboxRealtimeNotifier notifier,
-                               INotificationService notifications, ILogger<AiIntakeService> logger)
+                               INotificationService notifications, ILogger<AiIntakeService> logger, AiSalesControlService controls)
         {
             _context = context;
+            _controls = controls;
             _cloudApi = cloudApi;
             _notifier = notifier;
             _notifications = notifications;
@@ -83,10 +83,21 @@ namespace RecruitmentSaaS.Services
 
         public async Task ReplyAsync(Guid conversationId, CancellationToken ct)
         {
+            await using var gate = await ConversationLock.AcquireAsync(_context, "conversation:" + conversationId, ct);
             var conversation = await _context.WhatsAppConversations
                 .Include(c => c.Contact).Include(c => c.WhatsAppAccount)
                 .FirstOrDefaultAsync(c => c.Id == conversationId, ct);
             if (conversation == null || conversation.IntakeStatus != (byte)IntakeStatus.Collecting) return;
+
+            if (conversation.AssignedAiSalesAgentId != null)
+            {
+                var permitted = _controls.Options.Enabled && await _context.AiSalesAgents.AnyAsync(a =>
+                    a.Id == conversation.AssignedAiSalesAgentId && a.TenantId == _controls.Options.TenantId
+                    && !a.Paused && a.Mode == AiSalesMode.Shadow, ct);
+                if (!permitted) return;
+                var control = await _context.ConversationControls.AsNoTracking().SingleOrDefaultAsync(c => c.ConversationId == conversationId, ct);
+                if (control?.Controller != ConversationControllerMode.Intake) return;
+            }
 
             var settings = await _context.LeadFormSettings.AsNoTracking().FirstOrDefaultAsync(ct) ?? new LeadFormSetting();
             var history = await _context.WhatsAppMessages.AsNoTracking()
@@ -138,10 +149,15 @@ namespace RecruitmentSaaS.Services
             var asked = IntakeScript.IsQuestion(norm);
             string reply;
 
+            if (conversation.IntakeName != null && conversation.IntakeAge != null && conversation.IntakeJob != null)
+            {
+                await CompleteAsync(conversation, settings, ct);
+                return;
+            }
             if (isFirstReply)
             {
                 // Their first message is usually "السلام عليكم" or a question — greet, then ask the name
-                reply = greeting + "\n\n" + AiMessages.Get(settings, AiMessages.AskName);
+                reply = greeting + "\n\n" + AiMessages.Get(settings, conversation.IntakeName == null ? AiMessages.AskName : conversation.IntakeAge == null ? AiMessages.AskAge : AiMessages.AskJob);
             }
             else
             {
@@ -206,7 +222,9 @@ namespace RecruitmentSaaS.Services
 
             // Already a lead with this phone (e.g. registered on the site meanwhile): attach to it
             var variants = PhoneNumbers.StoredVariants(phone);
-            var lead = await _context.Leads.FirstOrDefaultAsync(l => variants.Contains(l.Phone), ct);
+            var lead = conversation.LeadId != null
+                ? await _context.Leads.SingleOrDefaultAsync(l => l.Id == conversation.LeadId, ct)
+                : await _context.Leads.FirstOrDefaultAsync(l => variants.Contains(l.Phone), ct);
             if (lead == null)
             {
                 var branchId = await _context.Branches.Where(b => b.IsActive).OrderBy(b => b.Name).Select(b => (Guid?)b.Id).FirstOrDefaultAsync(ct);
@@ -235,6 +253,16 @@ namespace RecruitmentSaaS.Services
             }
             conversation.LeadId = lead.Id;
 
+            if (lead.AssignedAiSalesAgentId != null)
+            {
+                conversation.IntakeStatus = (byte)IntakeStatus.Completed;
+                lead.Age ??= conversation.IntakeAge;
+                lead.InterestedJobTitle ??= conversation.IntakeJob;
+                await _controls.CompleteIntakeLockedAsync(conversation, ct);
+                await _context.SaveChangesAsync(ct);
+                return; // Phase 1 records the handoff; it never sends an AI sales reply.
+            }
+            await using var assignmentTransaction = await _context.Database.BeginTransactionAsync(ct);
             var threshold = settings.SeniorAgeThreshold == 0 ? (byte)45 : settings.SeniorAgeThreshold;
             var atOrAboveAge = conversation.IntakeAge != null && conversation.IntakeAge >= threshold;
             var toRotation = lead.AssignedSalesId == null
@@ -272,6 +300,7 @@ namespace RecruitmentSaaS.Services
                 });
                 await _context.SaveChangesAsync(ct);
 
+                await assignmentTransaction.CommitAsync(ct);
                 await SendAsync(conversation, AiMessages.Get(settings, AiMessages.DoneAssigned, conversation.IntakeName, agent.DisplayNameAr), ct);
 
                 await NotifyAsync(agent.Id, "عميل جديد من واتساب (المساعد الآلي)",
@@ -283,6 +312,7 @@ namespace RecruitmentSaaS.Services
                 // Under the age (or no salesperson available): waits with the team leader, like the form
                 conversation.PendingTeamManagerId = team;
                 await _context.SaveChangesAsync(ct);
+                await assignmentTransaction.CommitAsync(ct);
                 await SendAsync(conversation, AiMessages.Get(settings, AiMessages.DoneWaiting, conversation.IntakeName), ct);
                 await NotifyTeamLeaderAsync(team, "عميل جديد من واتساب في انتظار التعيين",
                     $"{lead.FullName} — السن {conversation.IntakeAge?.ToString() ?? "؟"} — {conversation.IntakeJob ?? ""}", conversation.Id, ct);
@@ -294,6 +324,7 @@ namespace RecruitmentSaaS.Services
         public async Task HandOffAsync(WhatsAppConversation conversation, string reason, CancellationToken ct)
         {
             var team = await TeamOfAccountAsync(conversation.WhatsAppAccount, ct);
+            await _controls.TakeOverLockedAsync(conversation, null, reason, ct);
             conversation.IntakeStatus = (byte)IntakeStatus.HandedOff;
             conversation.IntakeHandoffReason = reason;
             conversation.PendingTeamManagerId = team;
@@ -385,6 +416,10 @@ namespace RecruitmentSaaS.Services
                 var quietSince = c.IntakeLastCustomerAt ?? c.IntakeStartedAt ?? now;
                 try
                 {
+                    await using var gate = await ConversationLock.AcquireAsync(_context, "conversation:" + c.Id, ct);
+                    await _context.Entry(c).ReloadAsync(ct);
+                    if (c.IntakeStatus != (byte)IntakeStatus.Collecting) continue;
+                    quietSince = c.IntakeLastCustomerAt ?? c.IntakeStartedAt ?? now;
                     if (c.IntakeAge != null && now - quietSince >= afterAge)
                         await CompleteAsync(c, settings, ct);
                     else if (c.IntakeAge == null && now - quietSince >= noAge)
@@ -398,98 +433,6 @@ namespace RecruitmentSaaS.Services
         }
     }
 
-    /// <summary>
-    /// Queue between the webhook and the assistant: waits a few seconds after a customer's last message
-    /// (people send several in a row) and answers each chat one turn at a time. Also runs the timeouts.
-    /// </summary>
-    public class AiIntakeQueue
-    {
-        private readonly Channel<Guid> _channel = Channel.CreateUnbounded<Guid>();
-        public readonly ConcurrentDictionary<Guid, DateTime> LastMessageAt = new();
-
-        public void Enqueue(Guid conversationId)
-        {
-            LastMessageAt[conversationId] = DateTime.UtcNow;
-            _channel.Writer.TryWrite(conversationId);
-        }
-
-        public ChannelReader<Guid> Reader => _channel.Reader;
-    }
-
-    public class AiIntakeWorker : BackgroundService
-    {
-        private static readonly TimeSpan Debounce = TimeSpan.FromSeconds(4);
-        private readonly AiIntakeQueue _queue;
-        private readonly IServiceScopeFactory _scopeFactory;
-        private readonly ILogger<AiIntakeWorker> _logger;
-        private readonly ConcurrentDictionary<Guid, byte> _running = new();
-
-        public AiIntakeWorker(AiIntakeQueue queue, IServiceScopeFactory scopeFactory, ILogger<AiIntakeWorker> logger)
-        {
-            _queue = queue;
-            _scopeFactory = scopeFactory;
-            _logger = logger;
-        }
-
-        protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
-            Task.WhenAll(ConsumeAsync(stoppingToken), SweepLoopAsync(stoppingToken));
-
-        private async Task ConsumeAsync(CancellationToken ct)
-        {
-            await foreach (var id in _queue.Reader.ReadAllAsync(ct))
-            {
-                if (!_running.TryAdd(id, 0)) continue;   // that chat is already being answered; its latest message is in the batch
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        // Wait until the customer has been quiet for a moment
-                        while (_queue.LastMessageAt.TryGetValue(id, out var last) && DateTime.UtcNow - last < Debounce)
-                            await Task.Delay(1000, ct);
-                        using var scope = _scopeFactory.CreateScope();
-                        await scope.ServiceProvider.GetRequiredService<AiIntakeService>().ReplyAsync(id, ct);
-                    }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        _logger.LogError(ex, "AI assistant turn failed for {ConversationId}", id);
-                    }
-                    finally
-                    {
-                        _running.TryRemove(id, out _);
-                        // A message that arrived while we were answering gets its own turn
-                        if (_queue.LastMessageAt.TryGetValue(id, out var last) && DateTime.UtcNow - last < TimeSpan.FromSeconds(30))
-                        {
-                            using var scope = _scopeFactory.CreateScope();
-                            var db = scope.ServiceProvider.GetRequiredService<RecruitmentCrmContext>();
-                            var unanswered = await db.WhatsAppMessages.AsNoTracking()
-                                .Where(m => m.ConversationId == id)
-                                .OrderByDescending(m => m.WhatsAppTimestamp).ThenByDescending(m => m.CreatedAt)
-                                .Select(m => m.Direction).FirstOrDefaultAsync();
-                            if (unanswered == (byte)MessageDirection.Incoming) _queue.Enqueue(id);
-                        }
-                    }
-                }, ct);
-            }
-        }
-
-        private async Task SweepLoopAsync(CancellationToken ct)
-        {
-            await Task.Delay(TimeSpan.FromMinutes(1), ct);
-            while (!ct.IsCancellationRequested)
-            {
-                try
-                {
-                    using var scope = _scopeFactory.CreateScope();
-                    await scope.ServiceProvider.GetRequiredService<AiIntakeService>().SweepTimeoutsAsync(ct);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _logger.LogError(ex, "AI assistant timeout sweep failed");
-                }
-                await Task.Delay(TimeSpan.FromMinutes(5), ct);
-            }
-        }
-    }
 }
 
 namespace RecruitmentSaaS.Services

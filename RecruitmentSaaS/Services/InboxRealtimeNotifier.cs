@@ -49,6 +49,7 @@ namespace RecruitmentSaaS.Services
                 message.WhatsAppTimestamp,
                 message.CreatedAt,
                 message.SenderUserId,
+                message.SenderAiSalesAgentId,
                 SenderUserName = senderUserName ?? message.SenderUser?.FullName
             };
 
@@ -58,8 +59,7 @@ namespace RecruitmentSaaS.Services
         public async Task MessageStatusUpdatedAsync(Guid messageId, Guid conversationId, byte status, string? errorMessage)
         {
             var payload = new { messageId, conversationId, status, errorMessage };
-            await _hub.Clients.Group($"wa-conversation-{conversationId}").SendAsync("MessageStatusUpdated", payload);
-            await _hub.Clients.Group("org-all").SendAsync("MessageStatusUpdated", payload);
+            await BroadcastAsync("MessageStatusUpdated", conversationId, null, payload);
         }
 
         public async Task ConversationUpdatedAsync(Guid conversationId, Guid whatsAppAccountId, Guid? assignedAgentId)
@@ -72,13 +72,10 @@ namespace RecruitmentSaaS.Services
         {
             var payload = new { conversationId, whatsAppAccountId, previousAgentId, newAgentId };
 
-            await _hub.Clients.Group("org-all").SendAsync("ConversationAssigned", payload);
-
+            await BroadcastAsync("ConversationAssigned", conversationId, newAgentId, payload);
             if (previousAgentId.HasValue)
-                await _hub.Clients.Group($"user-{previousAgentId}").SendAsync("ConversationAssigned", payload);
+                await _hub.Clients.User(previousAgentId.Value.ToString()).SendAsync("ConversationAssigned", payload);
 
-            if (newAgentId.HasValue)
-                await _hub.Clients.Group($"user-{newAgentId}").SendAsync("ConversationAssigned", payload);
         }
 
         public async Task UnreadCountUpdatedAsync(Guid conversationId, Guid whatsAppAccountId, int unreadCount, Guid? assignedAgentId)
@@ -91,32 +88,18 @@ namespace RecruitmentSaaS.Services
         // "team-waiting-{leaderId}" = that team's leader + TeleSales manager.
         private async Task BroadcastAsync(string eventName, Guid conversationId, Guid? assignedAgentId, object payload)
         {
-            await _hub.Clients.Group($"wa-conversation-{conversationId}").SendAsync(eventName, payload);
-
-            if (assignedAgentId.HasValue)
-            {
-                await _hub.Clients.Group("org-all").SendAsync(eventName, payload);
-                await _hub.Clients.Group($"user-{assignedAgentId}").SendAsync(eventName, payload);
-                return;
-            }
-
-            // Unassigned: a chat waiting with a team (its member was deactivated) goes only to admin and
-            // that team; other team leaders must not get it. A chat that never had anyone stays org-wide.
-            var waitingTeam = await _context.WhatsAppConversations.AsNoTracking()
-                .Where(c => c.Id == conversationId).Select(c => c.PendingTeamManagerId).FirstOrDefaultAsync();
-            if (waitingTeam == null)
-            {
-                await _hub.Clients.Group("org-all").SendAsync(eventName, payload);
-                // Not taken yet: the team whose number it came in on sees it too
-                var accountId = await _context.WhatsAppConversations.AsNoTracking()
-                    .Where(c => c.Id == conversationId).Select(c => c.WhatsAppAccountId).FirstOrDefaultAsync();
-                var numberTeam = await WhatsAppScope.TeamOfAccountAsync(_context, accountId);
-                if (numberTeam != null)
-                    await _hub.Clients.Group($"team-waiting-{numberTeam}").SendAsync(eventName, payload);
-                return;
-            }
-            await _hub.Clients.Group("org-admin").SendAsync(eventName, payload);
-            await _hub.Clients.Group($"team-waiting-{waitingTeam}").SendAsync(eventName, payload);
+            var chat = await _context.WhatsAppConversations.AsNoTracking().SingleOrDefaultAsync(c => c.Id == conversationId);
+            if (chat == null) return;
+            var ownerTeam = chat.AssignedSalesAgentId == null ? null : await _context.Users
+                .Where(u => u.Id == chat.AssignedSalesAgentId).Select(u => u.ManagerId).SingleOrDefaultAsync();
+            var team = chat.PendingTeamManagerId ?? ownerTeam;
+            if (team == null && chat.AssignedSalesAgentId == null && chat.AssignedAiSalesAgentId == null)
+                team = await WhatsAppScope.TeamOfAccountAsync(_context, chat.WhatsAppAccountId);
+            var recipients = await _context.Users.AsNoTracking().Where(u => u.IsActive &&
+                (u.Role == 1 || u.Id == chat.AssignedSalesAgentId ||
+                 (team != null && ((u.Role == 7 && u.Id == team) || (u.Role == 8 && u.ManagerId == team)))))
+                .Select(u => u.Id.ToString()).ToListAsync();
+            await _hub.Clients.Users(recipients).SendAsync(eventName, payload);
         }
     }
 }

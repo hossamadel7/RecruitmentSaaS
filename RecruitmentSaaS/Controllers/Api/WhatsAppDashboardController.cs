@@ -152,7 +152,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 .Select(h => new { h.ToStatus, h.ChangedById, h.LeadId, Owner = h.Lead.AssignedSalesId }).ToListAsync();
 
             // Right now
-            var waiting = await _context.WhatsAppConversations.AsNoTracking().Where(c => c.AssignedSalesAgentId == null)
+            var waiting = await _context.WhatsAppConversations.AsNoTracking().Where(c => c.AssignedSalesAgentId == null && c.AssignedAiSalesAgentId == null)
                 .Select(c => new { c.WhatsAppAccountId, c.PendingTeamManagerId }).ToListAsync();
             var unread = await _context.WhatsAppConversations.AsNoTracking().Where(c => c.UnreadCount > 0 && c.AssignedSalesAgentId != null)
                 .Select(c => new { Agent = c.AssignedSalesAgentId!.Value }).ToListAsync();

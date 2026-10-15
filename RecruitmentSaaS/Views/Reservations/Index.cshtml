@@ -10,6 +10,7 @@
     var days = ViewBag.Days as List<DateTime> ?? new();
     var rows = ViewBag.Rows as List<ReservationsController.AgentRow> ?? new();
     var appointments = ViewBag.Appointments as List<ReservationsController.Appointment> ?? new();
+    var aiBookings = ViewBag.AiBookings as List<ReservationsController.AiBookingRow> ?? new();
     int visits = ViewBag.Visits;
     bool isAdmin = ViewBag.IsAdmin;
     var teams = ViewBag.Teams as List<(Guid Id, string Name)> ?? new();
@@ -85,6 +86,21 @@
         </div>
     </form>
 
+    @if (aiBookings.Any())
+    {
+        <section class="card p-3 mb-3">
+            <h2 class="h5">استشارات المساعد الافتراضي — راجعها الموظف</h2>
+            <p>الحضور الموثق يحتاج سجل استقبال مطابقًا للفرع واليوم. غياب الدليل لا يعني أن العميل لم يحضر. تُعرض آخر 500 حجز ضمن فترة إنشاء الحجز المحددة.</p>
+            <div class="table-responsive"><table class="table table-sm">
+                <thead><tr><th>العميل</th><th>المساعد</th><th>الفرع</th><th>الوصول التقريبي بتوقيت القاهرة</th><th>الحالة / دليل الحضور</th></tr></thead>
+                <tbody>@foreach (var booking in aiBookings)
+                {
+                    <tr><td>@booking.LeadName</td><td>@booking.AgentName</td><td>@booking.BranchName</td><td>@booking.ArrivalLocal.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@(booking.VerifiedVisitId != null ? "حضور موثق بالاستقبال" : booking.Status == RecruitmentSaaS.Models.Entities.AiOfficeBookingStatus.Cancelled ? "ملغي" : "حجز محفوظ — الحضور غير موثق")</td></tr>
+                }</tbody>
+            </table></div>
+        </section>
+    }
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-3"><div class="card"><div class="card-body p-3"><div class="rv-stat" style="color:#2563eb">@todayTotal</div><div class="rv-stat-label">حجوزات النهارده</div></div></div></div>
         <div class="col-6 col-md-3"><div class="card"><div class="card-body p-3"><div class="rv-stat">@total</div><div class="rv-stat-label">الحجوزات</div></div></div></div>

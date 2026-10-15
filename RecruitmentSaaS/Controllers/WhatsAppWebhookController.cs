@@ -17,14 +17,14 @@ namespace RecruitmentSaaS.Controllers
     [AllowAnonymous]
     public class WhatsAppWebhookController : ControllerBase
     {
-        private readonly IWhatsAppWebhookProcessor _processor;
+        private readonly DurableWorkService _processor;
         private readonly IConfiguration _config;
         private readonly ILogger<WhatsAppWebhookController> _logger;
         private readonly string _verifyToken;
         private readonly string _appSecret;
 
         public WhatsAppWebhookController(
-            IWhatsAppWebhookProcessor processor,
+            DurableWorkService processor,
             IConfiguration config,
             ILogger<WhatsAppWebhookController> logger)
         {
@@ -56,6 +56,7 @@ namespace RecruitmentSaaS.Controllers
 
         // ── POST: Meta webhook notification (messages + status updates) ──────
         [HttpPost]
+        [RequestSizeLimit(1048576)]
         public async Task<IActionResult> Receive(CancellationToken ct)
         {
             string rawBody;
@@ -65,7 +66,7 @@ namespace RecruitmentSaaS.Controllers
             }
 
             if (string.IsNullOrWhiteSpace(rawBody))
-                return Ok(); // nothing to do, but still 200 — Meta will otherwise keep retrying
+                return BadRequest();
 
             if (!IsValidSignature(rawBody))
             {
@@ -73,27 +74,25 @@ namespace RecruitmentSaaS.Controllers
                 return Unauthorized();
             }
 
-            JObject payload;
             try
             {
-                payload = JObject.Parse(rawBody);
+                _ = JObject.Parse(rawBody);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "WhatsApp webhook: invalid JSON payload.");
-                // Meta will retry on non-2xx, and a malformed body will never parse — swallow it.
-                return Ok();
+                _logger.LogWarning("WhatsApp webhook: invalid JSON ({ErrorType}).", ex.GetType().Name);
+                return BadRequest();
             }
 
             try
             {
-                await _processor.ProcessAsync(payload, ct);
+                await _processor.AcceptWebhookAsync(rawBody, ct);
             }
             catch (Exception ex)
             {
-                // Never lose a message: log and still ack, since Meta redelivery + our own
-                // idempotency-by-WhatsAppMessageId means a retry after a real fix will heal this.
-                _logger.LogError(ex, "Error processing WhatsApp webhook payload.");
+                _logger.LogError("Webhook persistence failed ({ErrorType}); requesting provider retry", ex.GetType().Name);
+                return StatusCode(503);
+
             }
 
             return Ok();
@@ -103,8 +102,8 @@ namespace RecruitmentSaaS.Controllers
         {
             if (string.IsNullOrWhiteSpace(_appSecret))
             {
-                _logger.LogWarning("WhatsApp:AppSecret is not configured — skipping webhook signature validation.");
-                return true;
+                _logger.LogWarning("WhatsApp:AppSecret is not configured — rejecting webhook until configured.");
+                return false;
             }
 
             var signatureHeader = Request.Headers["X-Hub-Signature-256"].ToString();

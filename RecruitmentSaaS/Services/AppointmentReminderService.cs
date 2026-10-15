@@ -28,13 +28,13 @@ namespace RecruitmentSaaS.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 // Calculate time until next 9:00 AM
-                var now = DateTime.Now;
+                var now = EgyptTime.FromUtc(DateTime.UtcNow);
                 var nextRun = now.Date.AddDays(1).AddHours(9);
-                var delay = nextRun - now;
+                var delay = EgyptTime.ToUtc(nextRun) - DateTime.UtcNow;
 
                 // If it's before 9 AM today, run today at 9 AM
                 if (now.Hour < 9)
-                    delay = now.Date.AddHours(9) - now;
+                    delay = EgyptTime.ToUtc(now.Date.AddHours(9)) - DateTime.UtcNow;
 
                 _logger.LogInformation("Next reminder run at: {NextRun}", nextRun);
 
@@ -60,8 +60,8 @@ namespace RecruitmentSaaS.Services
             var context = scope.ServiceProvider.GetRequiredService<RecruitmentCrmContext>();
             var notificationSvc = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
-            var tomorrow = DateTime.Today.AddDays(1);
-            var today = DateTime.Today;
+            var tomorrow = EgyptTime.Today.AddDays(1);
+            var today = EgyptTime.Today;
 
             // ── 1. Appointments tomorrow (Status = 5) ──────────────────────
             var tomorrowAppointments = await context.Leads

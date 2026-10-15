@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="OwnerPilotControl/**/*.cs" />
+    <Compile Remove="BrowserHost/**" />
+    <Compile Remove="ReplayRunner/**" />
+    <Compile Remove="RealModelRunner/**" />
+    <Content Remove="BrowserHost/**" />
+    <Content Remove="ReplayRunner/**" />
+    <Content Remove="RealModelRunner/**" />
+    <None Remove="BrowserHost/**" />
+    <None Remove="ReplayRunner/**" />
+    <None Remove="RealModelRunner/**" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2"><PrivateAssets>all</PrivateAssets></PackageReference>
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="8.0.11" />
+    <ProjectReference Include="../RecruitmentSaaS.csproj" />
+  </ItemGroup>
+</Project>

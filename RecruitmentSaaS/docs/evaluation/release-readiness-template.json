@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "purpose": "Human-owned evidence worksheet for a supervised manual-assignment Shadow pilot. Not a configuration file, import payload, or approval mechanism.",
+  "targetStage": "supervised_manual_assignment_shadow_pilot",
+  "tenantReference": null,
+  "accountAndTeamReference": null,
+  "businessOwner": null,
+  "releaseReviewer": null,
+  "approvedAt": null,
+  "approved": false,
+  "realModelEvaluationCompleted": false,
+  "automaticDispatchImplemented": false,
+  "weightedAiRotationImplemented": false,
+  "proposedQualityThresholds": {
+    "criticalViolationsAllowed": 0,
+    "eligibleScenarioCoveragePercent": 90,
+    "medianDimensionScore": 4,
+    "modelBackedRepeats": 3,
+    "businessAcceptedTheseThresholds": null
+  },
+  "operatorAcceptedLimits": {
+    "maxProviderLatencyP95Milliseconds": null,
+    "maxFailureRatePercent": null,
+    "maxDailySpend": null,
+    "spendCurrency": null,
+    "maxPilotAssignments": null,
+    "reviewerAvailability": null
+  },
+  "evidence": [
+    { "id": "verified_company_facts_and_office_hours", "reference": null, "reviewer": null, "reviewedAt": null, "passed": null },
+    { "id": "privacy_external_processing_and_retention", "reference": null, "reviewer": null, "reviewedAt": null, "passed": null },
+    { "id": "real_model_replay_and_human_semantic_scores", "reference": null, "reviewer": null, "reviewedAt": null, "passed": null },
+    { "id": "representative_authorized_audio_accuracy", "reference": null, "reviewer": null, "reviewedAt": null, "passed": null },
+    { "id": "staging_schema_migration_backup_and_restore", "reference": null, "reviewer": null, "reviewedAt": null, "passed": null },
+    { "id": "webhook_worker_takeover_and_paid_retry_recovery", "reference": null, "reviewer": null, "reviewedAt": null, "passed": null },
+    { "id": "representative_sustained_load_and_monitoring", "reference": null, "reviewer": null, "reviewedAt": null, "passed": null },
+    { "id": "manual_pilot_process_and_stop_conditions", "reference": null, "reviewer": null, "reviewedAt": null, "passed": null },
+    { "id": "booking_reminder_reception_and_legacy_edit_reconciliation", "reference": null, "reviewer": null, "reviewedAt": null, "passed": null }
+  ],
+  "notes": "Keep missing evidence unknown. Do not insert secrets, unredacted conversations, or synthetic facts as actual company information. Local structural results do not establish sales quality, live acoustic accuracy, customer consent, or production capacity."
+}

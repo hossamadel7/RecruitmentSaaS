@@ -1,0 +1,48 @@
+@{
+    ViewData["Title"] = "مساعد المبيعات";
+}
+@Html.AntiForgeryToken()
+<div id="ai-sales-page" class="container py-3" dir="rtl" style="max-width:960px">
+    <h1 class="h3 mb-2">مساعد المبيعات</h1>
+    <p class="text-muted">اختار العميل، عيّنه للمساعد، وراجع الرد المقترح.</p>
+    <p id="ai-status" role="status" aria-live="polite"></p>
+    <section class="card p-3 mb-3">
+        <h2 class="h5 mb-3">العميل</h2>
+        <form id="search-form" class="row g-2 mb-3">
+            <div class="col-md-4"><label for="search-account" class="form-label">رقم واتساب</label><select id="search-account" class="form-select"><option value="">كل العملاء</option></select></div>
+            <div class="col-md-6"><label for="search" class="form-label">بحث عن عميل</label><input id="search" class="form-control" placeholder="الاسم أو الهاتف أو كود العميل" maxlength="100" /></div>
+            <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary w-100">بحث</button></div>
+        </form>
+        <label for="chat-select" class="form-label">العميل والمحادثة</label>
+        <select id="chat-select" class="form-select mb-3"></select>
+        <label for="agent-select" class="form-label">المساعد</label>
+        <select id="agent-select" class="form-select mb-2"><option value="">اختار المساعد</option></select>
+        <p id="agent-state" class="small text-muted mb-2"></p>
+        <p id="control-state" class="mb-3"></p>
+        <details class="mb-3"><summary class="small">إضافة ملاحظة</summary><label for="reason" class="form-label mt-2">ملاحظة الإجراء (اختياري)</label><input id="reason" class="form-control" maxlength="500" /></details>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-primary" data-action="assign">تعيين للمساعد</button>
+            <a id="open-chat" class="btn btn-outline-primary">فتح المحادثة</a>
+        </div>
+        <details class="mt-3"><summary>إدارة المتابعة</summary>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="button" class="btn btn-outline-dark" data-action="takeover">استلام بشري</button>
+                <button type="button" class="btn btn-outline-primary" data-action="resume">استئناف المساعد</button>
+                <button type="button" class="btn btn-outline-danger" data-action="release">إعادة للموظف</button>
+            </div>
+        </details>
+    </section>
+    <section class="card p-3 mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h5 mb-0">الرد المقترح</h2>
+            <button id="generate-draft" type="button" class="btn btn-primary" disabled>اقتراح رد للمراجعة</button>
+        </div>
+        <p id="sending-status" class="small text-muted">راجع الرد قبل اعتماده.</p>
+        <p id="engine-status" role="status" aria-live="polite">اختار محادثة لعرض الرد.</p>
+        <div id="draft-list"></div>
+    </section>
+</div>
+@section Scripts {
+    <script src="~/js/ai-sales.js" asp-append-version="true"></script>
+    <script src="~/js/ai-sales-review.js" asp-append-version="true"></script>
+}
