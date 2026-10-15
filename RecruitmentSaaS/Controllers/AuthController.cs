@@ -24,6 +24,21 @@ namespace RecruitmentSaaS.Controllers
             return View();
         }
 
+        /// <summary>
+        /// Stored passwords are either plain text or "bcrypt:&lt;hash&gt;" (written by the password-hashing
+        /// build when a user signed in with it) — both must keep working.
+        /// </summary>
+        private static bool PasswordMatches(string? stored, string? supplied)
+        {
+            if (string.IsNullOrEmpty(stored) || supplied == null) return false;
+            if (stored.StartsWith("bcrypt:", StringComparison.Ordinal))
+            {
+                try { return BCrypt.Net.BCrypt.Verify(supplied, stored[7..]); }
+                catch (BCrypt.Net.SaltParseException) { return false; }
+            }
+            return stored == supplied;
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginDto dto)
@@ -34,7 +49,7 @@ namespace RecruitmentSaaS.Controllers
             var user = _context.Users
                 .FirstOrDefault(u => u.Email == dto.Email && u.IsActive == true);
 
-            if (user == null || user.PasswordHash != dto.Password)
+            if (user == null || !PasswordMatches(user.PasswordHash, dto.Password))
             {
                 ModelState.AddModelError("", "البريد الإلكتروني أو كلمة المرور غير صحيحة");
                 return View(dto);
