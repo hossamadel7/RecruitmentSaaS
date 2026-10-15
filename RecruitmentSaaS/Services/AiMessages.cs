@@ -6,7 +6,8 @@ namespace RecruitmentSaaS.Services
     /// <summary>
     /// Every message the WhatsApp assistant sends, editable from the "المساعد الآلي" page.
     /// Edited texts are stored in <see cref="LeadFormSetting.AiMessagesJson"/>; an empty box means the default below.
-    /// Placeholders: {الاسم} = customer's first name, {الموظف} = the TeleSales the chat went to.
+    /// Placeholder: {الموظف} = the TeleSales the chat went to. The customer is never called by name
+    /// (what they type as a name is often their job or a question): an old {الاسم} becomes "فندم".
     /// </summary>
     public static class AiMessages
     {
@@ -31,14 +32,14 @@ namespace RecruitmentSaaS.Services
         {
             new Definition(AskName, "سؤال الاسم (بعد أول رسالة)", "اسم حضرتك إيه؟ (الاسم ثلاثي لو سمحت)"),
             new Definition(AskNameAgain, "لو ما فهمش الاسم", "ممكن تكتبلي اسم حضرتك؟ 🙏"),
-            new Definition(AskAge, "سؤال السن", "تمام يا أ/ {الاسم} 🙏 حضرتك عندك كام سنة؟ (اكتب الرقم بس، مثال: 45)", "{الاسم} = الاسم الأول للعميل"),
+            new Definition(AskAge, "سؤال السن", "تمام يا فندم 🙏 حضرتك عندك كام سنة؟ (اكتب الرقم بس، مثال: 45)"),
             new Definition(AskAgeAgain, "لو ما فهمش السن", "معلش اكتبلي السن بالأرقام بس، مثال: 45"),
             new Definition(AskJob, "سؤال الوظيفة", "حضرتك عايز تشتغل إيه؟ (مثال: سواق، نجار، فني كهرباء)"),
             new Definition(AskJobAgain, "لو ما فهمش الوظيفة", "ممكن تكتبلي الوظيفة اللي حضرتك عايزها؟ (مثال: سواق، نجار)"),
             new Definition(ConsultantWillExplain, "لو العميل سأل سؤال (مرتب، فيزا، مصاريف…) قبل ما يخلص", "المستشار هيوضح لحضرتك كل التفاصيل بعد ما نخلص الأسئلة دي 🙏", "بيتبعت وبعده السؤال اللي عليه الدور"),
             new Definition(NoVoice, "لو بعت رسالة صوتية أو صورة", "معلش يا فندم 🙏 مش بقدر أسمع الرسايل الصوتية أو أشوف الصور — ممكن تكتبلي الرد كتابة؟"),
-            new Definition(DoneAssigned, "خلص واتوزع على تيلي سيلز (السن فوق الحد)", "شكراً يا أ/ {الاسم} 🙏 معاك أ/ {الموظف} هتكمل مع حضرتك دلوقتي.", "{الاسم} = اسم العميل، {الموظف} = اسم التيلي سيلز"),
-            new Definition(DoneWaiting, "خلص ومستني مسؤول الفريق (السن تحت الحد)", "شكراً يا أ/ {الاسم} 🙏 هيتواصل مع حضرتك مستشار من فريقنا قريب.", "{الاسم} = اسم العميل"),
+            new Definition(DoneAssigned, "خلص واتوزع على تيلي سيلز (السن فوق الحد)", "شكراً ليك 🙏 معاك أ/ {الموظف} هتكمل مع حضرتك دلوقتي.", "{الموظف} = اسم التيلي سيلز"),
+            new Definition(DoneWaiting, "خلص ومستني مسؤول الفريق (السن تحت الحد)", "شكراً ليك 🙏 هيتواصل مع حضرتك مستشار من فريقنا قريب."),
             new Definition(HandOff, "تحويل لمسؤول الفريق (طلب موظف، مش مهتم، رسايل صوتية…)", "تمام 🙏 هحول حضرتك لمسؤول الفريق وهيرد عليك في أقرب وقت."),
         };
 
@@ -52,14 +53,17 @@ namespace RecruitmentSaaS.Services
             catch (JsonException) { return new(); }
         }
 
-        /// <summary>The text to send, with {الاسم} / {الموظف} filled in.</summary>
-        public static string Get(LeadFormSetting? settings, string key, string? customerName = null, string? agentName = null)
+        // "أ/ {الاسم}", "أستاذ {الاسم}" or a bare {الاسم} in a text edited before names were dropped
+        private static readonly System.Text.RegularExpressions.Regex NameSlot =
+            new(@"(?:(?:[أاإ]\s*/|[أا]ستاذ|[أا]\.)\s*)?\{الاسم\}");
+
+        /// <summary>The text to send, with {الموظف} filled in. The customer's name is never used.</summary>
+        public static string Get(LeadFormSetting? settings, string key, string? agentName = null)
         {
             var text = Overrides(settings).TryGetValue(key, out var edited) && !string.IsNullOrWhiteSpace(edited)
                 ? edited
                 : ByKey[key].Default;
-            var name = string.IsNullOrWhiteSpace(customerName) ? "فندم" : customerName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
-            return text.Replace(NamePlaceholder, name).Replace(AgentPlaceholder, agentName ?? "");
+            return NameSlot.Replace(text, "فندم").Replace(AgentPlaceholder, agentName ?? "");
         }
 
         /// <summary>JSON of the edited texts to store (null when everything is the default).</summary>
