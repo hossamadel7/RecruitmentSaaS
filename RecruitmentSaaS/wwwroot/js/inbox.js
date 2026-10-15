@@ -692,17 +692,44 @@
     }
 
     // ── Composer ─────────────────────────────────────────────────────────────
+    // Empties the box. Android keyboards can put the text back right after (a word still being typed
+    // when send is pressed), and the agent then sends it a second time — so for a moment, a box that
+    // refills with the very same text is emptied again.
+    function clearComposer(input, sentText) {
+        input.value = '';
+        autoGrow(input);
+        updateComposerButton();
+        var until = Date.now() + 2500;
+        var guard = function () {
+            if (Date.now() > until) { input.removeEventListener('input', guard); input.removeEventListener('compositionend', guard); return; }
+            if (input.value.trim() === sentText) { input.value = ''; autoGrow(input); updateComposerButton(); }
+        };
+        input.addEventListener('input', guard);
+        input.addEventListener('compositionend', guard);
+        setTimeout(guard, 300);
+        setTimeout(guard, 2600);
+    }
+
     // Optimistic send: the bubble shows immediately with a clock icon and the box clears; it is
     // swapped for the saved message when the server (or its realtime event) confirms it.
     var pendingSeq = 0;
+    var lastSent = {};   // conversationId → { text, at }: the same text again within minutes is almost always by mistake
+    var RESEND_WINDOW_MS = 3 * 60 * 1000;
     async function sendMessage() {
         var input = document.getElementById('composer-input');
         var text = input.value.trim();
         var conversationId = state.selectedConversationId;
         if (!text || !conversationId) return;
 
-        input.value = '';
-        autoGrow(input);
+        var previous = lastSent[conversationId];
+        if (previous && previous.text === text && Date.now() - previous.at < RESEND_WINDOW_MS
+            && !confirm('الرسالة دي نفسها اتبعتت للعميل من شوية.\nتبعتها تاني؟')) {
+            clearComposer(input, text);
+            return;
+        }
+        lastSent[conversationId] = { text: text, at: Date.now() };
+
+        clearComposer(input, text);
         input.focus();
 
         var container = document.getElementById('chat-messages');
