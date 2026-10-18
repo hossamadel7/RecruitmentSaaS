@@ -567,7 +567,7 @@
     // Meta's error titles in plain Arabic for the team
     var KNOWN_FAILURES = {
         'message undeliverable': 'الرسالة ما وصلتش للعميل — ممكن يكون عمل بلوك للرقم، أو قفل/شال واتساب، أو الرقم مش عليه واتساب. كلّمه تليفون',
-        're-engagement message': 'لم تُرسل: العميل لسه ما ردش (واتساب بيسمح بالرسائل العادية بس خلال 24 ساعة من آخر رسالة منه)',
+        're-engagement message': 'لم تُرسل: عدّت 24 ساعة من آخر رسالة من العميل (واتساب بيسمح بالرسائل العادية بس خلال 24 ساعة من آخر رسالة منه) — ابعت رسالة جاهزة',
         'business eligibility payment issue': 'لم تُرسل: مشكلة في الدفع على حساب Meta'
     };
     function failureText(error) {
