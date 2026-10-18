@@ -61,7 +61,14 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
         {
             proposal = AiSalesReplyPolicy.Create(context);
             if (proposal == null && context.RecentMessages.Reverse().TakeWhile(m => m.Speaker == "customer").Any(m => m.Type is not ("Text" or "TranscribedAudio")))
-                proposal = new("ممكن توضح طلبك كتابة عشان نقدر نساعدك بدقة؟", "handoff", "Media has not been interpreted; human review required.", true, [], "local-policy");
+            {
+                var voiceOnly = context.RecentMessages.Reverse().TakeWhile(m => m.Speaker == "customer")
+                    .All(m => m.Type is "Text" or "TranscribedAudio" or "Audio");
+                proposal = voiceOnly
+                    ? new("ممكن توضح طلبك بالكتابة عشان نقدر نساعدك بدقة؟", "acknowledgement",
+                        "Audio awaits interpretation; request written clarification without a staff handoff.", false, [], "local-policy")
+                    : new("ممكن توضح طلبك كتابة عشان نقدر نساعدك بدقة؟", "handoff", "Media has not been interpreted; human review required.", true, [], "local-policy");
+            }
             else if (proposal == null && !context.Knowledge.Any(k => k.Kind == AiKnowledgeKind.Fact))
                 proposal = new("محتاجين نراجع المعلومة مع موظف قبل ما نأكد أي تفاصيل.", "handoff", "No currently approved facts for this account.", true, [], "local-policy");
             else if (proposal == null)
