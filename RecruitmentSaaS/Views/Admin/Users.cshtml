@@ -14,6 +14,7 @@
     bool anyFilter = !string.IsNullOrWhiteSpace(q) || role.HasValue || status != "active" || !string.IsNullOrEmpty(team);
     var managers = ViewBag.Managers as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
     var allTeleSales = ViewBag.AllTeleSales as List<RecruitmentSaaS.Models.Entities.User> ?? new List<RecruitmentSaaS.Models.Entities.User>();
+    var waitingOf = ViewBag.WaitingOf as Dictionary<Guid, int> ?? new Dictionary<Guid, int>();
 
     string[] roleNames = { "", "مدير", "استقبال", "تيلي سيلز", "محاسب", "عمليات", "مبيعات مكتبية", "مدير فريق", "مدير التيلي سيلز" };
     string[] roleColors = { "", "#dc2626", "#0ea5e9", "#8b5cf6", "#16a34a", "#f59e0b", "#6366f1", "#7c3aed", "#be185d" };
@@ -217,15 +218,34 @@
                             <td class="u-date"><span class="u-date-label">أُنشئ </span>@u.CreatedAt.ToString("dd/MM/yyyy")</td>
                             <td class="u-actions">
                                 <div class="d-flex gap-1 flex-wrap">
-                                    <form method="post" action="/Admin/ToggleUser" class="d-inline">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="userId" value="@u.Id" />
-                                        <button type="submit" class="btn btn-outline-secondary btn-sm"
-                                                title="@(u.IsActive ? "تعطيل" : "تفعيل")"
-                                                onclick="return confirm('@(u.IsActive ? "تعطيل المستخدم؟ محادثاته وعملاؤه هيتشالوا منه ويستنوا مدير الفريق يختار مين ياخدهم." : "هل أنت متأكد؟")')">
-                                            <i class="bi @(u.IsActive ? "bi-person-slash" : "bi-person-check")"></i>
+                                    @if (u.IsActive && (u.Role == 3 || u.Role == 8))
+                                    {
+                                        @* TeleSales: choose who takes their chats and clients *@
+                                        <button type="button" class="btn btn-outline-secondary btn-sm transfer-btn" title="تعطيل"
+                                                data-mode="deactivate" data-user-id="@u.Id" data-user-name="@u.FullName">
+                                            <i class="bi bi-person-slash"></i>
                                         </button>
-                                    </form>
+                                    }
+                                    else
+                                    {
+                                        <form method="post" action="/Admin/ToggleUser" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userId" value="@u.Id" />
+                                            <button type="submit" class="btn btn-outline-secondary btn-sm"
+                                                    title="@(u.IsActive ? "تعطيل" : "تفعيل")"
+                                                    onclick="return confirm('@(u.IsActive ? "تعطيل المستخدم؟ محادثاته وعملاؤه هيتشالوا منه ويستنوا مدير الفريق يختار مين ياخدهم." : "هل أنت متأكد؟")')">
+                                                <i class="bi @(u.IsActive ? "bi-person-slash" : "bi-person-check")"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                    @if (!u.IsActive && waitingOf.TryGetValue(u.Id, out var waitingCount))
+                                    {
+                                        <button type="button" class="btn btn-sm transfer-btn" title="نقل عملاءه لموظف تاني"
+                                                style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;font-size:.72rem;font-weight:700;"
+                                                data-mode="transfer" data-user-id="@u.Id" data-user-name="@u.FullName" data-count="@waitingCount">
+                                            <i class="bi bi-arrow-left-right"></i> نقل @waitingCount عميل
+                                        </button>
+                                    }
 
                                     <button class="btn btn-outline-secondary btn-sm edit-user-btn"
                                             title="تعديل الاسم والبريد"
@@ -585,8 +605,69 @@
     </div>
 </div>
 
+@* ── Deactivate a TeleSales / move a deactivated person's clients ───────── *@
+<div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" method="post" id="transferForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="userId" id="transferUserId" />
+            <div class="modal-header">
+                <h5 class="modal-title" id="transferTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body">
+                <div id="transferIntro" style="font-size:13px;color:var(--text-muted);margin-bottom:10px"></div>
+                <label class="form-label fw-semibold" for="transferTo">مين ياخد محادثاته وعملاءه؟</label>
+                <select class="form-select" name="transferTo" id="transferTo">
+                    <option value="" id="transferWaitOption">يفضلوا مستنيين مدير الفريق يوزعهم</option>
+                    @foreach (var grp in allTeleSales.Where(t => t.IsActive).GroupBy(t => t.Manager?.FullName ?? "بدون فريق").OrderBy(g => g.Key))
+                    {
+                        <optgroup label="@(grp.Key == "بدون فريق" ? grp.Key : "فريق " + grp.Key)">
+                            @foreach (var t in grp)
+                            {
+                                <option value="@t.Id">@t.FullName</option>
+                            }
+                        </optgroup>
+                    }
+                </select>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:8px">كل محادثاته وعملاءه (والمواعيد المحجوزة) بتروح للموظف ده مرة واحدة، وبيوصله إشعار.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
+                <button type="submit" class="btn btn-danger" id="transferSubmit"></button>
+            </div>
+        </form>
+    </div>
+</div>
+
 @section Scripts {
     <script>
+        // ── Deactivate a TeleSales (choose who takes their work) / move a deactivated person's clients ──
+        (function () {
+            var modalEl = document.getElementById('transferModal');
+            if (!modalEl) return;
+            var form = document.getElementById('transferForm'), select = document.getElementById('transferTo');
+            var waitOption = document.getElementById('transferWaitOption');
+            document.querySelectorAll('.transfer-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var deactivate = btn.dataset.mode === 'deactivate', name = btn.dataset.userName;
+                    document.getElementById('transferUserId').value = btn.dataset.userId;
+                    form.action = deactivate ? '/Admin/ToggleUser' : '/Admin/TransferReleasedWork';
+                    document.getElementById('transferTitle').textContent = deactivate ? 'تعطيل ' + name : 'نقل عملاء ' + name;
+                    document.getElementById('transferIntro').textContent = deactivate
+                        ? 'هيتسجل خروجه من النظام ومش هيقدر يدخل تاني.'
+                        : btn.dataset.count + ' عميل اتشالوا منه لما اتعطل ولسه مستنيين حد ياخدهم.';
+                    document.getElementById('transferSubmit').textContent = deactivate ? 'تعطيل' : 'نقل';
+                    document.getElementById('transferSubmit').className = 'btn ' + (deactivate ? 'btn-danger' : 'btn-primary');
+                    waitOption.hidden = !deactivate;     // moving needs a person
+                    select.required = !deactivate;
+                    select.value = '';
+                    Array.prototype.forEach.call(select.options, function (o) { o.disabled = o.value === btn.dataset.userId; });
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                });
+            });
+        })();
+
         // ── Team popup: search + group filter; reopen after add/remove ─────────
         document.querySelectorAll('.team-modal').forEach(function (modal) {
             var filter = 'all', term = '';

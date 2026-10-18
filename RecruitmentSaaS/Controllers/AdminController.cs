@@ -195,6 +195,17 @@ namespace RecruitmentSaaS.Controllers
             ViewBag.Managers = managers;
             ViewBag.AllTeleSales = allTeleSales;
 
+            // Deactivated TeleSales whose released clients still wait for someone
+            var waitingOf = new Dictionary<Guid, int>();
+            foreach (var off in users.Where(u => !u.IsActive && (u.Role == 3 || u.Role == 8)))
+            {
+                var note = ReleasedNote(off);
+                var n = await _context.Leads.CountAsync(l => !l.IsConverted && (l.AssignedSalesId == off.Id
+                    || (l.AssignedSalesId == null && _context.LeadActivities.Any(a => a.LeadId == l.Id && a.Description == note))));
+                if (n > 0) waitingOf[off.Id] = n;
+            }
+            ViewBag.WaitingOf = waitingOf;
+
             return View(users);
         }
 
@@ -278,7 +289,7 @@ namespace RecruitmentSaaS.Controllers
         // ── POST /Admin/ToggleUser ──────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ToggleUser(Guid userId)
+        public async Task<IActionResult> ToggleUser(Guid userId, Guid? transferTo = null)
         {
             var user = await _context.Users.FindAsync(userId);
             if (user == null)
@@ -291,6 +302,18 @@ namespace RecruitmentSaaS.Controllers
             {
                 TempData["Error"] = "لا يمكنك تعطيل حسابك الخاص";
                 return RedirectToAction("Users");
+            }
+
+            // Deactivating with "give everything to …": check that person before changing anything
+            User? target = null;
+            if (user.IsActive && transferTo != null)
+            {
+                target = await _context.Users.FirstOrDefaultAsync(u => u.Id == transferTo && u.IsActive && (u.Role == 3 || u.Role == 8));
+                if (target == null || target.Id == user.Id)
+                {
+                    TempData["Error"] = "الموظف اللي اخترته مش موجود أو مش نشط";
+                    return RedirectToAction("Users");
+                }
             }
 
             user.IsActive = !user.IsActive;
@@ -306,10 +329,118 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("Users");
             }
 
+            if (target != null)
+            {
+                var chatsOf = await _context.WhatsAppConversations.Where(c => c.AssignedSalesAgentId == user.Id).ToListAsync();
+                var leadsOf = user.Role == 3 || user.Role == 8
+                    ? await _context.Leads.Where(l => l.AssignedSalesId == user.Id && !l.IsConverted).ToListAsync()
+                    : new List<Lead>();
+                var accounts = await _context.WhatsAppAccounts.Where(a => a.AssignedSalesAgentId == user.Id).ToListAsync();
+                foreach (var account in accounts) account.AssignedSalesAgentId = null;   // new chats on a number must not keep going to them
+                var (movedChats, movedLeads) = await MoveWorkAsync(user, target, chatsOf, leadsOf, "بعد تعطيله");
+                TempData["Success"] = $"تم تعطيل {user.FullName} — تم تسجيل خروجه من النظام"
+                    + (movedChats + movedLeads > 0 ? $". اتنقل {movedChats} محادثة و {movedLeads} عميل لـ {target.FullName}" : "");
+                return RedirectToAction("Users");
+            }
+
             var (chats, leads) = await ReleaseWorkOfAsync(user);
             TempData["Success"] = $"تم تعطيل {user.FullName} — تم تسجيل خروجه من النظام"
                 + (chats + leads > 0 ? $". اتشال منه {chats} محادثة و {leads} عميل وفي انتظار التعيين من مدير الفريق" : "");
             return RedirectToAction("Users");
+        }
+
+        /// <summary>The note written on each lead when a deactivated person's clients were released to their team.</summary>
+        private static string ReleasedNote(User user) => $"تم إلغاء تعيين العميل بعد تعطيل {user.FullName} — في انتظار التعيين";
+
+        /// <summary>
+        /// Clients released when this (deactivated) person was switched off and still nobody's:
+        /// their leads plus those leads' chats, and anything still assigned to them.
+        /// </summary>
+        private async Task<(List<WhatsAppConversation> Chats, List<Lead> Leads)> ReleasedWorkOfAsync(User user)
+        {
+            var note = ReleasedNote(user);
+            var leads = await _context.Leads
+                .Where(l => !l.IsConverted && (l.AssignedSalesId == user.Id
+                    || (l.AssignedSalesId == null && _context.LeadActivities.Any(a => a.LeadId == l.Id && a.Description == note))))
+                .ToListAsync();
+            var leadIds = leads.Select(l => l.Id).ToList();
+            var chats = await _context.WhatsAppConversations
+                .Where(c => c.AssignedSalesAgentId == user.Id
+                    || (c.AssignedSalesAgentId == null && c.LeadId != null && leadIds.Contains(c.LeadId.Value)))
+                .ToListAsync();
+            return (chats, leads);
+        }
+
+        // ── POST /Admin/TransferReleasedWork — a deactivated person's waiting clients → another TeleSales ──
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> TransferReleasedWork(Guid userId, Guid transferTo)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            var target = await _context.Users.FirstOrDefaultAsync(u => u.Id == transferTo && u.IsActive && (u.Role == 3 || u.Role == 8));
+            if (user == null || target == null || user.Id == target.Id)
+            {
+                TempData["Error"] = "اختار موظف نشط تاني";
+                return RedirectToAction("Users", new { status = "inactive" });
+            }
+            if (user.IsActive)
+            {
+                TempData["Error"] = $"{user.FullName} لسه نشط — عطّله الأول أو انقل عملاءه من صفحة العملاء";
+                return RedirectToAction("Users");
+            }
+
+            var (chatsOf, leadsOf) = await ReleasedWorkOfAsync(user);
+            var (chats, leads) = await MoveWorkAsync(user, target, chatsOf, leadsOf, "بعد تعطيله");
+            TempData["Success"] = chats + leads > 0
+                ? $"اتنقل {chats} محادثة و {leads} عميل من {user.FullName} لـ {target.FullName}"
+                : $"مفيش عملاء أو محادثات من {user.FullName} مستنية تعيين";
+            return RedirectToAction("Users", new { status = "inactive" });
+        }
+
+        /// <summary>Gives chats and leads to <paramref name="target"/>, notes it on each lead and tells them.</summary>
+        private async Task<(int Chats, int Leads)> MoveWorkAsync(User from, User target, List<WhatsAppConversation> chats, List<Lead> leads, string why)
+        {
+            var now = DateTime.UtcNow;
+            var previous = chats.ToDictionary(c => c.Id, c => c.AssignedSalesAgentId);
+            foreach (var chat in chats)
+            {
+                chat.AssignedSalesAgentId = target.Id;
+                chat.PendingTeamManagerId = null;
+                chat.UpdatedAt = now;
+            }
+            foreach (var lead in leads)
+            {
+                lead.AssignedSalesId = target.Id;
+                lead.TeamManagerId = target.ManagerId ?? lead.TeamManagerId;
+                lead.UpdatedAt = now;
+                _context.LeadActivities.Add(new LeadActivity
+                {
+                    Id = Guid.NewGuid(),
+                    LeadId = lead.Id,
+                    ActivityType = 8,
+                    Description = $"تم نقل العميل من {from.FullName} لـ {target.FullName} ({why})",
+                    CreatedById = CurrentUserId,
+                    CreatedByName = User.FindFirstValue(ClaimTypes.Name),
+                    ActorType = 1,
+                    CreatedAt = now
+                });
+            }
+            await _context.SaveChangesAsync();
+
+            var notifier = HttpContext.RequestServices.GetRequiredService<RecruitmentSaaS.Services.IInboxRealtimeNotifier>();
+            foreach (var chat in chats)
+                await notifier.ConversationAssignedAsync(chat.Id, chat.WhatsAppAccountId, previous[chat.Id], target.Id);
+
+            if (chats.Count + leads.Count > 0)
+            {
+                try
+                {
+                    await _notifications.SendAsync(target.Id, $"اتنقلك عملاء {from.FullName}",
+                        $"{chats.Count} محادثة و {leads.Count} عميل بقوا معاك", link: "/Inbox/Index");
+                }
+                catch { /* the move is saved; a failed notification must not undo it */ }
+            }
+            return (chats.Count, leads.Count);
         }
 
         /// <summary>
@@ -348,7 +479,7 @@ namespace RecruitmentSaaS.Controllers
                         Id = Guid.NewGuid(),
                         LeadId = lead.Id,
                         ActivityType = 8,
-                        Description = $"تم إلغاء تعيين العميل بعد تعطيل {user.FullName} — في انتظار التعيين",
+                        Description = ReleasedNote(user),
                         CreatedById = CurrentUserId,
                         CreatedByName = User.FindFirstValue(ClaimTypes.Name),
                         ActorType = 1,
