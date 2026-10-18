@@ -35,6 +35,50 @@ public sealed partial class FoundationTests
 
 public sealed class ReplyPolicyTests
 {
+    private static AiSalesContext Followup(string question, AiContextFact[]? facts = null) => new(
+        new(null, null, null, null, null, "", 0),
+        [new(Guid.NewGuid(), "customer", "Text", "حابب أجي السبت", DateTime.UtcNow.AddMinutes(-2)),
+         new(Guid.NewGuid(), "staff_or_script", "Text", "الرسوم 35000 جنيه في مصر", DateTime.UtcNow.AddMinutes(-1)),
+         new(Guid.NewGuid(), "customer", "Text", question, DateTime.UtcNow)], facts ?? []);
+
+    [Theory]
+    [InlineData("هفكر")]
+    [InlineData("هفكر وأرد عليك")]
+    [InlineData("محتاج وقت أفكر")]
+    public void Thinking_gets_short_acknowledgement_without_offer_or_invitation(string text)
+    {
+        var reply = AiSalesReplyPolicy.Create(Followup(text))!;
+        Assert.Equal("acknowledgement", reply.Intent);
+        Assert.False(reply.NeedsHuman);
+        Assert.Empty(reply.SourceIds);
+        Assert.Contains("خد وقتك", reply.Reply);
+        Assert.DoesNotContain("المكتب", reply.Reply);
+        Assert.DoesNotContain("650", reply.Reply);
+    }
+
+    [Theory]
+    [InlineData("هفكر بس السكن عليكم؟")]
+    [InlineData("مش غالي، بس هدفع امتى؟")]
+    [InlineData("المرتب كام؟")]
+    public void Mixed_questions_are_not_swallowed_by_acknowledgement(string text)
+        => Assert.Null(AiSalesReplyPolicy.Create(Followup(text)));
+
+    [Theory]
+    [InlineData(0, false, true)]
+    [InlineData(1, false, false)]
+    [InlineData(0, true, false)]
+    public void Price_objection_uses_only_current_fact_discount_policy(int kind, bool expired, bool supported)
+    {
+        var fact = new AiContextFact(Guid.NewGuid(), 1, (AiKnowledgeKind)kind, "رسوم",
+            "الخصم يمكن طلبه من الإدارة، ولا تؤكد خصمًا قبل اعتماده.", DateTime.UtcNow.AddDays(expired ? -1 : 1));
+        var reply = AiSalesReplyPolicy.Create(Followup("بس 35000 كتير أوي", [fact]))!;
+        Assert.False(reply.NeedsHuman);
+        Assert.DoesNotContain("650", reply.Reply);
+        Assert.DoesNotContain("السبت", reply.Reply);
+        Assert.Equal(supported ? new[] { fact.Id } : [], reply.SourceIds);
+        Assert.Equal(supported, reply.Reply.Contains("الخصم مش مؤكد"));
+    }
+
     [Theory]
     [InlineData(0, false, "المكتب مفتوح الخميس، والجمعة مغلق.", true)]
     [InlineData(1, false, "المكتب مفتوح الخميس، والجمعة مغلق.", false)]

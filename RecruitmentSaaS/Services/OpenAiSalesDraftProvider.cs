@@ -19,7 +19,7 @@ public interface IAiSalesDraftProvider
 /// <summary>One bounded stateless request. No provider retries, uploads, tools, or transport sends.</summary>
 public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEngineOptions> options) : IAiSalesDraftProvider
 {
-    public const string PromptVersion = "egyptian-sales-draft-v7-reviewed-routing";
+    public const string PromptVersion = "egyptian-sales-draft-v8-conversation-followup";
     // The nested JSON is model-visible text: preserve Arabic rather than forcing it to decode \u sequences.
     private static readonly JsonSerializerOptions ContextJsonOptions = new() { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) };
     public const string Instructions = """
@@ -30,7 +30,21 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         virtual-assistant introduction or Turkey scope at the start of each reply. If the customer explicitly asks
         who you are or whether you are AI, answer honestly even in an ongoing conversation, without a new welcome.
         Turkey-only is the assistant's current scope, not proof that the company has no other-country offers.
-        Answer the customer's current question first, in two to four short sentences. Do not add unrelated facts.
+        Respond to the customer's LAST conversational act, using RecentMessages as chronological context.
+        Knowledge is a reference library, NOT a checklist to summarize. One or two short sentences are usually enough.
+        A price objection ("بس 35000 كتير أوي", "غالي", "مش معايا المبلغ") is NOT a request for salary,
+        office hours, address or a repeat of the fee schedule. Acknowledge the cost concern first. Mention a free
+        consultation or possible management discount review only if explicitly supported by a current FACT;
+        never promise a discount, instalments or a lower price. Ask at most one relevant question if needed.
+        "هفكر", "هفكر وأرد عليك", "محتاج وقت" mean the customer wants time. Briefly accept without pressure,
+        repeating the offer, adding professions or a visit invitation. Do not treat this as a stop-contact request.
+        Example acknowledgement: "تمام يا فندم، خد وقتك. لو احتجت توضيح أي نقطة أنا معاك."
+        If the same message also asks a question ("هفكر بس السكن عليكم؟"), answer that question briefly as well.
+        If the customer already selected Saturday, retain that preference; do not ask again which day or whether
+        they want to visit. A preference is not a confirmed booking. Do not copy irrelevant content from earlier replies.
+        Use intent acknowledgement with empty sourceIds for a purely social acknowledgement without business claims.
+        Use intent answer and cite relevant FACT IDs when making business claims, including discount-review policies.
+        Answer the customer's current question first. Do not add unrelated facts.
         Copy addresses and document requirements accurately; do not paraphrase them into different requirements.
         Never promise a visa, employment, salary, fee, contract or vacancy without a currently approved FACT.
         Use FACTS only for business claims, and cite their exact IDs in sourceIds. PLAYBOOK examples are style only;
@@ -72,7 +86,7 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
     private const string Schema = """
         {"type":"object","properties":{
           "reply":{"type":"string"},
-          "intent":{"type":"string","enum":["answer","qualification","consultation","handoff","stop"]},
+          "intent":{"type":"string","enum":["answer","acknowledgement","qualification","consultation","handoff","stop"]},
           "reviewNote":{"type":"string"},"needsHuman":{"type":"boolean"},
           "sourceIds":{"type":"array","items":{"type":"string"}}
         },"required":["reply","intent","reviewNote","needsHuman","sourceIds"],"additionalProperties":false}
@@ -93,7 +107,8 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         var isFirstReply = !context.RecentMessages.Any(m => m.Speaker is "staff_or_script" or "staff" or "assistant" or "ai")
             && context.Customer.MemoryVersion == 0 && string.IsNullOrWhiteSpace(context.Customer.ReviewedSummary);
         var modelContext = new { context.Customer, context.RecentMessages, context.Knowledge,
-            ConversationState = new { IsFirstReply = isFirstReply } };
+            ConversationState = new { IsFirstReply = isFirstReply,
+                LatestCustomerMessage = context.RecentMessages.LastOrDefault(m => m.Speaker == "customer")?.Text } };
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/responses");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", o.ApiKey);
         request.Content = JsonContent.Create(new

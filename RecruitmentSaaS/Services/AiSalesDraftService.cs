@@ -154,7 +154,7 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
     private static void ValidateProposal(AiDraftProposal p, AiSalesContext context)
     {
         if (string.IsNullOrWhiteSpace(p.Reply) || p.Reply.Length > 3000 || p.ReviewNote == null || p.ReviewNote.Length > 500 || p.Model.Length > 100 ||
-            p.Intent is not ("answer" or "qualification" or "consultation" or "handoff" or "stop") || p.SourceIds.Length > 6)
+            p.Intent is not ("answer" or "acknowledgement" or "qualification" or "consultation" or "handoff" or "stop") || p.SourceIds.Length > 6)
             throw new AiSalesProviderException("InvalidDraft");
         var facts = context.Knowledge.Where(k => k.Kind == AiKnowledgeKind.Fact).Select(k => k.Id).ToHashSet();
         if (p.SourceIds.Any(id => !facts.Contains(id))) throw new AiSalesProviderException("UnapprovedCitation");

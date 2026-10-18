@@ -52,7 +52,7 @@ public sealed class AiSalesDispatchService(RecruitmentCrmContext db, AiSalesCont
 
     private async Task<bool> EligibleAsync(AiSalesDraft d, CancellationToken ct) =>
         d.Status == AiDraftStatus.Reviewed && d.ReviewedById != null && d.ReviewedAt != null && !d.NeedsHuman &&
-        d.Intent is "answer" or "qualification" or "consultation" && !string.IsNullOrWhiteSpace(d.Reply) &&
+        d.Intent is "answer" or "acknowledgement" or "qualification" or "consultation" && !string.IsNullOrWhiteSpace(d.Reply) &&
         d.Reply.Length <= 3000 && await drafts.IsCurrentAsync(d, ct);
 
     private async Task RequireWindowAsync(Guid chat, CancellationToken ct)

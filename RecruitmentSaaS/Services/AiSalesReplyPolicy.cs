@@ -1,4 +1,5 @@
 using RecruitmentSaaS.Models.Entities;
+using System.Text.RegularExpressions;
 
 namespace RecruitmentSaaS.Services;
 
@@ -15,6 +16,29 @@ public static class AiSalesReplyPolicy
             return Local("حاضر يا فندم، نحترم رغبتك في عدم المتابعة.", "stop", "Customer declined contact; staff must handle the stop request.");
         if (IntakeScript.WantsPerson(text))
             return Local("حاضر يا فندم، طلبك محتاج متابعة من موظف.", "handoff", "Customer requested a person; do not condition handoff on another sales question.");
+
+        // Bounded conversational acts: do not let a generic sales pitch override a request for time.
+        // A mixed question (e.g. "هفكر بس السكن عليكم؟") must still reach the provider.
+        var plain = Regex.Replace(text, @"[^\p{L}\p{N}\s]", " ");
+        plain = Regex.Replace(plain, @"\s+", " ").Trim();
+        if (Regex.IsMatch(plain, @"^(?:طيب |تمام |انا )?(?:هفكر|حافكر|هفكر شويه|هفكر وارد عليك|هفكر و ارد عليك|محتاج وقت افكر|محتاج وقت|خليني افكر)(?: يا فندم)?$"))
+            return new("تمام يا فندم، خد وقتك. لو احتجت توضيح أي نقطة أنا معاك.",
+                "acknowledgement", "Customer requests time; no sales pitch or contact-stop action.", false, [], "local-policy");
+
+        var previousReply = context.RecentMessages.LastOrDefault(m => m.Speaker != "customer")?.Text ?? "";
+        var feeContext = Has(text, "رسوم", "تكلف", "35000", "٣٥٠٠٠") || Has(IntakeScript.Normalize(previousReply), "رسوم", "35000", "٣٥٠٠٠");
+        var priceConcern = Has(text, "غالي", "كتير", "كثير", "مبلغ كبير", "مش معايا المبلغ");
+        var questionOrNegation = Has(text, "مش غالي", "مش كتير", "مش كثير", "مش كبير", "كام", "امتي", "ليه", "ازاي", "هل", "؟", "?");
+        if (feeContext && priceConcern && !questionOrNegation)
+        {
+            var discountPolicy = context.Knowledge.FirstOrDefault(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow &&
+                IntakeScript.Normalize(k.Content).Contains(IntakeScript.Normalize("الخصم يمكن طلبه من الإدارة، ولا تؤكد خصمًا قبل اعتماده")));
+            return discountPolicy == null
+                ? new("فاهم يا فندم إن المبلغ كبير بالنسبة لحضرتك. لو تحب، نراجع استفسارك عن الرسوم مع المسؤول.",
+                    "acknowledgement", "Price objection acknowledged; no discount policy established and no action claimed.", false, [], "local-policy")
+                : new("فاهم يا فندم إن المبلغ كبير بالنسبة لحضرتك. ممكن تطلب من الإدارة مراجعة إمكانية خصم، لكن الخصم مش مؤكد قبل موافقتهم.",
+                    "answer", "Price objection; approved policy allows requesting a discount review, never guarantees one.", false, [discountPolicy.Id], "local-policy");
+        }
 
         // Named-day requests require staff/calendar review. Free text is not a confirmed appointment.
         if (text.Contains("الجمعه") && Has(text, "هجيل", "اجي", "ازياره", "ازور", "زياره", "موعد", "معاد", "المكتب"))

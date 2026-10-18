@@ -258,6 +258,93 @@
         "Repeat the greeting, company introduction or AI disclosure",
         "Invent a fee or repeat unrelated scope"
       ]
+    },
+    {
+      "id": "TR51",
+      "customer": "بس 35000 كتير أوي",
+      "history": [
+        {
+          "speaker": "customer",
+          "text": "أنا عامل، حابب أجي يوم السبت"
+        },
+        {
+          "speaker": "staff_or_script",
+          "text": "الرسوم 35000 جنيه في مصر بعد انتهاء الإجراءات و10000 جنيه بعد الوصول."
+        }
+      ],
+      "must": [
+        "Acknowledge cost concern; possible management discount review only without guarantee"
+      ],
+      "mustNot": [
+        "Salary recap",
+        "Address or office-hours recap",
+        "Ask which day to visit again",
+        "Guaranteed discount"
+      ]
+    },
+    {
+      "id": "TR52",
+      "customer": "هفكر",
+      "history": [
+        {
+          "speaker": "customer",
+          "text": "أنا عامل، حابب أجي يوم السبت"
+        },
+        {
+          "speaker": "staff_or_script",
+          "text": "الرسوم 35000 جنيه في مصر بعد انتهاء الإجراءات و10000 جنيه بعد الوصول."
+        }
+      ],
+      "must": [
+        "Briefly allow time without pressure; acknowledgement intent allowed"
+      ],
+      "mustNot": [
+        "Salary or job recap",
+        "Visit invitation",
+        "Invent a profession",
+        "Stop-contact intent"
+      ]
+    },
+    {
+      "id": "TR53",
+      "customer": "هفكر بس السكن عليكم؟",
+      "history": [
+        {
+          "speaker": "customer",
+          "text": "أنا عامل، حابب أجي يوم السبت"
+        },
+        {
+          "speaker": "staff_or_script",
+          "text": "الرسوم 35000 جنيه في مصر بعد انتهاء الإجراءات و10000 جنيه بعد الوصول."
+        }
+      ],
+      "must": [
+        "Answer the housing question briefly using facts"
+      ],
+      "mustNot": [
+        "Ignore the question",
+        "Fees or address recap"
+      ]
+    },
+    {
+      "id": "TR54",
+      "customer": "مش غالي، بس هدفع امتى؟",
+      "history": [
+        {
+          "speaker": "customer",
+          "text": "أنا عامل، حابب أجي يوم السبت"
+        },
+        {
+          "speaker": "staff_or_script",
+          "text": "الرسوم 35000 جنيه في مصر بعد انتهاء الإجراءات و10000 جنيه بعد الوصول."
+        }
+      ],
+      "must": [
+        "Answer timing of payment, not a price objection"
+      ],
+      "mustNot": [
+        "Offer a discount without being asked"
+      ]
     }
   ],
   "livePilotQualified": false

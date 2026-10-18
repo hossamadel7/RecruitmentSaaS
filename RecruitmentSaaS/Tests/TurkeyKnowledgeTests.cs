@@ -64,7 +64,8 @@ public sealed partial class FoundationTests
         var engine = Engine(db, s, provider.Object);
         var draft = await engine.GenerateAsync(s.Chat, s.Admin, 1, "turkey-case:" + id, default);
         var local = AiSalesReplyPolicy.Create(context) != null;
-        Assert.Equal(AiDraftStatus.ReviewRequired, draft.Status); Assert.True(draft.NeedsHuman);
+        Assert.Equal(AiDraftStatus.ReviewRequired, draft.Status);
+        Assert.Equal(draft.Intent is "handoff" or "stop", draft.NeedsHuman);
         provider.Verify(p => p.GenerateAsync(It.IsAny<AiSalesContext>(), It.IsAny<CancellationToken>()), local ? Times.Never() : Times.Once());
         if (!local) Assert.True(context.Knowledge.Select(k => k.Id).ToHashSet().SetEquals(supplied!.Knowledge.Select(k => k.Id)));
         Assert.Equal(draft.Id, (await engine.GenerateAsync(s.Chat, s.Admin, 1, "turkey-case:" + id, default)).Id);
