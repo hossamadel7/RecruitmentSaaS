@@ -43,7 +43,7 @@
     function fillAgents(accountId, selected) {
         $('agent-select').replaceChildren(); option($('agent-select'), '', 'اختار المساعد');
         agents.filter(a => !accountId || a.whatsAppAccountId === accountId).forEach(a =>
-            option($('agent-select'), a.id, (accounts.find(x => x.id === a.whatsAppAccountId)?.name || '') + ' — ' + a.displayName + (a.paused ? ' (متوقف)' : '')));
+            option($('agent-select'), a.id, (accounts.find(x => x.id === a.whatsAppAccountId)?.name || '') + ' — ' + a.displayName + ' (مساعد AI)' + (a.paused ? ' (متوقف)' : '')));
         $('agent-select').value = selected || '';
         $('agent-select').dispatchEvent(new Event('change'));
     }

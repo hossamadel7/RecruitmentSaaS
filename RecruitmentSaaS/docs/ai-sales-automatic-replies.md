@@ -1,5 +1,7 @@
 # Automatic replies after manual assignment
 
+Current naming: service identities display as `مصطفى زكي`, with an AI badge added only by the authenticated administration page. See [persona v9 validation](validation/mustafa-persona-v9.md). Automatic assignment behavior below is unchanged.
+
 The owner requested an AI identity named **مصطفى زكي — مساعد AI** that replies without per-message approval on any conversation newly assigned to it. The feature was released on 19 October 2026 for the Bakar, Mekky and Sherif accounts. Each identity remains bound to its own account and team. There is no human login or fabricated human reviewer. The customer-facing assistant retains its virtual-assistant identity.
 
 An administrator selects a conversation and assigns the matching Mustafa identity. New assignments after the configured activation time enter Assisted control, including conversations previously collecting intake data. The worker debounces incoming messages, prepares a reply, authorizes it as `AutomaticallyApproved`, and sends it through the existing durable dispatch flow. The page identifies automatic mode and refreshes draft status. Monitoring remains available through the inbox.

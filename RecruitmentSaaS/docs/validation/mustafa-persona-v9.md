@@ -1,0 +1,9 @@
+# Mustafa identity and administrative labels — 19 October 2026
+
+The owner clarified that the AI marker should be administrative and the conversational name should be Mustafa Zaki. The three service identities now have display name `مصطفى زكي`; the authenticated AI admin selector appends its own `مساعد AI` badge. That badge is never included in the WhatsApp text transport.
+
+Prompt v9 introduces the conversational name without proactively adding an AI suffix or virtual-assistant introduction to an ordinary greeting. Current instructions explicitly override older Playbook welcome examples. A direct question about whether the assistant is AI or human receives a truthful answer; the assistant may not claim to be a human employee, invent a biography or claim physical presence in the office. Continuing conversations retain the existing no-repeat-greeting behavior.
+
+Two real gpt-4.1-mini trials used fictional customer messages and the existing owner knowledge pack: the initial greeting used Mustafa without an AI suffix, and the direct identity question identified the virtual assistant. Generated replies were inspected against these criteria and had valid permitted fact references. These two cases do not establish behavior for every possible phrasing. No real customer messages were used or sent by the trial.
+
+Production publication and JavaScript syntax checks passed. Installation preserved the automatic-reply configuration and retained a private prior-DLL/script backup and database recovery dump. Only the service identity labels, their version counters, the system audit, the admin selector and provider instructions changed; existing customer messages and business knowledge were not rewritten. Old Playbook examples remain data with lower priority than the current identity instructions.
