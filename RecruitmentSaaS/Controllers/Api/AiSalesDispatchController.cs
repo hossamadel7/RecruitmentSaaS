@@ -10,7 +10,7 @@ namespace RecruitmentSaaS.Controllers.Api;
 
 [ApiController, Route("api/ai-sales-dispatch"), Authorize(Roles = "1"), AutoValidateAntiforgeryToken]
 public sealed class AiSalesDispatchController(RecruitmentCrmContext db, AiSalesControlService controls,
-    AiSalesDispatchService dispatch, IOptions<AiSalesDispatchOptions> options) : ControllerBase
+    AiSalesDispatchService dispatch, IOptions<AiSalesDispatchOptions> options, IOptions<AiSalesEngineOptions> engine) : ControllerBase
 {
     private Guid Actor => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     public sealed record QueueRequest(Guid DraftId, long ExpectedOwnershipVersion);
@@ -18,12 +18,20 @@ public sealed class AiSalesDispatchController(RecruitmentCrmContext db, AiSalesC
     public async Task<IActionResult> Status([FromQuery] Guid? conversationId, CancellationToken ct)
     {
         var o = options.Value;
-        var account = conversationId == null ? null : await db.WhatsAppConversations.AsNoTracking()
-            .Where(c => c.Id == conversationId).Select(c => (Guid?)c.WhatsAppAccountId).SingleOrDefaultAsync(ct);
+        var chat = conversationId == null ? null : await db.WhatsAppConversations.AsNoTracking().SingleOrDefaultAsync(c => c.Id == conversationId, ct);
+        var account = chat?.WhatsAppAccountId;
+        var automatic = o.Enabled && o.ReleaseApproved && o.AutomaticEnabled && chat?.AssignedAiSalesAgentId != null &&
+            o.ApprovedAccountIds.Contains(chat.WhatsAppAccountId) && engine.Value.CanReplyAutomatically(chat.Id, chat.AssignedAiSalesAgentId.Value);
+        if (automatic && engine.Value.AutoReplyAnyAssignedConversation)
+            automatic = await db.AiLeadAssignments.AnyAsync(a => a.TenantId == controls.Options.TenantId && a.ConversationId == chat!.Id &&
+                a.AgentId == chat.AssignedAiSalesAgentId && a.EndedAt == null && a.StartedAt >= engine.Value.AutoReplySinceUtc, ct);
+        if (automatic)
+            automatic = await db.ConversationControls.AnyAsync(c => c.ConversationId == chat!.Id &&
+                c.TenantId == controls.Options.TenantId && c.Controller == RecruitmentSaaS.Models.Entities.ConversationControllerMode.Assisted, ct);
         return Ok(new { o.Enabled, o.ReleaseApproved, o.MaxAttemptsPerDay,
             sendingAvailable = controls.Options.Enabled && account != null && o.Enabled && o.ReleaseApproved &&
                 o.ApprovedAccountIds.Contains(account.Value) && o.ApprovedConversationIds.Contains(conversationId!.Value),
-            automaticDispatch = false, templatesAvailable = false });
+            automaticDispatch = automatic, templatesAvailable = false });
     }
     [HttpGet("conversations/{id:guid}")]
     public async Task<IActionResult> List(Guid id, CancellationToken ct) => Ok(await db.AiOutboundIntents.AsNoTracking()

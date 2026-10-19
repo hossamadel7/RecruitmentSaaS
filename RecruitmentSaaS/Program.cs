@@ -78,6 +78,8 @@ builder.Services.AddScoped<AiSalesContextService>();
 builder.Services.AddScoped<AiSalesDraftService>();
 builder.Services.AddScoped<AiSalesImprovementService>();
 builder.Services.AddScoped<AiSalesDispatchService>();
+builder.Services.AddScoped<AiAutomaticReplyService>();
+if (!isolatedValidation) builder.Services.AddHostedService<AiAutomaticReplyWorker>();
 builder.Services.AddScoped<AiChatLearningService>();
 builder.Services.AddScoped<AiChatFactService>();
 builder.Services.AddOptions<AiChatLearningOptions>().BindConfiguration("AiChatLearning")
@@ -109,6 +111,7 @@ builder.Services.AddOptions<AiVoiceOptions>().BindConfiguration("AiVoice")
         "External voice processing requires enabled voice handling, a supported transcription model, and an API key.")
     .ValidateOnStart();
 builder.Services.AddOptions<AiSalesEngineOptions>().BindConfiguration("AiSalesEngine")
+    .Validate(o => !o.AutoReplyEnabled || (o.DraftsEnabled && o.ExternalProcessingApproved && (o.AutoReplyAnyAssignedConversation || o.ApprovedConversationIds.Length is > 0 and <= 50) && o.AutoReplyAgentIds.Length > 0 && o.AutoReplySinceUtc != null), "Automatic replies require explicit assignments, agents, processing approval and a start time.")
     .Validate(o => o.MaxDraftsPerDay is >= 1 and <= 1000 && o.MaxOutputTokens is >= 200 and <= 2000, "Invalid draft limits.")
     .Validate(o => !o.ExternalProcessingApproved || (o.DraftsEnabled && !string.IsNullOrWhiteSpace(o.Model) && !string.IsNullOrWhiteSpace(o.ApiKey)), "External processing requires enabled drafts, a model, and an API key.")
     .ValidateOnStart();

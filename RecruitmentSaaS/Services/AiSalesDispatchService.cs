@@ -5,21 +5,27 @@ using RecruitmentSaaS.Models.Entities;
 
 namespace RecruitmentSaaS.Services;
 
-/// <summary>Explicit staff dispatch only. No timer, autonomous trigger, template, media or retry.</summary>
+/// <summary>Scoped staff or separately authorized automatic dispatch. Ambiguous transport outcomes are never retried.</summary>
 public sealed class AiSalesDispatchService(RecruitmentCrmContext db, AiSalesControlService controls,
     AiSalesDraftService drafts, IWhatsAppCloudApiService transport, IInboxRealtimeNotifier notifier,
     IOptions<AiSalesDispatchOptions> options)
 {
-    private void RequireRelease(Guid account, Guid conversation)
+    private void RequireRelease(Guid account, Guid conversation, bool automatic = false, AiSalesDraft? draft = null)
     {
         controls.RequireEnabled();
         var o = options.Value;
         if (!o.Enabled || !o.ReleaseApproved || !o.ApprovedAccountIds.Contains(account) ||
-            !o.ApprovedConversationIds.Contains(conversation) || o.MaxAttemptsPerDay is < 1 or > 1000)
+            !(o.ApprovedConversationIds.Contains(conversation) || automatic && o.AutomaticEnabled && draft != null && drafts.AutomaticEnabledFor(draft)) || o.MaxAttemptsPerDay is < 1 or > 1000)
             throw new AiSalesValidation("Reviewed dispatch has not been released for this account.");
     }
 
     public async Task<AiOutboundIntent> QueueAsync(Guid draftId, Guid actor, long version, string key, CancellationToken ct)
+        => await QueueCoreAsync(draftId, actor, version, key, ct);
+
+    public Task<AiOutboundIntent> QueueAutomaticallyAsync(Guid draftId, long version, string key, CancellationToken ct)
+        => QueueCoreAsync(draftId, null, version, key, ct);
+
+    private async Task<AiOutboundIntent> QueueCoreAsync(Guid draftId, Guid? actor, long version, string key, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(key) || key.Length > 128) throw new AiSalesValidation("Idempotency-Key is required (maximum 128 characters).");
         var tenant = controls.Options.TenantId;
@@ -35,8 +41,8 @@ public sealed class AiSalesDispatchService(RecruitmentCrmContext db, AiSalesCont
             ?? throw new AiSalesValidation("Draft unavailable.");
         await using var gate = await ConversationLock.AcquireAsync(db, "conversation:" + draft.ConversationId, ct);
         var chat = await db.WhatsAppConversations.AsNoTracking().SingleAsync(c => c.Id == draft.ConversationId, ct);
-        RequireRelease(chat.WhatsAppAccountId, chat.Id);
-        if (draft.OwnershipVersion != version || !await EligibleAsync(draft, ct))
+        RequireRelease(chat.WhatsAppAccountId, chat.Id, actor == null, draft);
+        if (draft.OwnershipVersion != version || !await EligibleAsync(draft, actor == null, ct))
             throw new AiSalesConflict("A current, reviewed reply without a human escalation is required.");
         if (await db.AiOutboundIntents.AnyAsync(i => i.DraftId == draftId, ct))
             throw new AiSalesConflict("This draft already has a dispatch record; inspect it before proceeding.");
@@ -50,8 +56,10 @@ public sealed class AiSalesDispatchService(RecruitmentCrmContext db, AiSalesCont
         return intent;
     }
 
-    private async Task<bool> EligibleAsync(AiSalesDraft d, CancellationToken ct) =>
-        d.Status == AiDraftStatus.Reviewed && d.ReviewedById != null && d.ReviewedAt != null && !d.NeedsHuman &&
+    private async Task<bool> EligibleAsync(AiSalesDraft d, bool automatic, CancellationToken ct) =>
+        (automatic ? options.Value.AutomaticEnabled && drafts.AutomaticEnabledFor(d) && d.RequestedById == null &&
+            d.Status == AiDraftStatus.AutomaticallyApproved && d.ReviewedById == null
+            : d.Status == AiDraftStatus.Reviewed && d.ReviewedById != null && d.ReviewedAt != null) && !d.NeedsHuman &&
         d.Intent is "answer" or "acknowledgement" or "qualification" or "consultation" && !string.IsNullOrWhiteSpace(d.Reply) &&
         d.Reply.Length <= 3000 && await drafts.IsCurrentAsync(d, ct);
 
@@ -66,6 +74,12 @@ public sealed class AiSalesDispatchService(RecruitmentCrmContext db, AiSalesCont
     }
 
     public async Task<AiOutboundIntent> DispatchAsync(Guid id, Guid actor, CancellationToken ct)
+        => await DispatchCoreAsync(id, actor, ct);
+
+    public Task<AiOutboundIntent> DispatchAutomaticallyAsync(Guid id, CancellationToken ct)
+        => DispatchCoreAsync(id, null, ct);
+
+    private async Task<AiOutboundIntent> DispatchCoreAsync(Guid id, Guid? actor, CancellationToken ct)
     {
         var seed = await db.AiOutboundIntents.AsNoTracking().SingleOrDefaultAsync(i => i.Id == id && i.TenantId == controls.Options.TenantId, ct)
             ?? throw new AiSalesValidation("Dispatch unavailable.");
@@ -81,9 +95,9 @@ public sealed class AiSalesDispatchService(RecruitmentCrmContext db, AiSalesCont
         }
         if (intent.State != "Queued") return intent;
         var chat = await db.WhatsAppConversations.Include(c => c.Contact).Include(c => c.WhatsAppAccount).SingleAsync(c => c.Id == intent.ConversationId, ct);
-        RequireRelease(chat.WhatsAppAccountId, chat.Id);
         var draft = await db.AiSalesDrafts.AsNoTracking().SingleAsync(d => d.Id == intent.DraftId && d.TenantId == intent.TenantId, ct);
-        if (!await EligibleAsync(draft, ct))
+        RequireRelease(chat.WhatsAppAccountId, chat.Id, actor == null, draft);
+        if ((actor == null) != (intent.RequestedById == null) || !await EligibleAsync(draft, actor == null, ct))
         {
             intent.State = "Invalidated"; intent.ErrorCode = "ContextChanged"; intent.CompletedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct); return intent;
@@ -137,6 +151,6 @@ public sealed class AiSalesDispatchService(RecruitmentCrmContext db, AiSalesCont
         return intent;
     }
 
-    private void Audit(AiOutboundIntent i, Guid actor, string action) => db.AiControlAudits.Add(new() { TenantId = i.TenantId,
+    private void Audit(AiOutboundIntent i, Guid? actor, string action) => db.AiControlAudits.Add(new() { TenantId = i.TenantId,
         ConversationId = i.ConversationId, ActorId = actor, Event = action, OwnershipVersion = i.OwnershipVersion, Reason = "Dispatch record " + i.Id });
 }

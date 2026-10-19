@@ -43,13 +43,16 @@
         ]);
         if (chat?.id !== selected) return;
         sending = dispatchStatus.sendingAvailable;
-        $('sending-status').textContent = sending ? 'بعد المراجعة، اضغط اعتماد وإرسال لإرسال الرد للعميل.' : 'راجع الرد قبل اعتماده. الإرسال لهذه المحادثة متوقف حالياً.';
+        if (dispatchStatus.automaticDispatch) $('generate-draft').disabled = true;
+        $('sending-status').textContent = dispatchStatus.automaticDispatch
+            ? 'الرد التلقائي مفعّل لهذه المحادثة. تابع الرسائل من فتح المحادثة، واستلمها بشريًا لإيقاف المساعد.'
+            : sending ? 'بعد المراجعة، اضغط اعتماد وإرسال لإرسال الرد للعميل.' : 'راجع الرد قبل اعتماده. الإرسال لهذه المحادثة متوقف حالياً.';
         $('draft-list').replaceChildren();
         if (!rows.length) { text($('draft-list'), 'لا يوجد رد مقترح بعد.', 'text-muted'); return; }
         const { draft, current, sources } = rows[0];
         const record = records.find(r => r.draftId === draft.id);
         const card = document.createElement('article'); card.className = 'border rounded p-3';
-        const labels = ['جاري تجهيز الرد', 'جاهز للمراجعة', 'تم اعتماد الرد — لم يُرسل', 'تم رفض الرد', 'تغيّرت المحادثة؛ اقترح رداً جديداً', 'تعذر تجهيز الرد'];
+        const labels = ['جاري تجهيز الرد', 'جاهز للمراجعة', 'تم اعتماد الرد — لم يُرسل', 'تم رفض الرد', 'تغيّرت المحادثة؛ اقترح رداً جديداً', 'تعذر تجهيز الرد', 'رد تلقائي من المساعد'];
         const dispatchLabels = { Sent: 'تم إرسال الرد', Sending: 'الإرسال قيد التحقق — لا تعِد الإرسال', Unknown: 'نتيجة الإرسال غير مؤكدة. راجع المحادثة قبل أي إرسال آخر.', Queued: 'الرد معتمد وجاهز للإرسال', Cancelled: 'تم إلغاء الإرسال', Invalidated: 'تغيّرت المحادثة؛ اقترح رداً جديداً' };
         text(card, record ? dispatchLabels[record.state] || 'راجع حالة الإرسال' : labels[draft.status] || 'حالة غير معروفة', 'small text-muted');
         if (draft.reply) text(card, draft.reply).style.whiteSpace = 'pre-wrap';
@@ -130,4 +133,5 @@
         } catch (error) { if (chat?.id === selected) $('engine-status').textContent = error.message; }
         finally { if (chat?.id === selected) button.disabled = false; }
     });
+    setInterval(() => { if (chat && !document.hidden) loadDraft().catch(() => {}); }, 15000);
 }());

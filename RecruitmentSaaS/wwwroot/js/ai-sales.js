@@ -64,7 +64,7 @@
         if ($('chat-select').value !== id) return;
         current = loaded;
         const selectedAgent = agents.find(a => a.id === $('agent-select').value);
-        const matching = agents.filter(a => a.whatsAppAccountId === current.whatsAppAccountId);
+        const matching = agents.filter(a => a.whatsAppAccountId === current.whatsAppAccountId && !a.paused);
         fillAgents(current.whatsAppAccountId, current.assignedAiSalesAgentId ||
             (selectedAgent?.whatsAppAccountId === current.whatsAppAccountId ? selectedAgent.id : matching.length === 1 ? matching[0].id : ''));
         $('open-chat').href = '/Inbox/Index?c=' + encodeURIComponent(id);

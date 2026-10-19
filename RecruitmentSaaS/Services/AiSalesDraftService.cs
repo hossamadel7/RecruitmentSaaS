@@ -9,12 +9,19 @@ namespace RecruitmentSaaS.Services;
 public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControlService controls,
     AiSalesContextService contextReader, IAiSalesDraftProvider provider, IOptions<AiSalesEngineOptions> options)
 {
-    public async Task<AiSalesDraft> GenerateAsync(Guid chatId, Guid actor, long expectedVersion, string key, CancellationToken ct)
+    public Task<AiSalesDraft> GenerateAsync(Guid chatId, Guid actor, long expectedVersion, string key, CancellationToken ct)
+        => GenerateCoreAsync(chatId, actor, expectedVersion, key, ct);
+
+    public Task<AiSalesDraft> GenerateAutomaticallyAsync(Guid chatId, long expectedVersion, string key, CancellationToken ct)
+        => GenerateCoreAsync(chatId, null, expectedVersion, key, ct);
+
+    private async Task<AiSalesDraft> GenerateCoreAsync(Guid chatId, Guid? actor, long expectedVersion, string key, CancellationToken ct)
     {
         controls.RequireEnabled();
         var settings = options.Value;
         if (!settings.DraftsEnabled) throw new AiSalesValidation("Reply drafts are disabled.");
-        if (settings.ApprovedConversationIds.Length > 0 && !settings.ApprovedConversationIds.Contains(chatId))
+        if (settings.ApprovedConversationIds.Length > 0 && !settings.ApprovedConversationIds.Contains(chatId) &&
+            !(actor == null && settings.AutoReplyEnabled && settings.AutoReplyAnyAssignedConversation))
             throw new AiSalesValidation("This conversation is outside the approved draft pilot.");
         if (string.IsNullOrWhiteSpace(key) || key.Length > 128) throw new AiSalesValidation("Idempotency-Key is required (maximum 128 characters).");
         var tenant = controls.Options.TenantId;
@@ -37,6 +44,12 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
         await using (var chatGate = await ConversationLock.AcquireAsync(db, "conversation:" + chatId, ct))
         {
             var chat = await RequireChatAsync(chatId, expectedVersion, ct);
+            if (actor == null && !settings.CanReplyAutomatically(chat.Id, chat.AssignedAiSalesAgentId!.Value))
+                throw new AiSalesValidation("Automatic replies are not enabled for this assignment.");
+            if (actor == null && settings.AutoReplyAnyAssignedConversation && !await db.AiLeadAssignments.AnyAsync(a =>
+                a.TenantId == tenant && a.ConversationId == chat.Id && a.AgentId == chat.AssignedAiSalesAgentId &&
+                a.EndedAt == null && a.StartedAt >= settings.AutoReplySinceUtc, ct))
+                throw new AiSalesValidation("Automatic replies require a new explicit assignment after release.");
             context = await contextReader.ReadAsync(tenant, chat, ct);
             if (context.RecentMessages.LastOrDefault()?.Speaker != "customer")
                 throw new AiSalesValidation("A new customer message is required before drafting.");
@@ -128,6 +141,27 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
         db.AuditLogs.Add(new() { Id = Guid.NewGuid(), ActorId = actor, ActorType = 1, EventType = accept ? "AiDraftReviewed" : "AiDraftRejected", EntityType = "AiSalesDraft", EntityId = draft.Id, CreatedAt = DateTime.UtcNow });
         await db.SaveChangesAsync(ct); return draft;
     }
+
+    public async Task<AiSalesDraft> ApproveAutomaticallyAsync(Guid id, CancellationToken ct)
+    {
+        var draft = await db.AiSalesDrafts.SingleAsync(d => d.Id == id && d.TenantId == controls.Options.TenantId, ct);
+        await using var gate = await ConversationLock.AcquireAsync(db, "conversation:" + draft.ConversationId, ct);
+        await db.Entry(draft).ReloadAsync(ct);
+        if (!options.Value.CanReplyAutomatically(draft.ConversationId, draft.AgentId) || draft.RequestedById != null)
+            throw new AiSalesValidation("Automatic replies are not enabled for this assignment.");
+        if (draft.Status == AiDraftStatus.AutomaticallyApproved) return draft;
+        if (draft.Status != AiDraftStatus.ReviewRequired || draft.NeedsHuman || !await IsCurrentAsync(draft, ct))
+            throw new AiSalesConflict("Automatic reply requires current context without a handoff.");
+        draft.Status = AiDraftStatus.AutomaticallyApproved;
+        // No human reviewer is attributed to a machine decision.
+        db.AiControlAudits.Add(new() { TenantId = draft.TenantId, ConversationId = draft.ConversationId,
+            ActorId = null, Event = "AutomaticReplyPrepared", OwnershipVersion = draft.OwnershipVersion,
+            Reason = "Owner enabled automatic replies for this assignment; draft " + draft.Id });
+        await db.SaveChangesAsync(ct);
+        return draft;
+    }
+
+    public bool AutomaticEnabledFor(AiSalesDraft draft) => options.Value.CanReplyAutomatically(draft.ConversationId, draft.AgentId);
 
     public async Task<bool> IsCurrentAsync(AiSalesDraft draft, CancellationToken ct)
     {

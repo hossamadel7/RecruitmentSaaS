@@ -10,7 +10,8 @@ namespace RecruitmentSaaS.Services;
 
 public sealed record AiControlResult(Guid ConversationId, long OwnershipVersion);
 
-public sealed class AiSalesControlService(RecruitmentCrmContext db, IOptions<AiSalesOptions> options)
+public sealed class AiSalesControlService(RecruitmentCrmContext db, IOptions<AiSalesOptions> options,
+    IOptions<AiSalesEngineOptions>? engine = null)
 {
     public AiSalesOptions Options => options.Value;
     public void RequireEnabled()
@@ -70,6 +71,7 @@ public sealed class AiSalesControlService(RecruitmentCrmContext db, IOptions<AiS
         chat.PendingTeamManagerId = agent.TeamManagerId;
         chat.UpdatedAt = DateTime.UtcNow;
         Change(control, agent.Paused ? ConversationControllerMode.Paused :
+            engine?.Value.CanReplyAutomatically(chat.Id, agent.Id) == true ? ConversationControllerMode.Assisted :
             chat.IntakeStatus == (byte)IntakeStatus.Collecting ? ConversationControllerMode.Intake : ConversationControllerMode.Assisted,
             actorId, "AssignedShadow", reason);
         // Seed known intake fields only from actual lead values. Do not reset the intake state.

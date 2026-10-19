@@ -2,7 +2,7 @@ namespace RecruitmentSaaS.Models.Entities;
 
 public enum AiKnowledgeKind : byte { Fact = 0, Playbook = 1 }
 public enum AiKnowledgeStatus : byte { Draft = 0, Approved = 1, Retired = 2 }
-public enum AiDraftStatus : byte { Generating = 0, ReviewRequired = 1, Reviewed = 2, Rejected = 3, Stale = 4, Failed = 5 }
+public enum AiDraftStatus : byte { Generating = 0, ReviewRequired = 1, Reviewed = 2, Rejected = 3, Stale = 4, Failed = 5, AutomaticallyApproved = 6 }
 
 /// <summary>Immutable content after approval. Publish a new entry to change an approved fact.</summary>
 public sealed class AiSalesKnowledge
@@ -44,7 +44,7 @@ public sealed class AiSalesDraft
     public Guid TenantId { get; set; }
     public Guid ConversationId { get; set; }
     public Guid AgentId { get; set; }
-    public Guid RequestedById { get; set; }
+    public Guid? RequestedById { get; set; }
     public string RequestKey { get; set; } = "";
     public long OwnershipVersion { get; set; }
     public long MemoryVersion { get; set; }

@@ -4,7 +4,7 @@ public sealed class AiSalesOptions
 {
     public bool Enabled { get; set; }
     public Guid TenantId { get; set; }
-    // This release intentionally exposes neither autonomous mode nor rotation switches.
+    // Automatic replies require separate engine and dispatch release settings.
 }
 
 public sealed class AiSalesConflict(string message) : Exception(message);

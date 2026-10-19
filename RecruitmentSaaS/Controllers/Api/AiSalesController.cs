@@ -54,7 +54,7 @@ public sealed class AiSalesController(RecruitmentCrmContext db, AiSalesControlSe
     [HttpGet("agents"), Authorize(Roles = "1")]
     public async Task<IActionResult> Agents(CancellationToken ct) => Ok(new
     {
-        enabled = controls.Options.Enabled, autonomousSendingAvailable = false, rotationAvailable = false,
+        enabled = controls.Options.Enabled, autonomousSendingAvailable = true, rotationAvailable = false,
         agents = await db.AiSalesAgents.AsNoTracking().Where(a => a.TenantId == controls.Options.TenantId).OrderBy(a => a.DisplayName).ToListAsync(ct),
         deadLetters = await db.DurableWorkItems.CountAsync(w => w.CompletedAt == null && w.Attempts >= 8, ct)
     });
