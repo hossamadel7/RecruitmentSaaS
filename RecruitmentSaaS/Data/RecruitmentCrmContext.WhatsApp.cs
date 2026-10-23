@@ -129,6 +129,8 @@ public partial class RecruitmentCrmContext
 
             entity.HasIndex(e => new { e.ConversationId, e.CreatedAt }, "IX_demorecruitment_WA_Msg_Cnv").IsDescending(false, true);
             entity.HasIndex(e => e.WhatsAppAccountId, "IX_demorecruitment_WA_Msg_Acc");
+            entity.HasIndex(e => e.ReferralCampaignId, "IX_demorecruitment_WA_Msg_ReferralCampaign");
+            entity.HasIndex(e => e.ReferralSourceId, "IX_demorecruitment_WA_Msg_ReferralSource");
             entity.HasIndex(e => e.Status, "IX_demorecruitment_WA_Msg_Status");
 
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
@@ -140,6 +142,13 @@ public partial class RecruitmentCrmContext
             entity.Property(e => e.MediaUrl).HasMaxLength(1000);
             entity.Property(e => e.ErrorCode).HasMaxLength(50);
             entity.Property(e => e.ErrorMessage).HasMaxLength(500);
+            entity.Property(e => e.ReferralSourceId).HasMaxLength(100);
+            entity.Property(e => e.ReferralClickId).HasMaxLength(1000);
+            entity.Property(e => e.ReferralSourceType).HasMaxLength(30);
+            entity.Property(e => e.ReferralSourceUrl).HasMaxLength(2000);
+            entity.Property(e => e.ReferralHeadline).HasMaxLength(500);
+            entity.Property(e => e.ReferralBody).HasMaxLength(2000);
+            entity.Property(e => e.ReferralMediaType).HasMaxLength(30);
             entity.Property(e => e.WhatsAppTimestamp).HasPrecision(0);
             entity.Property(e => e.CreatedAt).HasPrecision(0).HasDefaultValueSql("(clock_timestamp() AT TIME ZONE 'utc')");
 
@@ -162,6 +171,11 @@ public partial class RecruitmentCrmContext
                 .HasForeignKey(d => d.ReplyToMessageId)
                 .OnDelete(DeleteBehavior.NoAction)
                 .HasConstraintName("FK_demorecruitment_WA_Msg_Reply");
+
+            entity.HasOne(d => d.ReferralCampaign).WithMany()
+                .HasForeignKey(d => d.ReferralCampaignId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_demorecruitment_WA_Msg_ReferralCampaign");
         });
 
         modelBuilder.Entity<WhatsAppHandoff>(entity =>
@@ -302,5 +316,9 @@ public partial class RecruitmentCrmContext
         modelBuilder.Entity<AiVoicePart>().Property(x => x.MediaSha256).HasColumnType("text");
         modelBuilder.Entity<AiOfficeBooking>().Property(x => x.ConfirmationFingerprint).HasColumnType("text");
         modelBuilder.Entity<AiOfficeBookingEvent>().Property(x => x.ConfirmationFingerprint).HasColumnType("text");
+        // Meta attribution identifiers are opaque and case-sensitive; citext could merge distinct clicks.
+        modelBuilder.Entity<WhatsAppMessage>().Property(x => x.ReferralSourceId).HasColumnType("text");
+        modelBuilder.Entity<WhatsAppMessage>().Property(x => x.ReferralClickId).HasColumnType("text");
+        modelBuilder.Entity<WhatsAppMessage>().Property(x => x.ReferralSourceUrl).HasColumnType("text");
     }
 }

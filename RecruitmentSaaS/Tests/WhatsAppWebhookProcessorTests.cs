@@ -36,4 +36,42 @@ public sealed class WhatsAppWebhookProcessorTests
         Assert.Equal("Unsupported message type | Message type is not currently supported | poll", details);
         Assert.Contains("استطلاع رأي", WhatsAppWebhookProcessor.UnsupportedText(message));
     }
+
+    [Fact]
+    public void Click_to_whatsapp_referral_preserves_ad_and_click_attribution()
+    {
+        var message = JObject.Parse("""
+        {
+          "type": "text",
+          "text": { "body": "مهتم بالإعلان" },
+          "referral": {
+            "source_id": "120211234567890123",
+            "source_type": "ad",
+            "source_url": "https://fb.me/example",
+            "headline": "فرصة عمل",
+            "body": "تفاصيل الإعلان",
+            "media_type": "image",
+            "ctwa_clid": "ARAkExampleClickId"
+          }
+        }
+        """);
+
+        var referral = WhatsAppWebhookProcessor.ExtractAdReferral(message);
+
+        Assert.NotNull(referral);
+        Assert.Equal("120211234567890123", referral.SourceId);
+        Assert.Equal("ARAkExampleClickId", referral.ClickId);
+        Assert.Equal("ad", referral.SourceType);
+        Assert.Equal("فرصة عمل", referral.Headline);
+        Assert.Equal("تفاصيل الإعلان", referral.Body);
+        Assert.Equal("image", referral.MediaType);
+    }
+
+    [Fact]
+    public void Message_without_referral_has_no_ad_attribution()
+    {
+        var message = JObject.Parse("""{ "type": "text", "text": { "body": "hello" } }""");
+
+        Assert.Null(WhatsAppWebhookProcessor.ExtractAdReferral(message));
+    }
 }

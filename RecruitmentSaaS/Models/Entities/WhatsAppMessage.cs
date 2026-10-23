@@ -79,6 +79,25 @@ public partial class WhatsAppMessage
 
     public string? ErrorMessage { get; set; }
 
+    /// <summary>Meta ad/post ID from message.referral.source_id for Click-to-WhatsApp attribution.</summary>
+    public string? ReferralSourceId { get; set; }
+
+    /// <summary>Meta's unique Click-to-WhatsApp click ID (ctwa_clid).</summary>
+    public string? ReferralClickId { get; set; }
+
+    public string? ReferralSourceType { get; set; }
+
+    public string? ReferralSourceUrl { get; set; }
+
+    public string? ReferralHeadline { get; set; }
+
+    public string? ReferralBody { get; set; }
+
+    public string? ReferralMediaType { get; set; }
+
+    /// <summary>Our campaign matched by Campaign.FacebookAdId == referral.source_id.</summary>
+    public Guid? ReferralCampaignId { get; set; }
+
     public DateTime WhatsAppTimestamp { get; set; }
 
     public DateTime CreatedAt { get; set; }
@@ -90,4 +109,6 @@ public partial class WhatsAppMessage
     public virtual User? SenderUser { get; set; }
 
     public virtual WhatsAppMessage? ReplyToMessage { get; set; }
+
+    public virtual Campaign? ReferralCampaign { get; set; }
 }

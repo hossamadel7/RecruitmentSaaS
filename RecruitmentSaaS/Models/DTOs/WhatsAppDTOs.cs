@@ -74,6 +74,15 @@ namespace RecruitmentSaaS.Models.DTOs
         public string? AppointmentAt { get; set; }
         /// <summary>The next open follow-up (UTC).</summary>
         public DateTime? NextFollowUpAt { get; set; }
+
+        /// <summary>Click-to-WhatsApp attribution from the latest inbound referral in this chat.</summary>
+        public string? ReferralSourceId { get; set; }
+        public string? ReferralClickId { get; set; }
+        public string? ReferralHeadline { get; set; }
+        public string? ReferralBody { get; set; }
+        public string? ReferralSourceUrl { get; set; }
+        public Guid? ReferralCampaignId { get; set; }
+        public string? ReferralCampaignName { get; set; }
     }
 
     public class SendTemplateDto

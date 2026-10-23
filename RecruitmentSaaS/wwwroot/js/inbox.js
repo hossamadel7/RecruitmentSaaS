@@ -1305,6 +1305,9 @@
             '<div class="customer-field"><span class="customer-field-label">السن</span><span class="customer-field-value">' + (c.age != null ? esc(c.age) + ' سنة' : 'غير معروف') + '</span></div>' +
             (c.job ? '<div class="customer-field"><span class="customer-field-label">الوظيفة</span><span class="customer-field-value">' + esc(c.job) + '</span></div>' : '') +
             '<div class="customer-field"><span class="customer-field-label">رقم الواتساب المستقبِل</span><span class="customer-field-value">' + esc(c.whatsAppAccountName) + '</span></div>' +
+            (c.referralSourceId ? '<div class="customer-field"><span class="customer-field-label">مصدر المحادثة</span><span class="customer-field-value">' +
+                esc(c.referralCampaignName || c.referralHeadline || 'إعلان Meta') +
+                '<small style="display:block;color:var(--text-muted);margin-top:3px">Ad ID: ' + esc(c.referralSourceId) + '</small></span></div>' : '') +
             '<div class="customer-field"><span class="customer-field-label">المندوب المسؤول</span>' + agentField + '</div>' +
             '<div class="customer-field"><span class="customer-field-label">حالة العميل</span>' +
             '  <div class="outcome-options" id="cp-outcome" role="radiogroup">' +

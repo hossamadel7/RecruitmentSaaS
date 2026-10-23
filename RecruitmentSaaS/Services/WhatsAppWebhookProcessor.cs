@@ -20,6 +20,15 @@ namespace RecruitmentSaaS.Services
     {
         private static readonly Regex HandoffRefPattern = new(@"REF-[A-Z0-9]{6}", RegexOptions.Compiled);
 
+        internal sealed record WhatsAppAdReferral(
+            string? SourceId,
+            string? ClickId,
+            string? SourceType,
+            string? SourceUrl,
+            string? Headline,
+            string? Body,
+            string? MediaType);
+
         private readonly RecruitmentCrmContext _context;
         private readonly IInboxRealtimeNotifier _notifier;
         private readonly ILogger<WhatsAppWebhookProcessor> _logger;
@@ -155,6 +164,22 @@ namespace RecruitmentSaaS.Services
             await using var inboundTransaction = await _context.Database.BeginTransactionAsync(ct);
 
             var (messageType, textBody, mediaId) = ExtractContent(messageJ);
+            var referral = ExtractAdReferral(messageJ);
+            Guid? referralCampaignId = null;
+            if (!string.IsNullOrWhiteSpace(referral?.SourceId))
+            {
+                // For WhatsApp referral payloads Meta defines source_id as the Ad ID, not the
+                // Campaign ID. Match only FacebookAdId so similarly-shaped IDs cannot misattribute.
+                referralCampaignId = await _context.Campaigns.AsNoTracking()
+                    .Where(c => c.FacebookAdId == referral.SourceId)
+                    .OrderByDescending(c => c.UpdatedAt ?? c.CreatedAt)
+                    .Select(c => (Guid?)c.Id)
+                    .FirstOrDefaultAsync(ct);
+
+                _logger.LogInformation(
+                    "WhatsApp ad referral captured. AccountId={AccountId} Wamid={Wamid} SourceType={SourceType} SourceId={SourceId} CampaignId={CampaignId}",
+                    account.Id, wamid, referral.SourceType, referral.SourceId, referralCampaignId);
+            }
             var isUnsupported = !ShouldRunCustomerAutomation(messageType);
             var (unsupportedErrorCode, unsupportedErrorMessage) = isUnsupported
                 ? ExtractUnsupportedDiagnostics(messageJ)
@@ -193,6 +218,14 @@ namespace RecruitmentSaaS.Services
                 Status = (byte)MessageStatus.Received,
                 ErrorCode = unsupportedErrorCode,
                 ErrorMessage = unsupportedErrorMessage,
+                ReferralSourceId = referral?.SourceId,
+                ReferralClickId = referral?.ClickId,
+                ReferralSourceType = referral?.SourceType,
+                ReferralSourceUrl = referral?.SourceUrl,
+                ReferralHeadline = referral?.Headline,
+                ReferralBody = referral?.Body,
+                ReferralMediaType = referral?.MediaType,
+                ReferralCampaignId = referralCampaignId,
                 ReplyToMessageId = replyToMessageId,
                 WhatsAppTimestamp = whatsAppTimestamp,
                 CreatedAt = now
@@ -206,6 +239,7 @@ namespace RecruitmentSaaS.Services
             // Keep unsupported messages visible to staff, but never interpret Meta's warning as
             // customer text or let it trigger a customer-facing bot/welcome response.
             await TryConnectHandoffAsync(conversation, account, fromWaId, isUnsupported ? null : textBody, now, ct);
+            await ApplyReferralCampaignToLeadAsync(conversation, referralCampaignId, ct);
             if (!isUnsupported)
                 await TryAssignDirectChatAsync(conversation, textBody, ct);
 
@@ -824,6 +858,41 @@ namespace RecruitmentSaaS.Services
                 .Distinct(StringComparer.OrdinalIgnoreCase);
 
             return (code, Limit(string.Join(" | ", parts), 500));
+        }
+
+        /// <summary>
+        /// Meta attaches Click-to-WhatsApp attribution to the inbound message as a referral object.
+        /// It is independent from message.type and must be saved even when the content is unsupported.
+        /// </summary>
+        internal static WhatsAppAdReferral? ExtractAdReferral(JToken messageJ)
+        {
+            var referral = messageJ["referral"];
+            if (referral == null || referral.Type != JTokenType.Object) return null;
+
+            var result = new WhatsAppAdReferral(
+                Limit(referral["source_id"]?.ToString(), 100),
+                Limit(referral["ctwa_clid"]?.ToString(), 1000),
+                Limit(referral["source_type"]?.ToString(), 30),
+                Limit(referral["source_url"]?.ToString(), 2000),
+                Limit(referral["headline"]?.ToString(), 500),
+                Limit(referral["body"]?.ToString(), 2000),
+                Limit(referral["media_type"]?.ToString(), 30));
+
+            return result.SourceId == null && result.ClickId == null && result.SourceUrl == null
+                ? null
+                : result;
+        }
+
+        private async Task ApplyReferralCampaignToLeadAsync(
+            WhatsAppConversation conversation,
+            Guid? referralCampaignId,
+            CancellationToken ct)
+        {
+            if (referralCampaignId == null || conversation.LeadId == null) return;
+
+            var lead = await _context.Leads.FirstOrDefaultAsync(l => l.Id == conversation.LeadId, ct);
+            if (lead != null && lead.CampaignId == null)
+                lead.CampaignId = referralCampaignId;
         }
 
         private static string? Limit(string? value, int maxLength)
