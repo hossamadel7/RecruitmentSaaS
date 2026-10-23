@@ -155,8 +155,16 @@ namespace RecruitmentSaaS.Services
             await using var inboundTransaction = await _context.Database.BeginTransactionAsync(ct);
 
             var (messageType, textBody, mediaId) = ExtractContent(messageJ);
-            if (messageType == WhatsAppMessageType.Unsupported)
-                _logger.LogWarning("WhatsApp message type not shown in the inbox ({Type})", rawType);
+            var isUnsupported = !ShouldRunCustomerAutomation(messageType);
+            var (unsupportedErrorCode, unsupportedErrorMessage) = isUnsupported
+                ? ExtractUnsupportedDiagnostics(messageJ)
+                : (null, null);
+            if (isUnsupported)
+            {
+                _logger.LogWarning(
+                    "WhatsApp unsupported inbound message. AccountId={AccountId} Wamid={Wamid} RawType={RawType} ErrorCode={ErrorCode} Details={Details}",
+                    account.Id, wamid, rawType, unsupportedErrorCode, unsupportedErrorMessage);
+            }
 
             Guid? replyToMessageId = null;
             // A reaction points at the message it reacts to
@@ -183,6 +191,8 @@ namespace RecruitmentSaaS.Services
                 TextBody = textBody,
                 MediaId = mediaId,
                 Status = (byte)MessageStatus.Received,
+                ErrorCode = unsupportedErrorCode,
+                ErrorMessage = unsupportedErrorMessage,
                 ReplyToMessageId = replyToMessageId,
                 WhatsAppTimestamp = whatsAppTimestamp,
                 CreatedAt = now
@@ -193,10 +203,13 @@ namespace RecruitmentSaaS.Services
             conversation.LastMessageAt = whatsAppTimestamp;
             conversation.UpdatedAt = now;
 
-            await TryConnectHandoffAsync(conversation, account, fromWaId, textBody, now, ct);
-            await TryAssignDirectChatAsync(conversation, textBody, ct);
+            // Keep unsupported messages visible to staff, but never interpret Meta's warning as
+            // customer text or let it trigger a customer-facing bot/welcome response.
+            await TryConnectHandoffAsync(conversation, account, fromWaId, isUnsupported ? null : textBody, now, ct);
+            if (!isUnsupported)
+                await TryAssignDirectChatAsync(conversation, textBody, ct);
 
-            if (conversation.AssignedAiSalesAgentId != null && !string.IsNullOrWhiteSpace(textBody))
+            if (!isUnsupported && conversation.AssignedAiSalesAgentId != null && !string.IsNullOrWhiteSpace(textBody))
             {
                 var normalized = IntakeScript.Normalize(textBody);
                 if (IntakeScript.WantsPerson(normalized) || IntakeScript.NotInterested(normalized))
@@ -205,12 +218,16 @@ namespace RecruitmentSaaS.Services
 
             // A new chat from someone who isn't a lead yet: the AI assistant collects name / age / job
             var aiOwnsChat = false;
-            try { aiOwnsChat = await _aiIntake.ClaimAsync(conversation, account, fromWaId, ct); }
-            catch (Exception ex) { _logger.LogWarning(ex, "AI assistant check failed for {ConversationId}", conversation.Id); }
+            if (!isUnsupported)
+            {
+                try { aiOwnsChat = await _aiIntake.ClaimAsync(conversation, account, fromWaId, ct); }
+                catch (Exception ex) { _logger.LogWarning(ex, "AI assistant check failed for {ConversationId}", conversation.Id); }
+            }
 
             if (aiOwnsChat) _aiQueue.Enqueue(conversation.Id, wamid);
             await _context.SaveChangesAsync(ct);
-            await _voice.QueueIncomingLockedAsync(conversation, message, ct);
+            if (!isUnsupported)
+                await _voice.QueueIncomingLockedAsync(conversation, message, ct);
             await inboundTransaction.CommitAsync(ct);
 
             if (isNewConversation)
@@ -234,6 +251,8 @@ namespace RecruitmentSaaS.Services
             {
                 return;
             }
+            if (isUnsupported)
+                return;
             if (conversation.AssignedAiSalesAgentId == null) await TrySendWelcomeAsync(conversation, account, ct);
         }
 
@@ -759,22 +778,59 @@ namespace RecruitmentSaaS.Services
         }
 
         /// <summary>What to show for a message the Cloud API doesn't deliver (Meta sends type "unsupported").</summary>
-        private static string UnsupportedText(JToken messageJ)
+        internal static string UnsupportedText(JToken messageJ)
         {
-            var title = messageJ["errors"]?[0]?["title"]?.ToString()
-                     ?? messageJ["unsupported"]?["type"]?.ToString()
-                     ?? messageJ["type"]?.ToString();
-            var kind = title?.ToLowerInvariant() switch
+            // Meta often sends the generic title "Unsupported message type" alongside a more useful
+            // unsupported.type/details value, so inspect all descriptors instead of taking only the first.
+            var descriptor = string.Join(" ", new[]
             {
-                var t when t != null && t.Contains("poll") => "استطلاع رأي",
-                var t when t != null && (t.Contains("view") || t.Contains("ephemeral")) => "صورة/فيديو بيتشاف مرة واحدة",
-                var t when t != null && t.Contains("edit") => "تعديل على رسالة",
-                var t when t != null && t.Contains("event") => "دعوة لمناسبة",
+                messageJ["errors"]?[0]?["title"]?.ToString(),
+                messageJ["errors"]?[0]?["details"]?.ToString(),
+                messageJ["errors"]?[0]?["error_data"]?["details"]?.ToString(),
+                messageJ["unsupported"]?["type"]?.ToString(),
+                messageJ["type"]?.ToString()
+            }.Where(value => !string.IsNullOrWhiteSpace(value))).ToLowerInvariant();
+            var kind = descriptor switch
+            {
+                var t when t.Contains("poll") => "استطلاع رأي",
+                var t when t.Contains("view") || t.Contains("ephemeral") => "صورة/فيديو بيتشاف مرة واحدة",
+                var t when t.Contains("edit") => "تعديل على رسالة",
+                var t when t.Contains("event") => "دعوة لمناسبة",
                 _ => null
             };
             return kind == null
                 ? "⚠️ العميل بعت رسالة نوعها مش بيوصل عن طريق واتساب API — اطلب منه يكتبها نص"
                 : $"⚠️ العميل بعت {kind} ودي مش بتوصل عن طريق واتساب API — اطلب منه يكتبها نص";
+        }
+
+        /// <summary>
+        /// Preserve the useful part of Meta's unsupported-message envelope. The original content is
+        /// not delivered by Cloud API, but these fields let support distinguish known/new API types.
+        /// </summary>
+        internal static bool ShouldRunCustomerAutomation(WhatsAppMessageType messageType) =>
+            messageType != WhatsAppMessageType.Unsupported;
+
+        internal static (string? errorCode, string? errorMessage) ExtractUnsupportedDiagnostics(JToken messageJ)
+        {
+            var error = (messageJ["errors"] as JArray)?.FirstOrDefault();
+            var code = Limit(error?["code"]?.ToString(), 50);
+            var title = error?["title"]?.ToString();
+            var details = error?["details"]?.ToString() ?? error?["error_data"]?["details"]?.ToString();
+            var unsupportedType = messageJ["unsupported"]?["type"]?.ToString();
+
+            var parts = new[] { title, details, unsupportedType }
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            return (code, Limit(string.Join(" | ", parts), 500));
+        }
+
+        private static string? Limit(string? value, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+            value = value.Trim();
+            return value.Length <= maxLength ? value : value[..maxLength];
         }
 
         private static string? FormatLocation(JToken? location)

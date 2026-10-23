@@ -149,6 +149,38 @@ public sealed partial class FoundationTests(DatabaseFixture fixture) : IClassFix
     }
 
     [Fact]
+    public async Task Unsupported_inbound_message_never_triggers_intake_reply_or_handoff()
+    {
+        var s = await SeedAsync(true);
+        await using var db = fixture.Create();
+        var chat = await db.WhatsAppConversations.SingleAsync(c => c.Id == s.Chat);
+        db.WhatsAppMessages.Add(new WhatsAppMessage
+        {
+            Id = Guid.NewGuid(), ConversationId = chat.Id, WhatsAppAccountId = chat.WhatsAppAccountId,
+            WhatsAppMessageId = "unsupported-" + Guid.NewGuid().ToString("N"),
+            Direction = (byte)MessageDirection.Incoming,
+            MessageType = (byte)WhatsAppMessageType.Unsupported,
+            MessageSource = (byte)MessageSource.Customer,
+            TextBody = "⚠️ unsupported placeholder",
+            Status = (byte)MessageStatus.Received,
+            WhatsAppTimestamp = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var transport = new Mock<IWhatsAppCloudApiService>(MockBehavior.Strict);
+        var intake = new AiIntakeService(db, transport.Object, Mock.Of<IInboxRealtimeNotifier>(),
+            Mock.Of<INotificationService>(), NullLogger<AiIntakeService>.Instance, Control(db, s));
+
+        await intake.ReplyAsync(s.Chat, default);
+
+        chat = await db.WhatsAppConversations.SingleAsync(c => c.Id == s.Chat);
+        Assert.Equal(0, chat.IntakeNoTextCount);
+        Assert.Equal((byte)IntakeStatus.Collecting, chat.IntakeStatus);
+        transport.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public async Task Durable_webhook_survives_context_restart_and_deduplicates()
     {
         var payload="{\"entry\":[],\"test\":\""+Guid.NewGuid()+"\"}";
