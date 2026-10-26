@@ -41,7 +41,11 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddMemoryCache();
 
-builder.Services.AddControllersWithViews(o => o.Filters.Add<ConversationMutationFilter>())
+builder.Services.AddControllersWithViews(o =>
+    {
+        o.Filters.Add<MonitoringReadOnlyFilter>(int.MinValue);
+        o.Filters.Add<ConversationMutationFilter>();
+    })
     // Dates go to the browser as UTC ("…Z") so they show in the viewer's local time
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter()));
 

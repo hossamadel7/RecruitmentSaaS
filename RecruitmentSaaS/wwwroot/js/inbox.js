@@ -180,7 +180,7 @@
 
     async function initAgentFilter() {
         var select = document.getElementById('agent-filter');
-        if (!select || !USER.canAssign) return;
+        if (!select || (!USER.canAssign && !USER.readOnly)) return;
 
         var agents = await getAgents();
 
@@ -372,6 +372,12 @@
         var banner = document.getElementById('chat-window-closed');
         var composer = document.getElementById('chat-composer');
         if (!banner || !composer) return;
+        if (USER.readOnly) {
+            banner.hidden = true;
+            composer.hidden = true;
+            composer.querySelectorAll('textarea, button, input').forEach(function (el) { el.disabled = true; });
+            return;
+        }
         banner.hidden = !closed;
         composer.classList.toggle('is-locked', closed);
         composer.querySelectorAll('textarea, button, input').forEach(function (el) { el.disabled = closed; });
@@ -605,7 +611,7 @@
             (text ? '<span class="bubble-text">' + linkify(text) + '</span>' : '') +
             meta + failure +
             '</div>' +
-            (m.id && m.status !== 6 && m.status !== 2 && (text || hasMediaShown)
+            (!USER.readOnly && m.id && m.status !== 6 && m.status !== 2 && (text || hasMediaShown)
                 ? '<button type="button" class="bubble-forward-btn" data-forward="' + m.id + '" title="تحويل الرسالة لمحادثة تانية"><i class="bi bi-forward-fill"></i></button>'
                 : '') +
             '</div>';
@@ -689,6 +695,7 @@
     }
 
     async function markRead(id) {
+        if (USER.readOnly) return;
         try { await api('/api/conversations/' + id + '/read', { method: 'POST' }); } catch (e) { /* non-fatal */ }
         patchListRow(id, { unreadCount: 0 });
         loadAccounts();
@@ -1473,6 +1480,13 @@
         document.getElementById('cp-note-add-btn').addEventListener('click', function () { addNote(c.id); });
 
         loadNotes(c.id);
+        if (USER.readOnly) {
+            body.querySelectorAll('input, select, textarea, button').forEach(function (el) { el.disabled = true; });
+            body.querySelector('.cp-save-bar').hidden = true;
+            document.getElementById('cp-note-input').hidden = true;
+            document.getElementById('cp-note-add-btn').hidden = true;
+            body.querySelector('.outcome-quick').hidden = true;
+        }
     }
 
     var agentsCache = null;
@@ -1707,6 +1721,11 @@
 
     function init() {
         if (!USER.isOrgWide) document.getElementById('inbox-app').classList.add('is-agent');
+        if (USER.canAssign || USER.readOnly) {
+            var filters = new URLSearchParams(location.search);
+            if (filters.get('team')) state.agentFilter = 'team:' + filters.get('team');
+            else if (filters.get('agent')) state.agentFilter = 'agent:' + filters.get('agent');
+        }
         // From the "deactivated — chats waiting" notification
         if (USER.canAssign && new URLSearchParams(location.search).get('f') === 'pending') state.agentFilter = 'unassigned';
         loadAccounts();

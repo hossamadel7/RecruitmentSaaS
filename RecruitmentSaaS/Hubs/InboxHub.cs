@@ -26,7 +26,7 @@ namespace RecruitmentSaaS.Hubs
 
         private string? CurrentRole => Context.User!.FindFirstValue(ClaimTypes.Role);
 
-        private bool IsOrgWideRole => WhatsAppAuthorization.IsOrgWide(CurrentRole); // Admin only
+        private bool IsOrgWideRole => WhatsAppAuthorization.IsOrgWide(CurrentRole); // Admin and read-only monitoring
 
         public override async Task OnConnectedAsync()
         {

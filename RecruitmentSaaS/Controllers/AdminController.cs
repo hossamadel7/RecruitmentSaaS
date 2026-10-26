@@ -209,7 +209,7 @@ namespace RecruitmentSaaS.Controllers
             return View(users);
         }
 
-        public const int MaxRole = 8;
+        public const int MaxRole = 9;
 
         // ── POST /Admin/CreateUser ──────────────────────────────────────────
         [HttpPost]
@@ -333,10 +333,8 @@ namespace RecruitmentSaaS.Controllers
             {
                 var chatsOf = await _context.WhatsAppConversations.Where(c => c.AssignedSalesAgentId == user.Id).ToListAsync();
                 var leadsOf = user.Role == 3 || user.Role == 8
-                    ? await _context.Leads.Where(l => l.AssignedSalesId == user.Id && !l.IsConverted).ToListAsync()
+                    ? await _context.Leads.Where(l => l.AssignedSalesId == user.Id).ToListAsync()
                     : new List<Lead>();
-                var accounts = await _context.WhatsAppAccounts.Where(a => a.AssignedSalesAgentId == user.Id).ToListAsync();
-                foreach (var account in accounts) account.AssignedSalesAgentId = null;   // new chats on a number must not keep going to them
                 var (movedChats, movedLeads) = await MoveWorkAsync(user, target, chatsOf, leadsOf, "بعد تعطيله");
                 TempData["Success"] = $"تم تعطيل {user.FullName} — تم تسجيل خروجه من النظام"
                     + (movedChats + movedLeads > 0 ? $". اتنقل {movedChats} محادثة و {movedLeads} عميل لـ {target.FullName}" : "");
@@ -360,7 +358,7 @@ namespace RecruitmentSaaS.Controllers
         {
             var note = ReleasedNote(user);
             var leads = await _context.Leads
-                .Where(l => !l.IsConverted && (l.AssignedSalesId == user.Id
+                .Where(l => (l.AssignedSalesId == user.Id
                     || (l.AssignedSalesId == null && _context.LeadActivities.Any(a => a.LeadId == l.Id && a.Description == note))))
                 .ToListAsync();
             var leadIds = leads.Select(l => l.Id).ToList();
@@ -401,6 +399,19 @@ namespace RecruitmentSaaS.Controllers
         private async Task<(int Chats, int Leads)> MoveWorkAsync(User from, User target, List<WhatsAppConversation> chats, List<Lead> leads, string why)
         {
             var now = DateTime.UtcNow;
+            // Pending links and AI release snapshots must follow the transfer too.
+            var handoffs = await _context.WhatsAppHandoffs.Where(h => h.AssignedSalesAgentId == from.Id
+                && (h.Status == (byte)HandoffStatus.Generated || h.Status == (byte)HandoffStatus.Sent)).ToListAsync();
+            foreach (var handoff in handoffs) handoff.AssignedSalesAgentId = target.Id;
+            var accounts = await _context.WhatsAppAccounts.Where(a => a.AssignedSalesAgentId == from.Id).ToListAsync();
+            foreach (var account in accounts) account.AssignedSalesAgentId = target.Id;
+            var snapshots = await _context.AiLeadAssignments.Where(a => a.EndedAt == null
+                && (a.PreviousSalesId == from.Id || a.PreviousConversationSalesId == from.Id)).ToListAsync();
+            foreach (var snapshot in snapshots)
+            {
+                if (snapshot.PreviousSalesId == from.Id) snapshot.PreviousSalesId = target.Id;
+                if (snapshot.PreviousConversationSalesId == from.Id) snapshot.PreviousConversationSalesId = target.Id;
+            }
             var previous = chats.ToDictionary(c => c.Id, c => c.AssignedSalesAgentId);
             foreach (var chat in chats)
             {
@@ -468,7 +479,7 @@ namespace RecruitmentSaaS.Controllers
             var leads = new List<Lead>();
             if (user.Role == 3 || user.Role == 8)
             {
-                leads = await _context.Leads.Where(l => l.AssignedSalesId == user.Id && !l.IsConverted).ToListAsync();
+                leads = await _context.Leads.Where(l => l.AssignedSalesId == user.Id).ToListAsync();
                 foreach (var lead in leads)
                 {
                     lead.AssignedSalesId = null;

@@ -286,13 +286,16 @@ namespace RecruitmentSaaS.Services
                 return; // Phase 1 records the handoff; it never sends an AI sales reply.
             }
             await using var assignmentTransaction = await _context.Database.BeginTransactionAsync(ct);
+            // Intake can finish after staff transferred the chat or disabled its former owner.
+            var currentAgent = await ChatAssignmentPolicy.ResolveAsync(_context,
+                conversation.AssignedSalesAgentId, lead.AssignedSalesId, ct);
             var threshold = settings.SeniorAgeThreshold == 0 ? (byte)45 : settings.SeniorAgeThreshold;
             var atOrAboveAge = conversation.IntakeAge != null && conversation.IntakeAge >= threshold;
-            var toRotation = lead.AssignedSalesId == null
+            var toRotation = currentAgent == null
                 && conversation.IntakeAge != null
                 && (atOrAboveAge || settings.AiUnderAgeToRotation);
 
-            Guid? agentId = lead.AssignedSalesId;
+            Guid? agentId = currentAgent;
             // Under the age on a team's number: that team's "أقل من السن" rotation, when the team set one
             if (agentId == null && conversation.IntakeAge != null && !atOrAboveAge && team != null)
                 agentId = await LeadDistributor.NextInTeamAsync(_context, team.Value, atOrAboveAge: false, ct);

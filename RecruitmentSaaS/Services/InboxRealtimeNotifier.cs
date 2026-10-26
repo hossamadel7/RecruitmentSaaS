@@ -96,7 +96,7 @@ namespace RecruitmentSaaS.Services
             if (team == null && chat.AssignedSalesAgentId == null && chat.AssignedAiSalesAgentId == null)
                 team = await WhatsAppScope.TeamOfAccountAsync(_context, chat.WhatsAppAccountId);
             var recipients = await _context.Users.AsNoTracking().Where(u => u.IsActive &&
-                (u.Role == 1 || u.Id == chat.AssignedSalesAgentId ||
+                (u.Role == 1 || u.Role == 9 || u.Id == chat.AssignedSalesAgentId ||
                  (team != null && ((u.Role == 7 && u.Id == team) || (u.Role == 8 && u.ManagerId == team)))))
                 .Select(u => u.Id.ToString()).ToListAsync();
             await _hub.Clients.Users(recipients).SendAsync(eventName, payload);

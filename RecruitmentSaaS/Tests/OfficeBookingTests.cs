@@ -134,12 +134,15 @@ public sealed partial class FoundationTests
         await using var verify = fixture.Create(); Assert.Single(await verify.AiOfficeBookings.Where(b => b.ConversationId == s.Chat).ToListAsync());
         Assert.Single(await verify.FollowUpReminders.Where(r => r.LeadId == s.Lead).ToListAsync());
     }
-    [Fact]
-    public async Task Human_outcome_cannot_silently_replace_an_active_AI_booking()
+    [Theory]
+    [InlineData(CustomerOutcomeService.Booked)]
+    [InlineData(CustomerOutcomeService.FollowUp)]
+    [InlineData(CustomerOutcomeService.Waiting)]
+    public async Task Human_outcome_cannot_silently_replace_an_active_AI_booking(string outcome)
     {
         var s = await SeedAsync(); var seed = await OfficeSeedAsync(s); await using var db = fixture.Create();
         await Office(db, s).SaveAsync(s.Chat, null, s.Admin, Request(seed), "protected-office", default);
-        var error = await new CustomerOutcomeService(db).ApplyAsync((await db.WhatsAppConversations.FindAsync(s.Chat))!, CustomerOutcomeService.Booked, seed.Arrival.AddDays(1), null, s.Admin, "Admin");
+        var error = await new CustomerOutcomeService(db).ApplyAsync((await db.WhatsAppConversations.FindAsync(s.Chat))!, outcome, seed.Arrival.AddDays(1), null, s.Admin, "Admin");
         Assert.NotNull(error); Assert.Equal(seed.Arrival, (await db.Leads.FindAsync(s.Lead))!.AppointmentDate);
     }
     [Fact]

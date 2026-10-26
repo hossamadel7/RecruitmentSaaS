@@ -36,7 +36,9 @@ namespace RecruitmentSaaS.Services
             if (lead.AssignedSalesId == null || lead.AssignedAiSalesAgentId != null)
                 return new(false, null, false, "العميل لسه مش متعيّن لموظف");
 
-            var agent = await _context.Users.AsNoTracking().FirstAsync(u => u.Id == lead.AssignedSalesId, ct);
+            var agent = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == lead.AssignedSalesId
+                && u.IsActive && (u.Role == 3 || u.Role == 6 || u.Role == 8), ct);
+            if (agent == null) return new(false, null, false, "الموظف غير نشط — عيّن العميل لموظف نشط الأول");
             var waId = PhoneNumbers.ToWhatsAppId(PhoneNumbers.Normalize(lead.Phone));
             if (!PhoneNumbers.IsValid(waId))
                 return new(false, null, false, "رقم العميل غير صحيح");
@@ -65,9 +67,13 @@ namespace RecruitmentSaaS.Services
             await using var chatGate = await ConversationLock.AcquireAsync(_context, "conversation:" + lockedConversationId, ct);
             await _context.Entry(lead).ReloadAsync(ct);
             if (conversation != null) await _context.Entry(conversation).ReloadAsync(ct);
+            if (conversation != null)
+                conversation.AssignedSalesAgentId = await ChatAssignmentPolicy.ActiveAgentAsync(_context, conversation.AssignedSalesAgentId, ct);
             if (lead.AssignedAiSalesAgentId != null || conversation?.AssignedAiSalesAgentId != null)
                 return new(false, conversation?.Id, false, "AI assignment requires explicit release before a human chat start.");
             if (lead.AssignedSalesId != agent.Id) return new(false, conversation?.Id, false, "Assignment changed; refresh first.");
+            if (await ChatAssignmentPolicy.ActiveAgentAsync(_context, agent.Id, ct) == null)
+                return new(false, conversation?.Id, false, "الموظف غير نشط");
             if (conversation == null)
             {
                 conversation = new WhatsAppConversation

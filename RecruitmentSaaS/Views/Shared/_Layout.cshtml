@@ -1007,6 +1007,21 @@
                 var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
             }
 
+            @if (role == "9")
+            {
+                <div class="sidebar-section">متابعة الفرق</div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Monitoring"?"active":"")" href="/Monitoring/Index">
+                        <span class="nav-icon"><i class="bi bi-bar-chart-line-fill"></i></span> أداء الفرق والتيلي سيلز
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link @(currentController=="Inbox"?"active":"")" href="/Inbox/Index">
+                        <span class="nav-icon"><i class="bi bi-whatsapp"></i></span> كل المحادثات
+                    </a>
+                </div>
+            }
+
             @* ── ADMIN (Role 1) ── *@
             @if (role == "1")
             {
@@ -1383,7 +1398,7 @@
                 <div style="flex:1;min-width:0">
                     <div class="user-name">@User.Identity?.Name</div>
                     <div class="user-role">
-                        @(role switch { "1" => "مدير", "2" => "استقبال", "3" => "تيلي سيلز", "4" => "محاسب", "5" => "عمليات", "6" => "مبيعات مكتبية", "7" => "مدير فريق", "8" => "مدير التيلي سيلز", _ => "مستخدم" })
+                        @(role switch { "1" => "مدير", "2" => "استقبال", "3" => "تيلي سيلز", "4" => "محاسب", "5" => "عمليات", "6" => "مبيعات مكتبية", "7" => "مدير فريق", "8" => "مدير التيلي سيلز", "9" => "مراقب الفرق", _ => "مستخدم" })
                     </div>
                 </div>
                 <form asp-controller="Auth" asp-action="Logout" method="post" class="d-inline">

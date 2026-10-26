@@ -8,15 +8,18 @@ namespace RecruitmentSaaS.Services
     ///   8 TeleSales manager -> SalesAgent + supervisor of their own team only (see WhatsAppScope)
     ///   2 Reception        -> Moderator  (create Messenger handoffs)
     ///   6 Sales, 3 TeleSales -> SalesAgent (reply/act only on conversations assigned to them)
+    ///   9 Team monitoring  -> Read-only access to every team's conversations and performance
     /// Every check here is also meant to be re-verified server-side per request — never trust
     /// the UI alone to hide actions a role shouldn't be able to take.
     /// </summary>
     public static class WhatsAppAuthorization
     {
-        public const string AllowedRoles = "1,2,3,6,7,8";
+        public const string AllowedRoles = "1,2,3,6,7,8,9";
 
-        /// <summary>Sees every team (admin only — team leaders see their own team, see WhatsAppScope).</summary>
-        public static bool IsOrgWide(string? role) => role == "1";
+        /// <summary>Sees every team (admin and monitoring); team leaders retain their own team scope.</summary>
+        public static bool IsOrgWide(string? role) => role == "1" || IsReadOnlyMonitor(role);
+
+        public static bool IsReadOnlyMonitor(string? role) => role == "9";
 
         public static bool IsAdmin(string? role) => role == "1";
 

@@ -34,7 +34,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 .ApplyVisibility(await WhatsAppScope.ForUserAsync(_context, CurrentRole, CurrentUserId));
 
             var accountsQuery = _context.WhatsAppAccounts.AsNoTracking();
-            if (!isAdmin)
+            if (!WhatsAppAuthorization.IsOrgWide(CurrentRole))
                 accountsQuery = accountsQuery.Where(a => a.IsActive);
 
             var accounts = await accountsQuery
@@ -70,13 +70,13 @@ namespace RecruitmentSaaS.Controllers.Api
         [HttpGet("agents")]
         public async Task<IActionResult> ListAgents()
         {
-            if (!WhatsAppAuthorization.CanAssignOrTransfer(CurrentRole))
+            if (!WhatsAppAuthorization.CanAssignOrTransfer(CurrentRole) && !WhatsAppAuthorization.IsReadOnlyMonitor(CurrentRole))
                 return Forbid();
 
             // The TeleSales manager only sees (and transfers between) their own team
             var visible = await WhatsAppScope.VisibleAgentIdsAsync(_context, CurrentRole, CurrentUserId);
             var agentsQuery = _context.Users.AsNoTracking()
-                .Where(u => u.IsActive && (u.Role == 6 || u.Role == 3 || u.Role == 8));
+                .Where(u => (u.IsActive || CurrentRole == "9") && (u.Role == 6 || u.Role == 3 || u.Role == 8));
             if (visible != null)
                 agentsQuery = agentsQuery.Where(u => visible.Contains(u.Id));
             var agents = await agentsQuery
@@ -85,8 +85,9 @@ namespace RecruitmentSaaS.Controllers.Api
                 {
                     u.Id,
                     u.FullName,
+                    u.IsActive,
                     u.ManagerId,
-                    ManagerName = u.Manager != null && u.Manager.IsActive ? u.Manager.FullName : null
+                    ManagerName = u.Manager != null && (u.Manager.IsActive || CurrentRole == "9") ? u.Manager.FullName : null
                 })
                 .ToListAsync();
 

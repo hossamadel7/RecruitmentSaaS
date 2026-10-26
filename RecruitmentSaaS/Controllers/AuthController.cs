@@ -89,6 +89,7 @@ namespace RecruitmentSaaS.Controllers
                 "6" => RedirectToAction("Index", "Sales"),
                 "7" => RedirectToAction("Index", "TeleSalesManager"),
                 "8" => RedirectToAction("Index", "TeleSales"),
+                "9" => RedirectToAction("Index", "Monitoring"),
                 _ => RedirectToAction("Login")
             };
         }

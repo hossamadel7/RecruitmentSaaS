@@ -1,0 +1,26 @@
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "متابعة الفرق والتيلي سيلز";
+    ViewData["Subtitle"] = "أداء كل الفرق ومحادثاتها";
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">متابعة الفرق والتيلي سيلز</h1>
+        <p class="text-muted mb-0">تابع النشاط والحجوزات والمحادثات لكل فريق ومندوب.</p>
+    </div>
+    <a href="/Inbox/Index" class="btn btn-primary"><i class="bi bi-whatsapp"></i> كل المحادثات</a>
+</div>
+<div class="card mb-4">
+    <form id="monitor-filters" class="card-body d-flex flex-wrap gap-3 align-items-end">
+        <div><label for="monitor-from" class="form-label">من</label><input id="monitor-from" type="date" class="form-control" required /></div>
+        <div><label for="monitor-to" class="form-label">إلى</label><input id="monitor-to" type="date" class="form-control" required /></div>
+        <button class="btn btn-primary" type="submit">عرض النتائج</button>
+        <span class="text-muted small">التواريخ بتوقيت مصر · الأرقام غير المقروءة وفي انتظار التعيين تعكس الحالة الحالية.</span>
+    </form>
+</div>
+<div id="monitor-status" class="text-muted mb-3" role="status" aria-live="polite">جارٍ تحميل النتائج...</div>
+<div id="monitor-totals" class="row g-3 mb-4"></div>
+<div id="monitor-teams"></div>
+@section Scripts {
+    <script src="~/js/monitoring.js" asp-append-version="true"></script>
+}

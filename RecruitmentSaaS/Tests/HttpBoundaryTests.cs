@@ -42,6 +42,8 @@ public sealed partial class FoundationTests
         builder.Services.AddScoped<AiChatFactService>();
         builder.Services.AddSingleton<IWhatsAppCloudApiService>(Moq.Mock.Of<IWhatsAppCloudApiService>(Moq.MockBehavior.Strict));
         builder.Services.AddSingleton<IInboxRealtimeNotifier>(Moq.Mock.Of<IInboxRealtimeNotifier>());
+        builder.Services.AddSingleton<INotificationService>(Moq.Mock.Of<INotificationService>());
+        builder.Services.AddScoped<CustomerOutcomeService>();
         builder.Services.Configure<AiOfficeBookingOptions>(o => o.Enabled = true);
         builder.Services.AddScoped<AiOfficeBookingService>();
         builder.Services.AddScoped<AiSalesOperationsService>();
@@ -51,13 +53,17 @@ public sealed partial class FoundationTests
         builder.Services.AddSingleton<IAiVoiceTranscriber>(Moq.Mock.Of<IAiVoiceTranscriber>(Moq.MockBehavior.Strict));
         builder.Services.AddSingleton<IAiSalesDraftProvider>(Moq.Mock.Of<IAiSalesDraftProvider>());
         builder.Services.AddScoped<ConversationMutationFilter>();
-        builder.Services.AddControllersWithViews(o => o.Filters.AddService<ConversationMutationFilter>())
+        builder.Services.AddControllersWithViews(o =>
+            {
+                o.Filters.Add<MonitoringReadOnlyFilter>(int.MinValue);
+                o.Filters.AddService<ConversationMutationFilter>();
+            })
             .AddApplicationPart(typeof(AiSalesController).Assembly);
         builder.Services.AddAntiforgery(o => o.HeaderName = "RequestVerificationToken");
         builder.Services.AddAuthentication("Test").AddScheme<AuthenticationSchemeOptions, SyntheticAuth>("Test", _ => { });
         builder.Services.AddAuthorization();
         var app = builder.Build();
-        app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
+        app.UseAuthentication(); app.UseAuthorization(); app.MapControllers(); app.MapDefaultControllerRoute();
         app.MapGet("/test-token", (HttpContext ctx, IAntiforgery antiforgery) =>
             Results.Text(antiforgery.GetAndStoreTokens(ctx).RequestToken!));
         await app.StartAsync(); return app;

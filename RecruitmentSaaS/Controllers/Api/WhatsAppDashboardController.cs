@@ -122,7 +122,7 @@ namespace RecruitmentSaaS.Controllers.Api
             var toUtc = EgyptTime.ToUtc(toDay.AddDays(1));
 
             // Teams, their TeleSales and their WhatsApp numbers (the number on the team's form)
-            var leaders = await _context.Users.AsNoTracking().Where(u => u.Role == 7 && u.IsActive)
+            var leaders = await _context.Users.AsNoTracking().Where(u => u.Role == 7)
                 .OrderBy(u => u.FullName).Select(u => new { u.Id, u.FullName }).ToListAsync();
             var agents = await _context.Users.AsNoTracking().Where(u => u.Role == 3 || u.Role == 8)
                 .Select(u => new { u.Id, Name = u.FullNameAr != null && u.FullNameAr != "" ? u.FullNameAr : u.FullName, u.ManagerId, u.IsActive }).ToListAsync();
@@ -172,7 +172,7 @@ namespace RecruitmentSaaS.Controllers.Api
             {
                 var teamAccounts = accounts.Where(a => teamOfAccount[a.Id] == teamId).ToList();
                 var accountIds = teamAccounts.Select(a => a.Id).ToHashSet();
-                var members = agents.Where(a => a.ManagerId == teamId && teamId != null).ToList();
+                var members = agents.Where(a => a.ManagerId == teamId).ToList();
                 var memberIds = members.Select(m => m.Id).ToHashSet();
                 var teamCreated = created.Where(c => accountIds.Contains(c.WhatsAppAccountId)).ToList();
                 return new
@@ -193,6 +193,7 @@ namespace RecruitmentSaaS.Controllers.Api
                     members = members
                         .Select(m => new
                         {
+                            m.Id,
                             m.Name,
                             m.IsActive,
                             newChats = created.Count(c => c.AssignedSalesAgentId == m.Id),
@@ -203,14 +204,14 @@ namespace RecruitmentSaaS.Controllers.Api
                             unreadNow = unread.Count(u => u.Agent == m.Id),
                             avgFirstReplyMinutes = AvgReply(created.Where(c => c.AssignedSalesAgentId == m.Id).Select(c => (c.FirstIn, c.FirstHuman)))
                         })
-                        .Where(m => m.IsActive || m.newChats + m.activeChats + m.bookings + m.visits + m.lost > 0)
+                        .Where(m => m.IsActive || CurrentRole == "9" || m.newChats + m.activeChats + m.bookings + m.visits + m.lost > 0)
                         .OrderByDescending(m => m.bookings).ThenByDescending(m => m.activeChats).ThenBy(m => m.Name)
                         .ToList()
                 };
             }
 
             var teams = leaders.Select(l => TeamRow(l.Id, l.FullName)).ToList();
-            if (accounts.Any(a => teamOfAccount[a.Id] == null))
+            if (accounts.Any(a => teamOfAccount[a.Id] == null) || agents.Any(a => a.ManagerId == null))
                 teams.Add(TeamRow(null, "أرقام بدون فريق"));
 
             return Ok(new

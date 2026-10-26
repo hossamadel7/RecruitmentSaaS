@@ -10,7 +10,7 @@
 }
 
 @Html.AntiForgeryToken()
-<div class="inbox-app" id="inbox-app">
+<div class="inbox-app @(currentRole == "9" ? "is-readonly" : "")" id="inbox-app">
     <div class="inbox-columns" id="inbox-columns">
 
         <!-- ══════════ SCREEN 1 (mobile) / COLUMN 1 (desktop) — Accounts + Conversations ══════════ -->
@@ -26,7 +26,7 @@
                     <i class="bi bi-search"></i>
                     <input type="text" id="conv-search" placeholder="بحث بالاسم أو الهاتف أو كود العميل..." />
                 </div>
-                @if (currentRole == "1" || currentRole == "7" || currentRole == "8")
+                @if (currentRole == "1" || currentRole == "7" || currentRole == "8" || currentRole == "9")
                 {
                     @* Admin / TeleSales Manager: chats of one salesperson or one team *@
                     <div class="inbox-agent-filter">
@@ -82,6 +82,10 @@
                 </div>
 
                 <div class="chat-messages" id="chat-messages"></div>
+                @if (currentRole == "9")
+                {
+                    <div class="text-center text-muted p-2 small"><i class="bi bi-eye"></i> متابعة المحادثة — عرض فقط</div>
+                }
 
                 @* WhatsApp's 24-hour rule: shown instead of a usable composer when the customer hasn't written *@
                 <div class="chat-window-closed" id="chat-window-closed" hidden>
@@ -234,7 +238,8 @@
             id: @Html.Raw(Json.Serialize(currentUserId)),
             name: @Html.Raw(Json.Serialize(currentUserName)),
             role: @Html.Raw(Json.Serialize(currentRole)),
-            isOrgWide: @Html.Raw((currentRole == "1" || currentRole == "7" || currentRole == "8") ? "true" : "false"),
+            isOrgWide: @Html.Raw((currentRole == "1" || currentRole == "7" || currentRole == "8" || currentRole == "9") ? "true" : "false"),
+            readOnly: @Html.Raw(currentRole == "9" ? "true" : "false"),
             canAssign: @Html.Raw((currentRole == "1" || currentRole == "7" || currentRole == "8") ? "true" : "false")
         };
         // Let the inbox use the full page body instead of the default padded layout.

@@ -1505,3 +1505,7 @@
 .link-card { display: flex; flex-direction: column; gap: 2px; background: rgba(0, 0, 0, .06); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; text-decoration: none; direction: ltr; text-align: left; }
 .link-card-title { font-weight: 700; font-size: 13.5px; color: #111b21; }
 .link-card-url, .link-card-host { font-size: 12px; color: #667781; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Monitoring can browse and play media without acting on customer conversations. */
+.is-readonly #chat-composer,
+.is-readonly #chat-window-closed,
+.is-readonly .bubble-forward-btn { display: none !important; }

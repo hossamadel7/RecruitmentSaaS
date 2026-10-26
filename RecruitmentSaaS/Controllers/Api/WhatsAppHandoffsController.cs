@@ -45,6 +45,8 @@ namespace RecruitmentSaaS.Controllers.Api
             var assignedAgentId = dto.AssignedSalesAgentId ?? account.AssignedSalesAgentId;
             if (assignedAgentId == null)
                 return BadRequest(new { error = "This account has no default sales agent — pick one explicitly." });
+            if (await ChatAssignmentPolicy.ActiveAgentAsync(_context, assignedAgentId) == null)
+                return BadRequest(new { error = "الموظف ده غير متاح لاستلام المحادثات" });
 
             var visible = await WhatsAppScope.VisibleAgentIdsAsync(_context, CurrentRole, CurrentUserId);
             if (!WhatsAppScope.CanSee(visible, assignedAgentId))

@@ -18,20 +18,20 @@ namespace RecruitmentSaaS.Services
         /// <summary>The team's own WhatsApp numbers: their chats nobody has taken yet are visible too.</summary>
         public List<Guid> TeamAccountIds { get; }
 
-        /// <summary>Salespeople whose assigned chats are visible; null = every salesperson's (admin).</summary>
+        /// <summary>Salespeople whose assigned chats are visible; null = every salesperson's (admin/monitoring).</summary>
         public List<Guid>? Agents { get; }
 
         /// <summary>The team whose waiting chats (left by a deactivated member) are visible.</summary>
         public Guid? TeamLeaderId { get; }
 
-        /// <summary>Every team's waiting chats are visible (admin only).</summary>
+        /// <summary>Every team's waiting chats are visible (admin and monitoring).</summary>
         public bool AllWaiting { get; }
 
         public bool SeesAll => Agents == null && AllWaiting;
     }
 
     /// <summary>
-    /// Whose WhatsApp chats a user may see. Admin sees everything. A team leader (role 7) and the
+    /// Whose WhatsApp chats a user may see. Admin and monitoring see everything. A team leader (role 7) and the
     /// TeleSales manager (role 8) see only their own team: chats assigned to its members, its waiting
     /// chats (left by a deactivated member) and the not-yet-taken chats on the team's WhatsApp number.
     /// Everyone else sees only their own.
@@ -40,7 +40,7 @@ namespace RecruitmentSaaS.Services
     {
         public static async Task<WhatsAppVisibility> ForUserAsync(RecruitmentCrmContext db, string? role, Guid userId, CancellationToken ct = default)
         {
-            if (WhatsAppAuthorization.IsAdmin(role)) return new WhatsAppVisibility(null, null, allWaiting: true);
+            if (WhatsAppAuthorization.IsOrgWide(role)) return new WhatsAppVisibility(null, null, allWaiting: true);
             if (role != "7" && role != "8") return new WhatsAppVisibility(new List<Guid> { userId }, null);
 
             // The team: a team leader's own, or the TeleSales manager's team leader's

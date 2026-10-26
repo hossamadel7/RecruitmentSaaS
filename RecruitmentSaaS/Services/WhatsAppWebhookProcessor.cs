@@ -149,9 +149,10 @@ namespace RecruitmentSaaS.Services
             var now = DateTime.UtcNow;
 
             var contact = await FindOrCreateContactAsync(fromWaId, profileName, now, ct);
-            var (conversation, isNewConversation) = await FindOrCreateConversationAsync(contact, account, now, ct);
+            var (conversation, isNewConversation) = await FindOrCreateConversationAsync(contact, account, now, ct, applyAccountDefault: false);
             await using var chatGate = await ConversationLock.AcquireAsync(_context, "conversation:" + conversation.Id, ct);
             if (!isNewConversation) await _context.Entry(conversation).ReloadAsync(ct);
+            conversation.AssignedSalesAgentId = await ChatAssignmentPolicy.ActiveAgentAsync(_context, conversation.AssignedSalesAgentId, ct);
             await using var inboundTransaction = await _context.Database.BeginTransactionAsync(ct);
 
             var (messageType, textBody, mediaId) = ExtractContent(messageJ);
@@ -194,6 +195,9 @@ namespace RecruitmentSaaS.Services
             conversation.UpdatedAt = now;
 
             await TryConnectHandoffAsync(conversation, account, fromWaId, textBody, now, ct);
+            if (isNewConversation && conversation.AssignedAiSalesAgentId == null && conversation.PendingTeamManagerId == null)
+                conversation.AssignedSalesAgentId = await ChatAssignmentPolicy.ResolveAsync(
+                    _context, conversation.AssignedSalesAgentId, account.AssignedSalesAgentId, ct);
             await TryAssignDirectChatAsync(conversation, textBody, ct);
 
             if (conversation.AssignedAiSalesAgentId != null && !string.IsNullOrWhiteSpace(textBody))
@@ -376,7 +380,7 @@ namespace RecruitmentSaaS.Services
         }
 
         private async Task<(WhatsAppConversation conversation, bool isNew)> FindOrCreateConversationAsync(
-            WhatsAppContact contact, WhatsAppAccount account, DateTime now, CancellationToken ct)
+            WhatsAppContact contact, WhatsAppAccount account, DateTime now, CancellationToken ct, bool applyAccountDefault = true)
         {
             var conversation = await _context.WhatsAppConversations
                 .FirstOrDefaultAsync(c => c.ContactId == contact.Id && c.WhatsAppAccountId == account.Id, ct);
@@ -390,7 +394,9 @@ namespace RecruitmentSaaS.Services
                     Id = Guid.NewGuid(),
                     ContactId = contact.Id,
                     WhatsAppAccountId = account.Id,
-                    AssignedSalesAgentId = account.AssignedSalesAgentId,
+                    // Resolve lead/handoff routing before applying the account's default.
+                    AssignedSalesAgentId = applyAccountDefault
+                        ? await ChatAssignmentPolicy.ActiveAgentAsync(_context, account.AssignedSalesAgentId, ct) : null,
                     Status = (byte)ConversationStatus.New,
                     LeadStage = (byte)LeadStage.New,
                     UnreadCount = 0,
@@ -404,6 +410,8 @@ namespace RecruitmentSaaS.Services
                 conversation.Status = (byte)ConversationStatus.Open;
             }
 
+            conversation.AssignedSalesAgentId = await ChatAssignmentPolicy.ActiveAgentAsync(
+                _context, conversation.AssignedSalesAgentId, ct);
             return (conversation, isNew);
         }
 
@@ -595,8 +603,12 @@ namespace RecruitmentSaaS.Services
             }
 
             conversation.LeadId = handoff.LeadId;
-            if (handoff.AssignedSalesAgentId != Guid.Empty)
-                conversation.AssignedSalesAgentId = handoff.AssignedSalesAgentId;
+            // A reference sent before a transfer must never take the chat from its current owner.
+            var leadOwner = await _context.Leads.Where(l => l.Id == handoff.LeadId)
+                .Select(l => l.AssignedSalesId).SingleOrDefaultAsync(ct);
+            var suggested = await ChatAssignmentPolicy.ResolveAsync(_context, leadOwner, handoff.AssignedSalesAgentId, ct);
+            conversation.AssignedSalesAgentId = await ChatAssignmentPolicy.ResolveAsync(
+                _context, conversation.AssignedSalesAgentId, suggested, ct);
 
             handoff.ConversationId = conversation.Id;
             handoff.Status = (byte)HandoffStatus.Connected;
@@ -639,13 +651,8 @@ namespace RecruitmentSaaS.Services
 
             conversation.LeadId = lead.Id;
 
-            // Don't take a chat away from someone it was deliberately given to — only replace
-            // "nobody" or the number's default agent
-            if (lead.AssignedSalesId != null
-                && (conversation.AssignedSalesAgentId == null || conversation.AssignedSalesAgentId == account.AssignedSalesAgentId))
-            {
-                conversation.AssignedSalesAgentId = lead.AssignedSalesId;
-            }
+            conversation.AssignedSalesAgentId = await ChatAssignmentPolicy.ResolveAsync(
+                _context, conversation.AssignedSalesAgentId, lead.AssignedSalesId, ct);
 
             _context.AuditLogs.Add(new AuditLog
             {

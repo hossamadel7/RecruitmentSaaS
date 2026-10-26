@@ -80,7 +80,7 @@ namespace RecruitmentSaaS.Services
                                               Guid actorId, string actorName)
         {
             var now = DateTime.UtcNow;
-            if (conversation.LeadId != null && outcome is Booked or Visited or Lost or InTurkey &&
+            if (conversation.LeadId != null && outcome is Waiting or FollowUp or Booked or Visited or Lost or InTurkey &&
                 await _context.AiOfficeBookings.AnyAsync(b => b.LeadId == conversation.LeadId && b.Status == AiOfficeBookingStatus.Confirmed))
                 return "يوجد حجز استشارة للمساعد؛ استخدم مراجعة الحجز للإلغاء أو تغيير الموعد، والاستقبال لتأكيد الحضور";
             reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
@@ -103,6 +103,7 @@ namespace RecruitmentSaaS.Services
             switch (outcome)
             {
                 case Waiting:
+                    await ClearOrdinaryBookingAsync(conversation, actorId, actorName, now);
                     conversation.Status = (byte)ConversationStatus.WaitingForCustomer;
                     break;
 
@@ -111,6 +112,7 @@ namespace RecruitmentSaaS.Services
                     if (at == null) return "حدد يوم ووقت المتابعة";
                     var dueUtc = at.Value.Kind == DateTimeKind.Local ? at.Value.ToUniversalTime() : at.Value;
                     if (dueUtc < now.AddMinutes(-5)) return "ميعاد المتابعة لازم يكون بعد دلوقتي";
+                    await ClearOrdinaryBookingAsync(conversation, actorId, actorName, now);
                     conversation.Status = (byte)ConversationStatus.FollowUp;
                     _context.ConversationFollowUps.Add(new ConversationFollowUp
                     {
@@ -205,6 +207,26 @@ namespace RecruitmentSaaS.Services
             conversation.UpdatedAt = now;
             await _context.SaveChangesAsync();
             return null;
+        }
+
+        // The outcome is a single choice. Leaving a booking must update the lead too,
+        // otherwise Current() and the inbox filters keep reporting the previous booking.
+        private async Task ClearOrdinaryBookingAsync(WhatsAppConversation conversation, Guid actorId, string actorName, DateTime now)
+        {
+            var lead = await LeadOfAsync(conversation, create: false);
+            if (lead?.Status != LeadBooked) return;
+
+            lead.AppointmentDate = null;
+            ChangeLeadStatus(lead, LeadInterested, actorId, actorName, "إلغاء موعد المكتب والعودة للمتابعة", now);
+            var reminders = await _context.FollowUpReminders.Where(r => r.LeadId == lead.Id
+                && (r.Status == 1 || r.Status == 2) && r.Notes != null && r.Notes.StartsWith("تذكير: موعد ")).ToListAsync();
+            foreach (var reminder in reminders)
+            {
+                reminder.Status = 3;
+                reminder.DismissedAt = now;
+                reminder.DismissedById = actorId;
+                reminder.UpdatedAt = now;
+            }
         }
 
         // The chat's lead; for a booking we register the customer as a lead if they aren't one yet
