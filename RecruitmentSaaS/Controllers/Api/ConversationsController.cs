@@ -244,6 +244,31 @@ namespace RecruitmentSaaS.Controllers.Api
                 .Where(f => f.ConversationId == id && f.Status == (byte)FollowUpStatus.Pending)
                 .OrderBy(f => f.DueAt).Select(f => (DateTime?)f.DueAt).FirstOrDefaultAsync();
 
+            var referral = await _context.WhatsAppMessages.AsNoTracking()
+                .Where(m => m.ConversationId == id && m.ReferralSourceId != null)
+                .OrderByDescending(m => m.WhatsAppTimestamp)
+                .Select(m => new
+                {
+                    m.ReferralSourceId,
+                    m.ReferralClickId,
+                    m.ReferralHeadline,
+                    m.ReferralBody,
+                    m.ReferralSourceUrl,
+                    m.ReferralCampaignId,
+                    CampaignName = m.ReferralCampaign != null ? m.ReferralCampaign.Name : null
+                })
+                .FirstOrDefaultAsync();
+            if (referral != null)
+            {
+                dto.ReferralSourceId = referral.ReferralSourceId;
+                dto.ReferralClickId = referral.ReferralClickId;
+                dto.ReferralHeadline = referral.ReferralHeadline;
+                dto.ReferralBody = referral.ReferralBody;
+                dto.ReferralSourceUrl = referral.ReferralSourceUrl;
+                dto.ReferralCampaignId = referral.ReferralCampaignId;
+                dto.ReferralCampaignName = referral.CampaignName;
+            }
+
             return Ok(dto);
         }
 

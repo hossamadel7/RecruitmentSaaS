@@ -109,9 +109,10 @@ namespace RecruitmentSaaS.Services
             var lastOut = history.LastOrDefault(m => m.Direction == (byte)MessageDirection.Outgoing);
             var fresh = history.Where(m => m.Direction == (byte)MessageDirection.Incoming
                                         && m.MessageType != (byte)WhatsAppMessageType.Reaction
+                                        && m.MessageType != (byte)WhatsAppMessageType.Unsupported
                                         && (lastOut == null || m.WhatsAppTimestamp >= lastOut.WhatsAppTimestamp)).ToList();
             if (fresh.Count == 0) return;
-            if (fresh.All(m => string.IsNullOrWhiteSpace(m.TextBody) || m.MessageType == (byte)WhatsAppMessageType.Unsupported))
+            if (fresh.All(m => string.IsNullOrWhiteSpace(m.TextBody)))
             {
                 conversation.IntakeNoTextCount++;
                 if (conversation.IntakeNoTextCount >= 2)
@@ -130,7 +131,7 @@ namespace RecruitmentSaaS.Services
             }
 
             // What the customer just wrote (all their messages since our last reply)
-            var said = string.Join(" ", fresh.Where(m => !string.IsNullOrWhiteSpace(m.TextBody) && m.MessageType != (byte)WhatsAppMessageType.Unsupported).Select(m => m.TextBody!.Trim()));
+            var said = string.Join(" ", fresh.Where(m => !string.IsNullOrWhiteSpace(m.TextBody)).Select(m => m.TextBody!.Trim()));
             var norm = IntakeScript.Normalize(said);
 
             if (IntakeScript.WantsPerson(norm))
@@ -243,6 +244,21 @@ namespace RecruitmentSaaS.Services
             var phone = PhoneNumbers.Normalize(conversation.Contact.WhatsAppPhoneNumber);
             var now = DateTime.UtcNow;
 
+            // Click-to-WhatsApp attribution belongs to the inbound message. Carry the latest
+            // referral into a lead created later by intake without overwriting prior attribution.
+            var referral = await _context.WhatsAppMessages.AsNoTracking()
+                .Where(m => m.ConversationId == conversation.Id && m.ReferralSourceId != null)
+                .OrderByDescending(m => m.WhatsAppTimestamp)
+                .Select(m => new
+                {
+                    m.ReferralCampaignId,
+                    m.ReferralSourceId,
+                    m.ReferralHeadline,
+                    CampaignName = m.ReferralCampaign != null ? m.ReferralCampaign.Name : null,
+                    CampaignUtm = m.ReferralCampaign != null ? m.ReferralCampaign.UtmCampaign : null
+                })
+                .FirstOrDefaultAsync(ct);
+
             // Already a lead with this phone (e.g. registered on the site meanwhile): attach to it
             var variants = PhoneNumbers.StoredVariants(phone);
             var lead = conversation.LeadId != null
@@ -273,6 +289,15 @@ namespace RecruitmentSaaS.Services
                     CreatedAt = now
                 };
                 _context.Leads.Add(lead);
+            }
+
+            if (referral != null)
+            {
+                lead.CampaignId ??= referral.ReferralCampaignId;
+                lead.UtmSource ??= "meta";
+                lead.UtmMedium ??= "click-to-whatsapp";
+                lead.UtmCampaign ??= Cut(referral.CampaignUtm ?? referral.CampaignName ?? referral.ReferralHeadline, 200);
+                lead.UtmContent ??= Cut(referral.ReferralSourceId, 200);
             }
             conversation.LeadId = lead.Id;
 

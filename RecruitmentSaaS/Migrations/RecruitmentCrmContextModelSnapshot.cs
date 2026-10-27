@@ -3998,6 +3998,37 @@ namespace RecruitmentSaaS.Migrations
                         .HasColumnType("smallint")
                         .HasDefaultValue((byte)1);
 
+                    b.Property<string>("ReferralBody")
+                        .HasMaxLength(2000)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid?>("ReferralCampaignId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReferralClickId")
+                        .HasMaxLength(1000)
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReferralHeadline")
+                        .HasMaxLength(500)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("ReferralMediaType")
+                        .HasMaxLength(30)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("ReferralSourceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReferralSourceType")
+                        .HasMaxLength(30)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("ReferralSourceUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("ReplyToMessageId")
                         .HasColumnType("uuid");
 
@@ -4038,6 +4069,10 @@ namespace RecruitmentSaaS.Migrations
 
                     b.HasIndex(new[] { "ConversationId", "CreatedAt" }, "IX_demorecruitment_WA_Msg_Cnv")
                         .IsDescending(false, true);
+
+                    b.HasIndex(new[] { "ReferralCampaignId" }, "IX_demorecruitment_WA_Msg_ReferralCampaign");
+
+                    b.HasIndex(new[] { "ReferralSourceId" }, "IX_demorecruitment_WA_Msg_ReferralSource");
 
                     b.HasIndex(new[] { "Status" }, "IX_demorecruitment_WA_Msg_Status");
 
@@ -5289,6 +5324,12 @@ namespace RecruitmentSaaS.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_demorecruitment_WA_Msg_Cnv");
 
+                    b.HasOne("RecruitmentSaaS.Models.Entities.Campaign", "ReferralCampaign")
+                        .WithMany()
+                        .HasForeignKey("ReferralCampaignId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_demorecruitment_WA_Msg_ReferralCampaign");
+
                     b.HasOne("RecruitmentSaaS.Models.Entities.WhatsAppMessage", "ReplyToMessage")
                         .WithMany()
                         .HasForeignKey("ReplyToMessageId")
@@ -5313,6 +5354,8 @@ namespace RecruitmentSaaS.Migrations
                         .HasConstraintName("FK_demorecruitment_WA_Msg_Acc");
 
                     b.Navigation("Conversation");
+
+                    b.Navigation("ReferralCampaign");
 
                     b.Navigation("ReplyToMessage");
 
