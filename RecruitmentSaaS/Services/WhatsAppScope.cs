@@ -18,6 +18,8 @@ namespace RecruitmentSaaS.Services
         /// <summary>The team's own WhatsApp numbers: their chats nobody has taken yet are visible too.</summary>
         public List<Guid> TeamAccountIds { get; }
 
+        public List<Guid> SharedAgents { get; set; } = new();
+
         /// <summary>Salespeople whose assigned chats are visible; null = every salesperson's (admin/monitoring).</summary>
         public List<Guid>? Agents { get; }
 
@@ -50,11 +52,12 @@ namespace RecruitmentSaaS.Services
             var ids = teamLeaderId == null
                 ? new List<Guid>()
                 : await db.Users.AsNoTracking()
-                    .Where(u => u.ManagerId == teamLeaderId && (u.Role == 3 || u.Role == 8))
+                    .Where(u => (u.ManagerId == teamLeaderId || u.TeamMemberships.Any(m => m.ManagerId == teamLeaderId)) && (u.Role == 3 || u.Role == 8))
                     .Select(u => u.Id).ToListAsync(ct);
             if (!ids.Contains(userId)) ids.Add(userId);
             var accounts = teamLeaderId == null ? new List<Guid>() : await TeamAccountIdsAsync(db, teamLeaderId.Value, ct);
-            return new WhatsAppVisibility(ids, teamLeaderId, teamAccountIds: accounts);
+            var shared = await db.Users.Where(u => ids.Contains(u.Id) && u.TeamMemberships.Any()).Select(u => u.Id).ToListAsync(ct);
+            return new WhatsAppVisibility(ids, teamLeaderId, teamAccountIds: accounts) { SharedAgents = shared };
         }
 
         /// <summary>The WhatsApp numbers that belong to a team (the number on its registration form).</summary>
@@ -93,17 +96,21 @@ namespace RecruitmentSaaS.Services
             var leader = v.TeamLeaderId;
             var agents = v.Agents;
             var accounts = v.TeamAccountIds;
+            var shared = v.SharedAgents;
             return leader == null
                 ? query.Where(c => c.AssignedSalesAgentId != null && agents.Contains(c.AssignedSalesAgentId.Value))
-                : query.Where(c => (c.AssignedSalesAgentId != null && agents.Contains(c.AssignedSalesAgentId.Value))
+                : query.Where(c => (c.AssignedSalesAgentId != null && agents.Contains(c.AssignedSalesAgentId.Value)
+                                    && (!shared.Contains(c.AssignedSalesAgentId.Value) || (c.Lead != null && c.Lead.TeamManagerId != null
+                                        ? c.Lead.TeamManagerId == leader : accounts.Contains(c.WhatsAppAccountId))))
                                 || (c.AssignedSalesAgentId == null && c.PendingTeamManagerId == leader)
                                 || (c.AssignedSalesAgentId == null && c.AssignedAiSalesAgentId == null && c.PendingTeamManagerId == null && accounts.Contains(c.WhatsAppAccountId)));
         }
 
-        public static bool CanSee(WhatsAppVisibility v, Guid? assignedAgentId, Guid? pendingTeamManagerId, Guid accountId, Guid? aiAgentId = null)
+        public static bool CanSee(WhatsAppVisibility v, Guid? assignedAgentId, Guid? pendingTeamManagerId, Guid accountId, Guid? aiAgentId = null, Guid? leadTeamManagerId = null)
         {
             if (v.SeesAll || v.Agents == null) return true;
-            if (assignedAgentId.HasValue) return v.Agents.Contains(assignedAgentId.Value);
+            if (assignedAgentId.HasValue) return v.Agents.Contains(assignedAgentId.Value)
+                && (v.TeamLeaderId == null || !v.SharedAgents.Contains(assignedAgentId.Value) || (leadTeamManagerId != null ? leadTeamManagerId == v.TeamLeaderId : v.TeamAccountIds.Contains(accountId)));
             if (pendingTeamManagerId != null) return pendingTeamManagerId == v.TeamLeaderId;   // a team's waiting chat: that team only
             return aiAgentId == null && v.TeamLeaderId != null && v.TeamAccountIds.Contains(accountId);           // not taken yet: the number's team
         }

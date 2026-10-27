@@ -3388,6 +3388,21 @@ namespace RecruitmentSaaS.Migrations
                     b.ToTable("TeamLeadForms", "demorecruitment");
                 });
 
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.TeleSalesTeamMembership", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ManagerId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("UserId", "ManagerId");
+
+                    b.HasIndex("ManagerId");
+
+                    b.ToTable("TeleSalesTeamMemberships", "demorecruitment");
+                });
+
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5119,6 +5134,25 @@ namespace RecruitmentSaaS.Migrations
                     b.Navigation("Manager");
                 });
 
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.TeleSalesTeamMembership", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.User", "Manager")
+                        .WithMany()
+                        .HasForeignKey("ManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.User", "User")
+                        .WithMany("TeamMemberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Manager");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.User", b =>
                 {
                     b.HasOne("RecruitmentSaaS.Models.Entities.Branch", "Branch")
@@ -5481,6 +5515,8 @@ namespace RecruitmentSaaS.Migrations
                     b.Navigation("StageApprovalRequestRequestedBies");
 
                     b.Navigation("StageApprovalRequestReviewedBies");
+
+                    b.Navigation("TeamMemberships");
 
                     b.Navigation("VisaUploads");
                 });

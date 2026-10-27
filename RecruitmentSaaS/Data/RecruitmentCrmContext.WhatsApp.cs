@@ -278,6 +278,13 @@ public partial class RecruitmentCrmContext
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
         });
 
+        modelBuilder.Entity<TeleSalesTeamMembership>(e =>
+        {
+            e.ToTable("TeleSalesTeamMemberships", "demorecruitment");
+            e.HasKey(x => new { x.UserId, x.ManagerId });
+            e.HasOne(x => x.User).WithMany(x => x.TeamMemberships).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Manager).WithMany().HasForeignKey(x => x.ManagerId).OnDelete(DeleteBehavior.Restrict);
+        });
         ConfigureLeadForm(modelBuilder);
         ConfigureLeadRotation(modelBuilder);
 

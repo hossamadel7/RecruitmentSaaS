@@ -133,7 +133,7 @@
 
                         // Count team members for managers (Role 7)
                         int teamCount = u.Role == 7
-                        ? allTeleSales.Count(x => x.ManagerId == u.Id)
+                        ? allTeleSales.Count(x => (x.ManagerId == u.Id || x.TeamMemberships.Any(m => m.ManagerId == u.Id)))
                         : 0;
 
                         <tr class="@(!u.IsActive ? "u-inactive" : "")">
@@ -185,7 +185,10 @@
                                 }
                                 else if (u.Role == 3 || u.Role == 8)
                                 {
-                                    @* TeleSales row: show current manager *@
+                                    @foreach (var membership in u.TeamMemberships)
+                                    {
+                                        <span style="color:#7c3aed;font-size:.8rem;display:block;">@membership.Manager.FullName</span>
+                                    }
                                     @if (u.Manager != null)
                                     {
                                         <span style="color:#7c3aed;font-size:.8rem;">
@@ -331,9 +334,8 @@
                 else
                 {
                     <input type="hidden" name="managerId" value="@mgrId" />
-                    <button type="submit" class="btn btn-sm team-btn-add"
-                            @(group == "other" ? "onclick=\"return confirm('الموظف ده في فريق تاني — هيتنقل لهذا الفريق. متأكد؟')\"" : "")>
-                        <i class="bi bi-plus-circle-fill"></i> @(group == "other" ? "نقل للفريق" : "إضافة للفريق")
+                    <button type="submit" class="btn btn-sm team-btn-add">
+                        <i class="bi bi-plus-circle-fill"></i> إضافة للفريق
                     </button>
                 }
             </form>
@@ -400,9 +402,9 @@
 
 @foreach (var mgr in managers7)
 {
-    var inTeam = telesalesUsers.Where(t => t.ManagerId == mgr.Id).OrderBy(t => !t.IsActive).ThenBy(t => t.FullName).ToList();
-    var unassigned = telesalesUsers.Where(t => t.ManagerId == null).OrderBy(t => !t.IsActive).ThenBy(t => t.FullName).ToList();
-    var inOtherTeams = telesalesUsers.Where(t => t.ManagerId != null && t.ManagerId != mgr.Id)
+    var inTeam = telesalesUsers.Where(t => (t.ManagerId == mgr.Id || t.TeamMemberships.Any(m => m.ManagerId == mgr.Id))).OrderBy(t => !t.IsActive).ThenBy(t => t.FullName).ToList();
+    var unassigned = telesalesUsers.Where(t => t.ManagerId == null && !t.TeamMemberships.Any()).OrderBy(t => !t.IsActive).ThenBy(t => t.FullName).ToList();
+    var inOtherTeams = telesalesUsers.Where(t => (t.ManagerId != null || t.TeamMemberships.Any()) && t.ManagerId != mgr.Id && !t.TeamMemberships.Any(m => m.ManagerId == mgr.Id))
                                      .OrderBy(t => t.Manager?.FullName).ThenBy(t => t.FullName).ToList();
 
     <div class="modal fade team-modal" id="manageTeamModal_@mgr.Id" tabindex="-1" aria-hidden="true">
@@ -423,6 +425,7 @@
                     }
                     else
                     {
+                        <p class="text-muted">يمكن إضافة موظف التيلي سيلز لأكثر من فريق. الإزالة تخص هذا الفريق فقط.</p>
                         <div class="team-toolbar">
                             <div class="team-search">
                                 <i class="bi bi-search"></i>

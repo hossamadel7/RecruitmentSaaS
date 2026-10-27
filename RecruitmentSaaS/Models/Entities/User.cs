@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -27,6 +27,8 @@ public partial class User
     public decimal BaseSalary { get; set; }
 
     public Guid? ManagerId { get; set; }
+
+    public virtual ICollection<TeleSalesTeamMembership> TeamMemberships { get; set; } = new List<TeleSalesTeamMembership>();
 
     [ForeignKey("BranchId")]
     [InverseProperty("Users")]

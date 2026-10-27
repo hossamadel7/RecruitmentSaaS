@@ -153,6 +153,7 @@ namespace RecruitmentSaaS.Controllers
 
             var query = _context.Users
                 .Include(u => u.Manager)
+                .Include(u => u.TeamMemberships).ThenInclude(m => m.Manager)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(q))
@@ -162,9 +163,9 @@ namespace RecruitmentSaaS.Controllers
                 query = query.Where(u => u.Role == role.Value);
 
             if (team == "none")
-                query = query.Where(u => (u.Role == 3 || u.Role == 8) && u.ManagerId == null);
+                query = query.Where(u => (u.Role == 3 || u.Role == 8) && u.ManagerId == null && !u.TeamMemberships.Any());
             else if (Guid.TryParse(team, out var teamManagerId))
-                query = query.Where(u => u.Id == teamManagerId || u.ManagerId == teamManagerId);
+                query = query.Where(u => u.Id == teamManagerId || u.ManagerId == teamManagerId || u.TeamMemberships.Any(m => m.ManagerId == teamManagerId));
 
             // Counts for the status options use every other filter, so the numbers match what you'd see
             ViewBag.ActiveCount = await query.CountAsync(u => u.IsActive);
@@ -184,6 +185,7 @@ namespace RecruitmentSaaS.Controllers
             // Team counts and the "manage team" modal must ignore the search/role filter
             var allTeleSales = await _context.Users
                 .Include(u => u.Manager)
+                .Include(u => u.TeamMemberships).ThenInclude(m => m.Manager)
                 .Where(u => u.Role == 3 || u.Role == 8)   // 8 = the team's TeleSales manager
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
@@ -232,6 +234,12 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("Users");
             }
 
+            if ((role == 3 || role == 8) && managerId.HasValue
+                && !await _context.Users.AnyAsync(u => u.Id == managerId && u.Role == 7 && u.IsActive))
+            {
+                TempData["Error"] = "مدير الفريق غير صحيح";
+                return RedirectToAction("Users");
+            }
             var user = new User
             {
                 Id = Guid.NewGuid(),
@@ -260,7 +268,7 @@ namespace RecruitmentSaaS.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AssignManager(Guid userId, Guid? managerId, Guid? reopenTeam)
         {
-            var user = await _context.Users.FindAsync(userId);
+            var user = await _context.Users.Include(u => u.TeamMemberships).FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null || (user.Role != 3 && user.Role != 8))
             {
                 TempData["Error"] = "المستخدم غير موجود أو ليس تيلي سيلز";
@@ -275,14 +283,47 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("Users", new { openTeam = reopenTeam });
             }
 
-            user.ManagerId = managerId;
+            if (managerId.HasValue && !await _context.Users.AnyAsync(u => u.Id == managerId && u.Role == 7 && u.IsActive))
+            {
+                TempData["Error"] = "مدير الفريق غير صحيح";
+                return RedirectToAction("Users", new { openTeam = reopenTeam });
+            }
+            if (user.Role == 3)
+            {
+                if (managerId.HasValue)
+                {
+                    // Preserve ownership of old leads before this person starts working across teams.
+                    if (user.ManagerId.HasValue && user.ManagerId != managerId)
+                    {
+                        var legacyLeads = await _context.Leads.Where(l => l.AssignedSalesId == user.Id && l.TeamManagerId == null).ToListAsync();
+                        foreach (var lead in legacyLeads) lead.TeamManagerId = user.ManagerId;
+                    }
+                    if (user.ManagerId == null) user.ManagerId = managerId;
+                    else if (user.ManagerId != managerId && !user.TeamMemberships.Any(m => m.ManagerId == managerId))
+                        user.TeamMemberships.Add(new TeleSalesTeamMembership { UserId = user.Id, ManagerId = managerId.Value });
+                }
+                else if (reopenTeam.HasValue)
+                {
+                    var membership = user.TeamMemberships.FirstOrDefault(m => m.ManagerId == reopenTeam);
+                    if (membership != null) _context.Remove(membership);
+                    if (user.ManagerId == reopenTeam)
+                    {
+                        var legacyLeads = await _context.Leads.Where(l => l.AssignedSalesId == user.Id && l.TeamManagerId == null).ToListAsync();
+                        foreach (var lead in legacyLeads) lead.TeamManagerId = user.ManagerId;
+                        var next = user.TeamMemberships.FirstOrDefault(m => m.ManagerId != reopenTeam);
+                        user.ManagerId = next?.ManagerId;
+                        if (next != null) _context.Remove(next);
+                    }
+                }
+            }
+            else user.ManagerId = managerId;
             await _context.SaveChangesAsync();
 
             var managerName = managerId.HasValue
                 ? (await _context.Users.FindAsync(managerId.Value))?.FullName ?? "—"
                 : "بدون مدير";
 
-            TempData["Success"] = $"تم تعيين {user.FullName} تحت إشراف {managerName}";
+            TempData["Success"] = managerId.HasValue ? $"تمت إضافة {user.FullName} لفريق {managerName}" : $"تمت إزالة {user.FullName} من هذا الفريق";
             return RedirectToAction("Users", new { openTeam = reopenTeam });
         }
 
@@ -422,7 +463,7 @@ namespace RecruitmentSaaS.Controllers
             foreach (var lead in leads)
             {
                 lead.AssignedSalesId = target.Id;
-                lead.TeamManagerId = target.ManagerId ?? lead.TeamManagerId;
+                lead.TeamManagerId ??= target.ManagerId;
                 lead.UpdatedAt = now;
                 _context.LeadActivities.Add(new LeadActivity
                 {
@@ -468,7 +509,8 @@ namespace RecruitmentSaaS.Controllers
             foreach (var chat in chats)
             {
                 chat.AssignedSalesAgentId = null;
-                chat.PendingTeamManagerId = team;
+                var leadTeam = chat.LeadId == null ? null : await _context.Leads.Where(l => l.Id == chat.LeadId).Select(l => l.TeamManagerId).SingleOrDefaultAsync();
+                chat.PendingTeamManagerId = leadTeam ?? await WhatsAppScope.TeamOfAccountAsync(_context, chat.WhatsAppAccountId) ?? team;
                 chat.UpdatedAt = now;
             }
 
@@ -556,7 +598,7 @@ namespace RecruitmentSaaS.Controllers
                     return RedirectToAction("Users");
                 }
                 // A team leader with members would leave them without a team
-                if (user.Role == 7 && await _context.Users.AnyAsync(u => u.ManagerId == user.Id))
+                if (user.Role == 7 && await _context.Users.AnyAsync(u => u.ManagerId == user.Id || u.TeamMemberships.Any(m => m.ManagerId == user.Id)))
                 {
                     TempData["Error"] = $"{user.FullName} عنده موظفين في فريقه — انقلهم لفريق تاني الأول من \"إدارة الفريق\"";
                     return RedirectToAction("Users");
@@ -593,6 +635,8 @@ namespace RecruitmentSaaS.Controllers
             if (roleChanged)
             {
                 user.Role = (byte)role!.Value;
+                if (user.Role != 3)
+                    _context.RemoveRange(await _context.Set<TeleSalesTeamMembership>().Where(m => m.UserId == user.Id).ToListAsync());
                 if (user.Role != 3 && user.Role != 8) user.ManagerId = null; // only TeleSales / TeleSales manager belong to a team
             }
             await _context.SaveChangesAsync();

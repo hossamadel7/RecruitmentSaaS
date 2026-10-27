@@ -302,7 +302,7 @@ namespace RecruitmentSaaS.Services
             if (agentId == null && toRotation)
             {
                 agentId = team != null
-                    ? await LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => u.ManagerId == team), LeadDistributor.TeamScope(team.Value), ct)
+                    ? await LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => (u.ManagerId == team || u.TeamMemberships.Any(m => m.ManagerId == team))), LeadDistributor.TeamScope(team.Value), ct)
                     : await LeadDistributor.NextTeleSalesAsync(_context, _context.Users, LeadDistributor.AllScope, ct);
             }
 
@@ -369,7 +369,7 @@ namespace RecruitmentSaaS.Services
             var link = $"/Inbox/Index?c={conversationId}";
             var ids = team == null
                 ? await _context.Users.Where(u => u.IsActive && u.Role == 1).Select(u => u.Id).ToListAsync(ct)   // general number: admins
-                : await _context.Users.Where(u => u.IsActive && (u.Id == team || (u.Role == 8 && u.ManagerId == team))).Select(u => u.Id).ToListAsync(ct);
+                : await _context.Users.Where(u => u.IsActive && (u.Id == team || (u.Role == 8 && (u.ManagerId == team || u.TeamMemberships.Any(m => m.ManagerId == team))))).Select(u => u.Id).ToListAsync(ct);
             foreach (var id in ids) await NotifyAsync(id, title, body, link);
         }
 

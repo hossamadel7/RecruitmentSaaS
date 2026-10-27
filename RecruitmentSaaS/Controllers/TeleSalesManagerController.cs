@@ -42,7 +42,7 @@ namespace RecruitmentSaaS.Controllers
             var me = CurrentUserId;
             return leader == null
                 ? _context.Users.Where(u => u.Id == me)
-                : _context.Users.Where(u => u.ManagerId == leader && (u.Role == 3 || u.Role == 8));
+                : _context.Users.Where(u => (u.ManagerId == leader || u.TeamMemberships.Any(m => m.ManagerId == leader)) && (u.Role == 3 || u.Role == 8));
         }
 
         // ── GET /TeleSalesManager/Index ──────────────────────────────────────
@@ -91,7 +91,7 @@ namespace RecruitmentSaaS.Controllers
             }
 
             // ── All leads assigned to my team THIS month ─────────────────────
-            var allLeadsCur = await _context.Leads
+            var allLeadsCur = await TeamLeadsScope(myTeamIds)
                 .Where(l => myTeamIds.Contains(l.AssignedSalesId ?? Guid.Empty)
                          && l.CreatedAt >= curStart && l.CreatedAt < curEnd)
                 .Select(l => new
@@ -104,7 +104,7 @@ namespace RecruitmentSaaS.Controllers
                 .ToListAsync();
 
             // ── All leads assigned to my team PREVIOUS month ─────────────────
-            var allLeadsPrev = await _context.Leads
+            var allLeadsPrev = await TeamLeadsScope(myTeamIds)
                 .Where(l => myTeamIds.Contains(l.AssignedSalesId ?? Guid.Empty)
                          && l.CreatedAt >= prevStart && l.CreatedAt < prevEnd)
                 .Select(l => new { l.AssignedSalesId, l.IsConverted })
@@ -214,7 +214,7 @@ namespace RecruitmentSaaS.Controllers
 
             if (member == null) return Forbid();
 
-            var leads = await _context.Leads
+            var leads = await TeamLeadsScope(new List<Guid> { userId })
                 .Include(l => l.Campaign)
                 .Where(l => l.AssignedSalesId == userId
                           && l.CreatedAt >= curStart
@@ -316,7 +316,7 @@ namespace RecruitmentSaaS.Controllers
         {
             var leader = TeamLeaderId();
             return _context.Leads.Where(l => (leader != null && l.TeamManagerId == leader)
-                                          || (l.AssignedSalesId != null && teamIds.Contains(l.AssignedSalesId.Value)));
+                                          || (l.TeamManagerId == null && l.AssignedSales != null && l.AssignedSales.ManagerId == leader && teamIds.Contains(l.AssignedSalesId!.Value)));
         }
 
         // ── POST /TeleSalesManager/AssignTeamLead ────────────────────────────
@@ -350,6 +350,7 @@ namespace RecruitmentSaaS.Controllers
 
             var previous = lead.AssignedSales;
             lead.AssignedSalesId = member.Id;
+            lead.TeamManagerId ??= TeamLeaderId();
             lead.UpdatedAt = DateTime.UtcNow;
 
             // The customer's WhatsApp chat follows the lead (unless someone else deliberately holds it).

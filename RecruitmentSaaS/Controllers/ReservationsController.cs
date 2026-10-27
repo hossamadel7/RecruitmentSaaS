@@ -48,6 +48,7 @@ namespace RecruitmentSaaS.Controllers
             // Whose numbers this page shows
             var agentsQuery = _context.Users.AsNoTracking().Where(u => u.Role == 3 || u.Role == 8);
             List<(Guid Id, string Name)> teams = new();
+            Guid? reportTeam = IsAdmin ? team : null;
             if (IsAdmin)
             {
                 teams = (await _context.Users.AsNoTracking()
@@ -56,7 +57,7 @@ namespace RecruitmentSaaS.Controllers
                         .Select(u => new { u.Id, u.FullName })
                         .ToListAsync())
                     .Select(t => (t.Id, t.FullName)).ToList();
-                if (team != null) agentsQuery = agentsQuery.Where(u => u.ManagerId == team);
+                if (team != null) agentsQuery = agentsQuery.Where(u => (u.ManagerId == team || u.TeamMemberships.Any(m => m.ManagerId == team)));
             }
             else
             {
@@ -64,7 +65,8 @@ namespace RecruitmentSaaS.Controllers
                 var leader = User.IsInRole("8")
                     ? await _context.Users.Where(u => u.Id == me).Select(u => u.ManagerId).FirstOrDefaultAsync()
                     : me;
-                agentsQuery = leader == null ? agentsQuery.Where(u => u.Id == me) : agentsQuery.Where(u => u.ManagerId == leader);
+                agentsQuery = leader == null ? agentsQuery.Where(u => u.Id == me) : agentsQuery.Where(u => (u.ManagerId == leader || u.TeamMemberships.Any(m => m.ManagerId == leader)));
+                reportTeam = leader;
                 team = null;
             }
 
@@ -77,7 +79,7 @@ namespace RecruitmentSaaS.Controllers
             var toUtc = EgyptTime.ToUtc(toDay.AddDays(1));
 
             var bookings = await _context.LeadFunnelHistories.AsNoTracking()
-                .Where(h => h.ToStatus == Booked && ids.Contains(h.ChangedById) && h.CreatedAt >= fromUtc && h.CreatedAt < toUtc &&
+                .Where(h => (reportTeam == null || h.Lead.TeamManagerId == reportTeam || (h.Lead.TeamManagerId == null && h.Lead.AssignedSales != null && h.Lead.AssignedSales.ManagerId == reportTeam)) && h.ToStatus == Booked && ids.Contains(h.ChangedById) && h.CreatedAt >= fromUtc && h.CreatedAt < toUtc &&
                     !_context.AiOfficeBookingEvents.Any(e => e.FunnelHistoryId == h.Id))
                 .Select(h => new { h.LeadId, h.ChangedById, h.CreatedAt, LeadStatus = h.Lead.Status })
                 .ToListAsync();
@@ -102,14 +104,14 @@ namespace RecruitmentSaaS.Controllers
 
             // Visits in the period, whoever recorded them, credited to the lead's TeleSales
             var visits = await _context.LeadFunnelHistories.AsNoTracking()
-                .Where(h => h.ToStatus == Visited && h.CreatedAt >= fromUtc && h.CreatedAt < toUtc
+                .Where(h => (reportTeam == null || h.Lead.TeamManagerId == reportTeam || (h.Lead.TeamManagerId == null && h.Lead.AssignedSales != null && h.Lead.AssignedSales.ManagerId == reportTeam)) && h.ToStatus == Visited && h.CreatedAt >= fromUtc && h.CreatedAt < toUtc
                          && h.Lead.AssignedSalesId != null && ids.Contains(h.Lead.AssignedSalesId.Value))
                 .Select(h => h.LeadId).Distinct().CountAsync();
 
             // Office appointments: the coming week, plus booked customers whose day passed without a visit
             var weekEnd = today.AddDays(8);
             var appointments = await _context.Leads.AsNoTracking()
-                .Where(l => l.Status == Booked && l.AppointmentDate != null && l.AppointmentDate < weekEnd
+                .Where(l => (reportTeam == null || l.TeamManagerId == reportTeam || (l.TeamManagerId == null && l.AssignedSales != null && l.AssignedSales.ManagerId == reportTeam)) && l.Status == Booked && l.AppointmentDate != null && l.AppointmentDate < weekEnd
                          && l.AppointmentDate >= today.AddDays(-14)
                          && l.AssignedSalesId != null && ids.Contains(l.AssignedSalesId.Value))
                 .OrderBy(l => l.AppointmentDate)

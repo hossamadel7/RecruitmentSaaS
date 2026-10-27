@@ -52,8 +52,11 @@ namespace RecruitmentSaaS.Controllers.Api
         private async Task<WhatsAppVisibility> VisibilityAsync() =>
             _visibility ??= await WhatsAppScope.ForUserAsync(_context, CurrentRole, CurrentUserId);
 
-        private async Task<bool> CanSeeAsync(WhatsAppConversation c) =>
-            WhatsAppScope.CanSee(await VisibilityAsync(), c.AssignedSalesAgentId, c.PendingTeamManagerId, c.WhatsAppAccountId, c.AssignedAiSalesAgentId);
+        private async Task<bool> CanSeeAsync(WhatsAppConversation c)
+        {
+            var leadTeam = c.LeadId == null ? null : await _context.Leads.Where(l => l.Id == c.LeadId).Select(l => l.TeamManagerId).SingleOrDefaultAsync();
+            return WhatsAppScope.CanSee(await VisibilityAsync(), c.AssignedSalesAgentId, c.PendingTeamManagerId, c.WhatsAppAccountId, c.AssignedAiSalesAgentId, leadTeam);
+        }
 
         // May a chat be given to this person? (the TeleSales manager: only their team)
         private async Task<bool> CanSeeAgentAsync(Guid agentId) =>
@@ -128,7 +131,7 @@ namespace RecruitmentSaaS.Controllers.Api
 
             // All chats of one TeleSales team (agents whose manager is <team>)
             if (team.HasValue)
-                query = query.Where(c => c.AssignedSalesAgent != null && c.AssignedSalesAgent.ManagerId == team.Value);
+                query = query.Where(c => c.AssignedSalesAgent != null && (c.AssignedSalesAgent.ManagerId == team.Value || c.AssignedSalesAgent.TeamMemberships.Any(m => m.ManagerId == team.Value)));
 
             if (!string.IsNullOrWhiteSpace(search))
             {

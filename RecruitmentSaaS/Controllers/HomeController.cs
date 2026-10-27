@@ -329,7 +329,7 @@ namespace RecruitmentSaaS.Controllers
 
         // The team's own rotation (order and leads-per-turn set by the manager on "توزيع الليدز")
         private Task<Guid?> NextTeamMemberAsync(Guid managerId) =>
-            LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => u.ManagerId == managerId),
+            LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => (u.ManagerId == managerId || u.TeamMemberships.Any(m => m.ManagerId == managerId))),
                 LeadDistributor.TeamScope(managerId));
 
         private async Task NotifyTeamAsync(Guid managerId, Guid? assignedSalesId, Guid leadId, string fullName, byte age)

@@ -175,7 +175,7 @@ public sealed class AiSalesControlService(RecruitmentCrmContext db, IOptions<AiS
 
     private async Task<Guid?> ActiveUserAsync(Guid? id, Guid? teamId, CancellationToken ct) => id != null &&
         await db.Users.AnyAsync(u => u.Id == id && u.IsActive && (u.Role == 3 || u.Role == 8)
-            && u.ManagerId == teamId, ct) ? id : null;
+            && (u.ManagerId == teamId || u.TeamMemberships.Any(m => m.ManagerId == teamId)), ct) ? id : null;
     private async Task<ConversationControl> GetControlAsync(WhatsAppConversation chat, CancellationToken ct)
     {
         var control = await db.ConversationControls.SingleOrDefaultAsync(c => c.ConversationId == chat.Id, ct);

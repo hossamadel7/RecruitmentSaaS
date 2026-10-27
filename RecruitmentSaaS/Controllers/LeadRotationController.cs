@@ -149,7 +149,7 @@ namespace RecruitmentSaaS.Controllers
             if (!IsAdmin)
             {
                 var me = CurrentUserId;
-                return (under ? LeadDistributor.TeamUnderAgeScope(me) : LeadDistributor.TeamScope(me), _context.Users.Where(u => u.ManagerId == me), "فريقي");
+                return (under ? LeadDistributor.TeamUnderAgeScope(me) : LeadDistributor.TeamScope(me), _context.Users.Where(u => (u.ManagerId == me || u.TeamMemberships.Any(m => m.ManagerId == me))), "فريقي");
             }
 
             if (string.IsNullOrEmpty(scope) || scope == LeadDistributor.AllScope)
@@ -162,7 +162,7 @@ namespace RecruitmentSaaS.Controllers
             if (manager == null) return null;
 
             return (under ? LeadDistributor.TeamUnderAgeScope(manager.Id) : LeadDistributor.TeamScope(manager.Id),
-                    _context.Users.Where(u => u.ManagerId == manager.Id), "فريق " + manager.FullName);
+                    _context.Users.Where(u => (u.ManagerId == manager.Id || u.TeamMemberships.Any(m => m.ManagerId == manager.Id))), "فريق " + manager.FullName);
         }
     }
 }

@@ -92,7 +92,8 @@ namespace RecruitmentSaaS.Services
             if (chat == null) return;
             var ownerTeam = chat.AssignedSalesAgentId == null ? null : await _context.Users
                 .Where(u => u.Id == chat.AssignedSalesAgentId).Select(u => u.ManagerId).SingleOrDefaultAsync();
-            var team = chat.PendingTeamManagerId ?? ownerTeam;
+            var leadTeam = chat.LeadId == null ? null : await _context.Leads.Where(l => l.Id == chat.LeadId).Select(l => l.TeamManagerId).SingleOrDefaultAsync();
+            var team = chat.PendingTeamManagerId ?? leadTeam ?? await WhatsAppScope.TeamOfAccountAsync(_context, chat.WhatsAppAccountId) ?? ownerTeam;
             if (team == null && chat.AssignedSalesAgentId == null && chat.AssignedAiSalesAgentId == null)
                 team = await WhatsAppScope.TeamOfAccountAsync(_context, chat.WhatsAppAccountId);
             var recipients = await _context.Users.AsNoTracking().Where(u => u.IsActive &&

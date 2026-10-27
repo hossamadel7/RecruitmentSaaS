@@ -60,7 +60,7 @@ namespace RecruitmentSaaS.Services
         /// otherwise (null = nobody set for under-age clients, they wait with the team leader).
         /// </summary>
         public static Task<Guid?> NextInTeamAsync(RecruitmentCrmContext db, Guid managerId, bool atOrAboveAge, CancellationToken ct = default) =>
-            NextTeleSalesAsync(db, db.Users.Where(u => u.ManagerId == managerId),
+            NextTeleSalesAsync(db, db.Users.Where(u => (u.ManagerId == managerId || u.TeamMemberships.Any(m => m.ManagerId == managerId))),
                 atOrAboveAge ? TeamScope(managerId) : TeamUnderAgeScope(managerId), ct);
 
         public static Task<Guid?> NextTeleSalesAsync(RecruitmentCrmContext db, IQueryable<User> candidates, string scope, CancellationToken ct = default) =>
