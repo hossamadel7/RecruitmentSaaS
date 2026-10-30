@@ -370,11 +370,18 @@ namespace RecruitmentSaaS.Controllers.Api
             ["text/plain"] = ("document", 16 * 1024 * 1024),
         };
 
+        private static bool IsSmallJson(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length > 16_000) return false;
+            try { using var _ = System.Text.Json.JsonDocument.Parse(value); return true; }
+            catch (System.Text.Json.JsonException) { return false; }
+        }
+
         // ── POST /api/conversations/{id}/media ────────────────────────────────
         // multipart: file, caption? — photo, voice note (audio/ogg opus), video or document
         [HttpPost("{id:guid}/media")]
         [RequestSizeLimit(20 * 1024 * 1024)]
-        public async Task<IActionResult> SendMedia(Guid id, IFormFile? file, [FromForm] string? caption, CancellationToken ct)
+        public async Task<IActionResult> SendMedia(Guid id, IFormFile? file, [FromForm] string? caption, [FromForm] string? recordingInfo, CancellationToken ct)
         {
             if (file == null || file.Length == 0) return BadRequest(new { error = "لم يتم اختيار ملف" });
 
@@ -460,6 +467,23 @@ namespace RecruitmentSaaS.Controllers.Api
                 NewValueJson = $"{{\"type\":\"{kind.type}\",\"mime\":\"{mime}\",\"bytes\":{file.Length}}}",
                 CreatedAt = now
             });
+            // Voice note recorder diagnostics from the browser (device, mic, recorder used, interruptions),
+            // kept to trace notes that arrive cut up. Query: AuditLogs where EventType = 'VoiceNoteRecorded'.
+            if (kind.type == "audio" && IsSmallJson(recordingInfo))
+            {
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    ActorId = CurrentUserId,
+                    ActorType = 1,
+                    EventType = "VoiceNoteRecorded",
+                    EntityType = "WhatsAppMessage",
+                    EntityId = message.Id,
+                    NewValueJson = recordingInfo,
+                    Ipaddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                    CreatedAt = now
+                });
+            }
             await _context.SaveChangesAsync(ct);
 
             await _notifier.NewMessageAsync(message, conversation.AssignedSalesAgentId, CurrentUserName);

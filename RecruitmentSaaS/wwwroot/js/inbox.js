@@ -787,7 +787,7 @@
         return 5;
     }
 
-    async function sendMedia(blob, fileName, caption, toConversationId) {
+    async function sendMedia(blob, fileName, caption, toConversationId, recordingInfo) {
         var conversationId = toConversationId || state.selectedConversationId;
         if (!conversationId || !blob) return;
         if (conversationId !== state.selectedConversationId) {
@@ -795,6 +795,7 @@
             var bg = new FormData();
             bg.append('file', blob, fileName);
             if (caption) bg.append('caption', caption);
+            if (recordingInfo) bg.append('recordingInfo', recordingInfo);
             fetch('/api/conversations/' + conversationId + '/media', { method: 'POST', body: bg, headers: csrfHeaders() }).catch(function () { });
             return;
         }
@@ -820,6 +821,7 @@
         var form = new FormData();
         form.append('file', blob, fileName);
         if (caption) form.append('caption', caption);
+        if (recordingInfo) form.append('recordingInfo', recordingInfo);
 
         try {
             var res = await fetch('/api/conversations/' + conversationId + '/media', { method: 'POST', body: form, headers: csrfHeaders() });
@@ -977,26 +979,38 @@
     var CAPTURE_PROCESSOR =
         'class VoiceCapture extends AudioWorkletProcessor {' +
         '  constructor() { super(); this.buf = new Float32Array(' + CAPTURE_BLOCK + '); this.n = 0; this.on = true; this.ended = false;' +
+        // diagnostics: how much sound really arrived, and how often the mic sent pure silence (muted / interrupted)
+        '    this.st = { quanta: 0, frames: 0, noInput: 0, silentQuanta: 0, longestSilentQuanta: 0, silentRuns: 0 }; this.run = 0;' +
         '    this.port.onmessage = (e) => {' +
         '      if (e.data === "pause") this.on = false;' +
         '      else if (e.data === "resume") this.on = true;' +
-        '      else if (e.data === "stop" && !this.ended) { this.ended = true; if (this.n) this.port.postMessage(this.buf); this.port.postMessage("end"); }' +
+        '      else if (e.data === "stop" && !this.ended) { this.ended = true; if (this.n) this.port.postMessage(this.buf); this.port.postMessage({ stats: this.st }); this.port.postMessage("end"); }' +
         '    }; }' +
         '  process(inputs) {' +
         '    if (this.ended) return false;' +
         '    var ch = inputs[0] && inputs[0][0];' +
-        '    if (ch && this.on) for (var i = 0; i < ch.length; i++) {' +
+        '    if (!this.on) return true;' +
+        '    var s = this.st; s.quanta++;' +
+        '    if (!ch) { s.noInput++; return true; }' +
+        '    var loud = false;' +
+        '    for (var i = 0; i < ch.length; i++) {' +
+        '      if (ch[i] !== 0) loud = true;' +
         '      this.buf[this.n++] = ch[i];' +
         '      if (this.n === ' + CAPTURE_BLOCK + ') { this.port.postMessage(this.buf); this.buf = new Float32Array(' + CAPTURE_BLOCK + '); this.n = 0; }' +
         '    }' +
+        '    s.frames += ch.length;' +
+        '    if (loud) this.run = 0;' +
+        '    else { s.silentQuanta++; if (this.run === 0) s.silentRuns++; this.run++; if (this.run > s.longestSilentQuanta) s.longestSilentQuanta = this.run; }' +
         '    return true; } }' +
         'registerProcessor("voice-capture", VoiceCapture);';
 
     // Records `stream` to an Ogg/Opus file. Resolves once recording has really started.
-    async function startOpusCapture(stream, workerUrl, onFile) {
+    async function startOpusCapture(stream, workerUrl, onFile, diag) {
         var Ctx = window.AudioContext || window.webkitAudioContext;
         if (!Ctx || typeof AudioWorkletNode === 'undefined') throw new Error('no audio worklet');
         var ctx = new Ctx(), worker = null;
+        diag.ctxRate = ctx.sampleRate;
+        ctx.onstatechange = function () { diagEvent(diag, 'ctx-' + ctx.state); };
         try {
             if (!ctx.audioWorklet) throw new Error('no audio worklet');
             if (!captureModuleUrl) captureModuleUrl = URL.createObjectURL(new Blob([CAPTURE_PROCESSOR], { type: 'application/javascript' }));
@@ -1010,6 +1024,7 @@
                 finished = true;
                 try { worker.terminate(); } catch (e) { }
                 try { ctx.close(); } catch (e) { }
+                diag.pages = pages.length;
                 onFile(new Blob(pages, { type: 'audio/ogg' }));
             };
             await new Promise(function (resolve, reject) {
@@ -1018,7 +1033,7 @@
                 worker.onmessage = function (e) {
                     var m = e.data && e.data.message;
                     if (m === 'ready') { clearTimeout(timer); resolve(); }
-                    else if (m === 'page') pages.push(e.data.page);
+                    else if (m === 'page') { pages.push(e.data.page); if (e.data.samplePosition) diag.encodedSamples = e.data.samplePosition; }
                     else if (m === 'done') finish();
                 };
                 worker.postMessage({
@@ -1032,7 +1047,8 @@
             var source = ctx.createMediaStreamSource(stream);
             var node = new AudioWorkletNode(ctx, 'voice-capture', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1, channelCountMode: 'explicit' });
             node.port.onmessage = function (e) {
-                if (e.data === 'end') { worker.postMessage({ command: 'done' }); setTimeout(finish, 5000); }
+                if (e.data === 'end') { diag.stopToEndMs = diag.stoppedAt ? Math.round(performance.now() - diag.stoppedAt) : null; worker.postMessage({ command: 'done' }); setTimeout(function () { if (!finished) diagEvent(diag, 'encoder-done-timeout'); finish(); }, 5000); }
+                else if (e.data && e.data.stats) diag.capture = e.data.stats;
                 else worker.postMessage({ command: 'encode', buffers: [e.data] });
             };
             var silent = ctx.createGain(); silent.gain.value = 0;   // keeps the graph running without playing the mic back
@@ -1088,30 +1104,95 @@
         document.getElementById('recorder-play').innerHTML = '<i class="bi bi-play-fill"></i>';
     }
 
+    // ── Voice note diagnostics ──
+    // Saved on the server with each voice note (audit log "VoiceNoteRecorded"), so a note that
+    // arrives cut up can be traced to the device, mic, recorder used and what interrupted it.
+    function newRecordingDiag() {
+        return {
+            v: 1, path: null, ua: navigator.userAgent, startedAt: new Date().toISOString(),
+            t0: performance.now(), events: [], fallbackErrors: []
+        };
+    }
+
+    function diagEvent(diag, name) {
+        if (!diag || diag.events.length >= 120) return;
+        diag.events.push([Math.round(performance.now() - diag.t0), name]);
+    }
+
+    // Mic details and events: label shows a Bluetooth headset, mute/unmute shows the phone taking the mic away
+    function watchMic(diag, stream) {
+        var track = stream && stream.getAudioTracks()[0];
+        if (!track) return;
+        var s = track.getSettings ? track.getSettings() : {};
+        diag.mic = {
+            label: track.label, sampleRate: s.sampleRate, channelCount: s.channelCount, sampleSize: s.sampleSize,
+            latency: s.latency, echoCancellation: s.echoCancellation, noiseSuppression: s.noiseSuppression, autoGainControl: s.autoGainControl
+        };
+        track.addEventListener('mute', function () { diagEvent(diag, 'mic-mute'); });
+        track.addEventListener('unmute', function () { diagEvent(diag, 'mic-unmute'); });
+        track.addEventListener('ended', function () { diagEvent(diag, 'mic-ended'); });
+    }
+
+    function summarizeDiag(diag, blob) {
+        delete diag.t0; delete diag.stoppedAt;
+        diag.bytes = blob ? blob.size : 0;
+        var flags = [];
+        var c = diag.capture, rate = diag.ctxRate;
+        if (c && rate) {
+            diag.capturedMs = Math.round(c.frames / rate * 1000);
+            diag.longestSilenceMs = Math.round(c.longestSilentQuanta * 128 / rate * 1000);
+            if (diag.activeMs && diag.capturedMs < diag.activeMs * 0.9) flags.push('audio-missing');   // less sound than time recorded
+            if (diag.longestSilenceMs >= 300) flags.push('mic-silent-gap');                            // mic sent pure zeros
+            if (c.noInput) flags.push('no-input-quanta');
+        }
+        if (diag.encodedSamples && diag.activeMs && diag.encodedSamples / 48 < diag.activeMs * 0.9) flags.push('encoded-short');
+        if (diag.mic && diag.mic.sampleRate && rate && diag.mic.sampleRate !== rate) flags.push('rate-mismatch');
+        if (diag.path !== 'worklet') flags.push('fallback-' + diag.path);
+        diag.events.forEach(function (ev) {
+            if (/^(mic-|ctx-(suspended|interrupted|closed)|hidden|pagehide|encoder-)/.test(ev[1]) && flags.indexOf(ev[1]) < 0) flags.push(ev[1]);
+        });
+        diag.flags = flags;
+        return diag;
+    }
+
+    document.addEventListener('visibilitychange', function () {
+        if (recorder && recorder.session.diag) diagEvent(recorder.session.diag, document.hidden ? 'hidden' : 'visible');
+    });
+    window.addEventListener('pagehide', function () {
+        if (recorder && recorder.session.diag) diagEvent(recorder.session.diag, 'pagehide');
+    });
+
     function finishRecording(blob, ext, conversationId, session) {
         if (recorder && recorder.session === session) { showRecorderBar(false); recorder = null; }
         if (session.cancelled || !blob || blob.size < 1200) return; // deleted, or a mis-tap
-        sendMedia(blob, 'voice-' + Date.now() + '.' + ext, null, conversationId);
+        var info = null;
+        try { info = session.diag ? JSON.stringify(summarizeDiag(session.diag, blob)) : null; } catch (e) { info = null; }
+        sendMedia(blob, 'voice-' + Date.now() + '.' + ext, null, conversationId, info);
     }
 
     async function startRecording() {
         if (recorder || !state.selectedConversationId) return;
         var conversationId = state.selectedConversationId;
-        var session = { cancelled: false };
+        var session = { cancelled: false, diag: newRecordingDiag() };
+        var diag = session.diag;
         var previewMime = pickPreviewType();
+        diag.previewMime = previewMime;
         var micStream = null;
         try {
             var captureWorkerUrl = await loadOpusRecorder();
             micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            watchMic(diag, micStream);
             var capturePreview = null;
             var capture = await startOpusCapture(micStream, captureWorkerUrl, function (blob) {
                 var done = function () { finishRecording(blob, 'ogg', conversationId, session); };
                 if (capturePreview) capturePreview.stop().then(done, done);
                 else { micStream.getTracks().forEach(function (t) { t.stop(); }); done(); }
-            });
+            }, diag);
+            diag.path = 'worklet';
             // the same microphone stream, recorded plainly, only for listening while paused
             if (previewMime !== null) {
-                try { capturePreview = chunkRecorder(micStream, previewMime); } catch (e) { capturePreview = null; }
+                try { capturePreview = chunkRecorder(micStream, previewMime); diag.preview = true; }
+                catch (e) { capturePreview = null; diag.preview = false; }
             }
             recorder = {
                 session: session, conversationId: conversationId, paused: false,
@@ -1130,6 +1211,7 @@
                 return;
             }
             if (micStream) micStream.getTracks().forEach(function (t) { t.stop(); });
+            diag.fallbackErrors.push('worklet: ' + ((e && (e.name + ' ' + e.message)) || e));
             /* older browser: fall back to the previous recorders below */
         }
         try {
@@ -1139,14 +1221,18 @@
             var preview = null;
             rec.ondataavailable = function (bytes) {
                 if (preview) preview.stop();
+                if (rec.encodedSamplePosition) diag.encodedSamples = rec.encodedSamplePosition;
                 finishRecording(new Blob([bytes], { type: 'audio/ogg' }), 'ogg', conversationId, session);
             };
             await rec.start();
+            diag.path = 'opus-recorder';
+            if (rec.audioContext) diag.ctxRate = rec.audioContext.sampleRate;
+            if (rec.stream) watchMic(diag, rec.stream);
             if (conversationId !== state.selectedConversationId) { session.cancelled = true; rec.stop(); return; } // left while the mic was opening
             // WhatsApp needs the Ogg/Opus file above; a second, plain recording is only for listening while paused
             if (previewMime !== null) {
-                try { preview = chunkRecorder(await navigator.mediaDevices.getUserMedia({ audio: true }), previewMime); }
-                catch (e) { preview = null; }
+                try { preview = chunkRecorder(await navigator.mediaDevices.getUserMedia({ audio: true }), previewMime); diag.preview = 'second-mic'; }
+                catch (e) { preview = null; diag.preview = false; }
             }
             recorder = {
                 session: session, conversationId: conversationId, paused: false,
@@ -1157,13 +1243,16 @@
             };
             showRecorderBar(true);
             return;
-        } catch (e) { /* fall back to the browser recorder below */ }
+        } catch (e) { diag.fallbackErrors.push('opus-recorder: ' + ((e && (e.name + ' ' + e.message)) || e)); /* fall back to the browser recorder below */ }
 
         var mime = pickMediaRecorderType();
         if (!mime) { alert('المتصفح ده مش بيدعم تسجيل رسائل صوتية لواتساب'); return; }
         try {
             var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            watchMic(diag, stream);
             var cr = chunkRecorder(stream, mime);
+            diag.path = 'media-recorder';
+            diag.mime = mime;
             if (conversationId !== state.selectedConversationId) { cr.stop(); return; }
             var baseType = mime.split(';')[0];
             var ext = baseType === 'audio/ogg' ? 'ogg' : baseType === 'audio/mpeg' ? 'mp3' : 'm4a';
@@ -1182,6 +1271,8 @@
     function stopRecording(cancel) {
         if (!recorder) return;
         recorder.session.cancelled = !!cancel;
+        var diag = recorder.session.diag;
+        if (diag) { diag.activeMs = Math.round(recorderElapsed()); diag.stoppedAt = performance.now(); diagEvent(diag, 'stop'); }
         stopRecordPreview();
         recorder.stop();
         if (cancel) { showRecorderBar(false); recorder = null; }
@@ -1193,12 +1284,14 @@
             stopRecordPreview();
             recorder.resume();
             recorder.paused = false;
+            diagEvent(recorder.session.diag, 'resume');
             recordStart = Date.now();
             setRecorderPaused(false);
         } else {
             recordElapsed += Date.now() - recordStart;
             recorder.pause();
             recorder.paused = true;
+            diagEvent(recorder.session.diag, 'pause');
             setRecorderPaused(true);
         }
     }
