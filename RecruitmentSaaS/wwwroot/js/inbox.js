@@ -906,6 +906,11 @@
     var OPUS_CDN = 'https://cdn.jsdelivr.net/npm/opus-recorder@8.0.5/dist/';
     var recorder = null, recordTimer = null, recordStart = 0, opusReady = null;
 
+    // Echo cancellation and noise suppression are for calls. On some phones the phone itself does them and
+    // cuts the mic to pure silence between words, so the voice note sounds chopped. Nothing plays while
+    // recording, so there is no echo to cancel (WhatsApp records the same way). Auto volume stays on.
+    var VOICE_MIC = { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } };
+
     function loadScript(src) {
         return new Promise(function (resolve, reject) {
             var el = document.createElement('script');
@@ -1149,7 +1154,7 @@
         if (diag.mic && diag.mic.sampleRate && rate && diag.mic.sampleRate !== rate) flags.push('rate-mismatch');
         if (diag.path !== 'worklet') flags.push('fallback-' + diag.path);
         diag.events.forEach(function (ev) {
-            if (/^(mic-|ctx-(suspended|interrupted|closed)|hidden|pagehide|encoder-)/.test(ev[1]) && flags.indexOf(ev[1]) < 0) flags.push(ev[1]);
+            if (/^(mic-|ctx-(suspended|interrupted)|hidden|pagehide|encoder-)/.test(ev[1]) && flags.indexOf(ev[1]) < 0) flags.push(ev[1]);
         });
         diag.flags = flags;
         return diag;
@@ -1180,7 +1185,7 @@
         var micStream = null;
         try {
             var captureWorkerUrl = await loadOpusRecorder();
-            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            micStream = await navigator.mediaDevices.getUserMedia(VOICE_MIC);
             watchMic(diag, micStream);
             var capturePreview = null;
             var capture = await startOpusCapture(micStream, captureWorkerUrl, function (blob) {
@@ -1217,7 +1222,7 @@
         try {
             var workerUrl = await loadOpusRecorder();
             if (!window.Recorder || !window.Recorder.isRecordingSupported()) throw new Error('opus unsupported');
-            var rec = new window.Recorder({ encoderPath: workerUrl, numberOfChannels: 1, encoderSampleRate: 48000, streamPages: false, maxFramesPerPage: 40 });
+            var rec = new window.Recorder({ encoderPath: workerUrl, mediaTrackConstraints: VOICE_MIC.audio, numberOfChannels: 1, encoderSampleRate: 48000, streamPages: false, maxFramesPerPage: 40 });
             var preview = null;
             rec.ondataavailable = function (bytes) {
                 if (preview) preview.stop();
@@ -1231,7 +1236,7 @@
             if (conversationId !== state.selectedConversationId) { session.cancelled = true; rec.stop(); return; } // left while the mic was opening
             // WhatsApp needs the Ogg/Opus file above; a second, plain recording is only for listening while paused
             if (previewMime !== null) {
-                try { preview = chunkRecorder(await navigator.mediaDevices.getUserMedia({ audio: true }), previewMime); diag.preview = 'second-mic'; }
+                try { preview = chunkRecorder(await navigator.mediaDevices.getUserMedia(VOICE_MIC), previewMime); diag.preview = 'second-mic'; }
                 catch (e) { preview = null; diag.preview = false; }
             }
             recorder = {
@@ -1248,7 +1253,7 @@
         var mime = pickMediaRecorderType();
         if (!mime) { alert('المتصفح ده مش بيدعم تسجيل رسائل صوتية لواتساب'); return; }
         try {
-            var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            var stream = await navigator.mediaDevices.getUserMedia(VOICE_MIC);
             watchMic(diag, stream);
             var cr = chunkRecorder(stream, mime);
             diag.path = 'media-recorder';
