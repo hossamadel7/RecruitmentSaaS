@@ -5,7 +5,7 @@
     var statusName = Model.Status switch {
         1 => "جديد", 2 => "تم التواصل", 3 => "استجاب",
         4 => "مهتم", 5 => "موعد مجدول", 6 => "زار المكتب",
-        7 => "تم التحويل", 8 => "خسارة", 9 => "متواجد في تركيا", _ => "غير معروف"
+        7 => "تم التحويل", 8 => "خسارة", 9 => "متواجد في الدولة", _ => "غير معروف"
     };
     bool isAssignedToMe = ViewBag.IsAssignedToMe == true;
 }
@@ -62,6 +62,9 @@
                         ("bi-geo-alt-fill",   "الدولة المطلوبة",  Model.InterestedCountry ?? "—"),
                         ("bi-person-vcard",  "السن",             Model.Age?.ToString() ?? "—"),
                         ("bi-person-fill",    "مسجل بواسطة",      Model.RegisteredByName ?? "—"),
+                        ("bi-globe", "دولة الإعلان", RecruitmentSaaS.Services.CountryRouting.DisplayName(Model.AdCountry) ?? "غير محددة"),
+                        ("bi-signpost", "دولة التوزيع", Model.RoutedCountry ?? "—"),
+                        ("bi-card-text", "نص الإعلان", Model.AdText ?? "—"),
                         ("bi-megaphone-fill", "الحملة",           Model.CampaignName ?? "—"),
                         ("bi-calendar3",      "تاريخ الإضافة",    Model.CreatedAt.ToString("dd/MM/yyyy")),
                     };
@@ -119,7 +122,7 @@
                                     (val: "2", label: "تم التواصل", st: (byte)2),
                                     (val: "4", label: "مهتم",       st: (byte)4),
                                     (val: "5", label: "موعد مجدول", st: (byte)5),
-                                    (val: "9", label: "متواجد في تركيا", st: (byte)9),
+                                    (val: "9", label: "متواجد في الدولة", st: (byte)9),
                                     (val: "8", label: "خسارة",      st: (byte)8),
                                 };
                                 var currentOrder = funnelOrder.GetValueOrDefault(Model.Status, 0);

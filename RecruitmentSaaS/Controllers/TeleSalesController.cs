@@ -392,6 +392,9 @@ namespace RecruitmentSaaS.Controllers
                 ConvertedAt = lead.ConvertedAt,
                 AssignedSalesName = lead.AssignedSales?.FullName,
                 CampaignName = lead.Campaign?.Name,
+                AdCountry = lead.AdCountry,
+                AdText = lead.AdText,
+                RoutedCountry = lead.RoutedCountry,
                 RegisteredByName = lead.RegisteredBy?.FullName,
                 CreatedAt = lead.CreatedAt,
                 LastContactedAt = lead.LastContactedAt,
@@ -435,7 +438,7 @@ namespace RecruitmentSaaS.Controllers
                 {1, 1}, {2, 2}, {4, 3}, {5, 4}, {7, 5}
             };
 
-            if (!new byte[] { 2, 4, 5, 8, 9 }.Contains(newStatus))   // 9 = متواجد في تركيا
+            if (!new byte[] { 2, 4, 5, 8, 9 }.Contains(newStatus))   // 9 = متواجد في الدولة
             {
                 TempData["Error"] = "غير مسموح بهذه الحالة";
                 return RedirectToAction("LeadDetail", new { id = leadId });
@@ -502,7 +505,7 @@ namespace RecruitmentSaaS.Controllers
             {
                 {1,"جديد"},{2,"تم التواصل"},
                 {4,"مهتم"},{5,"موعد مجدول"},{6,"زار المكتب"},
-                {7,"تم التحويل"},{8,"خسارة"},{9,"متواجد في تركيا"}
+                {7,"تم التحويل"},{8,"خسارة"},{9,"متواجد في الدولة"}
             };
 
             // Build intermediate steps for funnel tracking
@@ -510,7 +513,7 @@ namespace RecruitmentSaaS.Controllers
             var funnelSteps = new List<byte> { 1, 2, 4, 5 }; // ordered funnel statuses
             var stepsToLog = new List<(byte from, byte to)>();
 
-            if (newStatus != 8 && newStatus != 9) // خسارة / متواجد في تركيا log directly without intermediates
+            if (newStatus != 8 && newStatus != 9) // خسارة / متواجد في الدولة log directly without intermediates
             {
                 var fromIdx = funnelSteps.IndexOf(oldStatus);
                 var toIdx = funnelSteps.IndexOf(newStatus);

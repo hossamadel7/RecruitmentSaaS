@@ -26,6 +26,7 @@ public enum LeadStage : byte
 
 public partial class WhatsAppConversation
 {
+    public string? AdCountry { get; set; }
     public Guid Id { get; set; }
 
     public Guid ContactId { get; set; }

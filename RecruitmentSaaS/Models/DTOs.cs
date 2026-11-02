@@ -90,6 +90,9 @@ namespace RecruitmentSaaS.Models.DTOs
 
     public class LeadDetailDto
     {
+        public string? AdCountry { get; set; }
+        public string? AdText { get; set; }
+        public string? RoutedCountry { get; set; }
         public Guid Id { get; set; }
         public string LeadCode { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;

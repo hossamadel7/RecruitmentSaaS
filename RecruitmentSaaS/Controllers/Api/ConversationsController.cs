@@ -75,7 +75,8 @@ namespace RecruitmentSaaS.Controllers.Api
             [FromQuery] string? outcome = null,
             [FromQuery] string? search = null,
             [FromQuery] int page = 1,
-            [FromQuery] int? pageSize = null)
+            [FromQuery] int? pageSize = null,
+            [FromQuery] string? country = null)
         {
             // The list grows as you scroll: the page asks for everything it has shown so far (up to 1000)
             var size = Math.Clamp(pageSize ?? PageSize, 1, 1000);
@@ -87,6 +88,13 @@ namespace RecruitmentSaaS.Controllers.Api
 
             if (accountId.HasValue)
                 query = query.Where(c => c.WhatsAppAccountId == accountId.Value);
+
+            if (!string.IsNullOrEmpty(country))
+            {
+                if (country != "unknown" && !CountryRouting.Countries.Contains(country))
+                    return BadRequest(new { error = "الدولة غير صحيحة" });
+                query = CountryRouting.FilterInboxCountry(query, country == "unknown" ? null : country);
+            }
 
             if (status.HasValue)
                 query = query.Where(c => c.Status == status.Value);
@@ -163,6 +171,8 @@ namespace RecruitmentSaaS.Controllers.Api
                     UnreadCount = c.UnreadCount,
                     LastMessageAt = c.LastMessageAt,
                     LeadCode = c.Lead != null ? c.Lead.LeadCode : null,
+                    AdCountry = c.Lead != null && c.Lead.AdCountry != null ? c.Lead.AdCountry : c.AdCountry,
+                    RoutedCountry = c.Lead != null ? c.Lead.RoutedCountry : null,
                     IntakeStatus = c.IntakeStatus,
                     LastMessagePreview = _context.WhatsAppMessages
                         .Where(m => m.ConversationId == c.Id)
@@ -258,6 +268,8 @@ namespace RecruitmentSaaS.Controllers.Api
                     CampaignName = m.ReferralCampaign != null ? m.ReferralCampaign.Name : null
                 })
                 .FirstOrDefaultAsync();
+            dto.AdCountry = conversation.Lead?.AdCountry ?? conversation.AdCountry ?? CountryRouting.Detect(referral == null ? null : referral.ReferralHeadline + "\n" + referral.ReferralBody);
+            dto.RoutedCountry = conversation.Lead?.RoutedCountry;
             if (referral != null)
             {
                 dto.ReferralSourceId = referral.ReferralSourceId;

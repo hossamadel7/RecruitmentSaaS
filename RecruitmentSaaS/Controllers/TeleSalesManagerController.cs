@@ -111,7 +111,7 @@ namespace RecruitmentSaaS.Controllers
                 .ToListAsync();
 
             // ── Build per-member stats ────────────────────────────────────────
-            var statusLabels = new[] { "", "عميل جديد", "تم التواصل", "استجاب", "متابعة", "حجز", "حضر للمكتب", "تحويل", "خسارة", "متواجد في تركيا" };
+            var statusLabels = new[] { "", "عميل جديد", "تم التواصل", "استجاب", "متابعة", "حجز", "حضر للمكتب", "تحويل", "خسارة", "متواجد في الدولة" };
 
             var teamStats = myTeam.Select(member =>
             {

@@ -166,6 +166,7 @@ namespace RecruitmentSaaS.Services
 
             var (messageType, textBody, mediaId) = ExtractContent(messageJ);
             var referral = ExtractAdReferral(messageJ);
+            conversation.AdCountry ??= CountryRouting.Detect(referral == null ? null : referral.Headline + "\n" + referral.Body);
             Guid? referralCampaignId = null;
             if (!string.IsNullOrWhiteSpace(referral?.SourceId))
             {
@@ -239,7 +240,7 @@ namespace RecruitmentSaaS.Services
 
             // Retain manual ownership and never treat unsupported notifications as customer text.
             await TryConnectHandoffAsync(conversation, account, fromWaId, isUnsupported ? null : textBody, now, ct);
-            await ApplyReferralCampaignToLeadAsync(conversation, referralCampaignId, ct);
+            await ApplyReferralCampaignToLeadAsync(conversation, referralCampaignId, referral, ct);
             if (isNewConversation && conversation.AssignedAiSalesAgentId == null && conversation.PendingTeamManagerId == null)
                 conversation.AssignedSalesAgentId = await ChatAssignmentPolicy.ResolveAsync(
                     _context, conversation.AssignedSalesAgentId, account.AssignedSalesAgentId, ct);
@@ -892,13 +893,19 @@ namespace RecruitmentSaaS.Services
         private async Task ApplyReferralCampaignToLeadAsync(
             WhatsAppConversation conversation,
             Guid? referralCampaignId,
+            WhatsAppAdReferral? referral,
             CancellationToken ct)
         {
-            if (referralCampaignId == null || conversation.LeadId == null) return;
+            if (conversation.LeadId == null || referral == null) return;
 
             var lead = await _context.Leads.FirstOrDefaultAsync(l => l.Id == conversation.LeadId, ct);
-            if (lead != null && lead.CampaignId == null)
-                lead.CampaignId = referralCampaignId;
+            if (lead == null) return;
+            lead.CampaignId ??= referralCampaignId;
+            if (lead.AdCountry == null)
+            {
+                lead.AdText = Limit(referral.Headline + "\n" + referral.Body, 3000);
+                lead.AdCountry = CountryRouting.Detect(lead.AdText);
+            }
         }
 
         private static string? Limit(string? value, int maxLength)

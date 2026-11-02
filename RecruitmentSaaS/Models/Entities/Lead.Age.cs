@@ -5,6 +5,10 @@ namespace RecruitmentSaaS.Models.Entities;
 // Kept out of the scaffolded Lead.cs so a re-scaffold doesn't drop it.
 public partial class Lead
 {
+    public string? AdCountry { get; set; }
+    public string? AdText { get; set; }
+    public string? RoutedCountry { get; set; }
+
     public byte? Age { get; set; }
 
     /// <summary>

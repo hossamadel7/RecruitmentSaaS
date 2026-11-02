@@ -52,7 +52,7 @@ namespace RecruitmentSaaS.Services
         private static readonly Dictionary<byte, string> LeadStatusNames = new()
         {
             { 1, "جديد" }, { 2, "تم التواصل" }, { 3, "استجاب" }, { 4, "مهتم" }, { 5, "موعد مجدول" },
-            { 6, "زار المكتب" }, { 7, "تم التحويل" }, { 8, "خسارة" }, { 9, "متواجد في تركيا" }
+            { 6, "زار المكتب" }, { 7, "تم التحويل" }, { 8, "خسارة" }, { 9, "متواجد في الدولة" }
         };
 
         private readonly RecruitmentCrmContext _context;

@@ -254,6 +254,7 @@ namespace RecruitmentSaaS.Services
                     m.ReferralCampaignId,
                     m.ReferralSourceId,
                     m.ReferralHeadline,
+                    m.ReferralBody,
                     CampaignName = m.ReferralCampaign != null ? m.ReferralCampaign.Name : null,
                     CampaignUtm = m.ReferralCampaign != null ? m.ReferralCampaign.UtmCampaign : null
                 })
@@ -299,6 +300,12 @@ namespace RecruitmentSaaS.Services
                 lead.UtmCampaign ??= Cut(referral.CampaignUtm ?? referral.CampaignName ?? referral.ReferralHeadline, 200);
                 lead.UtmContent ??= Cut(referral.ReferralSourceId, 200);
             }
+            lead.Age ??= conversation.IntakeAge;
+            if (referral != null && lead.AdCountry == null)
+            {
+                lead.AdText = Cut(string.Join("\n", new[] { referral.ReferralHeadline, referral.ReferralBody }.Where(t => !string.IsNullOrWhiteSpace(t))), 3000);
+                lead.AdCountry = CountryRouting.Detect(lead.AdText);
+            }
             conversation.LeadId = lead.Id;
 
             if (lead.AssignedAiSalesAgentId != null)
@@ -321,10 +328,12 @@ namespace RecruitmentSaaS.Services
                 && (atOrAboveAge || settings.AiUnderAgeToRotation);
 
             Guid? agentId = currentAgent;
+            if (agentId == null && lead.AdCountry != null)
+                agentId = await CountryRouting.AssignAsync(_context, lead, ct);
             // Under the age on a team's number: that team's "أقل من السن" rotation, when the team set one
-            if (agentId == null && conversation.IntakeAge != null && !atOrAboveAge && team != null)
+            if (agentId == null && lead.AdCountry == null && conversation.IntakeAge != null && !atOrAboveAge && team != null)
                 agentId = await LeadDistributor.NextInTeamAsync(_context, team.Value, atOrAboveAge: false, ct);
-            if (agentId == null && toRotation)
+            if (agentId == null && lead.AdCountry == null && toRotation)
             {
                 agentId = team != null
                     ? await LeadDistributor.NextTeleSalesAsync(_context, _context.Users.Where(u => (u.ManagerId == team || u.TeamMemberships.Any(m => m.ManagerId == team))), LeadDistributor.TeamScope(team.Value), ct)

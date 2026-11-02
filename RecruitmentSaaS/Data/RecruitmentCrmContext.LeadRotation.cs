@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RecruitmentSaaS.Services;
 using RecruitmentSaaS.Models.Entities;
 
 namespace RecruitmentSaaS.Data;
@@ -12,8 +13,32 @@ public partial class RecruitmentCrmContext
 
     public virtual DbSet<FormVisit> FormVisits { get; set; } = null!;
 
+    public DbSet<CountryRoutingRule> CountryRoutingRules { get; set; } = null!;
+
+    public DbSet<TeamCountryRoutingRule> TeamCountryRoutingRules { get; set; } = null!;
+
     private static void ConfigureLeadRotation(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<TeamCountryRoutingRule>(e =>
+        {
+            e.ToTable("TeamCountryRoutingRules", "demorecruitment");
+            e.HasKey(r => new { r.ManagerId, r.Country });
+            e.Property(r => r.Country).HasMaxLength(20);
+            e.Property(r => r.FallbackCountry).HasMaxLength(20);
+            e.HasOne<User>().WithMany().HasForeignKey(r => r.ManagerId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<CountryRoutingRule>(e =>
+        {
+            e.ToTable("CountryRoutingRules", "demorecruitment");
+            e.HasKey(r => r.Country);
+            e.Property(r => r.Country).HasMaxLength(20);
+            e.Property(r => r.FallbackCountry).HasMaxLength(20);
+            e.HasData(CountryRouting.Countries.Select(c => new CountryRoutingRule { Country = c }));
+        });
+        modelBuilder.Entity<WhatsAppConversation>().Property(c => c.AdCountry).HasMaxLength(20);
+        modelBuilder.Entity<Lead>().Property(l => l.AdCountry).HasMaxLength(20);
+        modelBuilder.Entity<Lead>().Property(l => l.RoutedCountry).HasMaxLength(20);
+        modelBuilder.Entity<Lead>().Property(l => l.AdText).HasMaxLength(3000);
         modelBuilder.Entity<LeadRotationMember>(entity =>
         {
             entity.HasKey(e => new { e.ScopeKey, e.UserId }).HasName("PK_demorecruitment_LRM");

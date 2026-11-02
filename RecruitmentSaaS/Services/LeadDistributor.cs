@@ -25,6 +25,7 @@ namespace RecruitmentSaaS.Services
         public static bool IsUnderAgeScope(string? scope) => scope != null && scope.StartsWith("teamu:");
 
         public static Guid? ManagerOfScope(string? scope) =>
+            CountryRouting.TeamOfScope(scope) is Guid countryManager ? countryManager :
             scope != null && scope.StartsWith("team:") && Guid.TryParse(scope[5..], out var id) ? id
             : scope != null && scope.StartsWith("teamu:") && Guid.TryParse(scope[6..], out var underId) ? underId
             : null;
@@ -36,7 +37,7 @@ namespace RecruitmentSaaS.Services
         public static async Task<List<RotationSlot>> RotationAsync(RecruitmentCrmContext db, IQueryable<User> candidates, string configScope, CancellationToken ct = default)
         {
             // Someone not configured yet takes 1 lead per turn — except in an under-age rotation, where they take none
-            var defaultShare = IsUnderAgeScope(configScope) ? (short)0 : (short)1;
+            var defaultShare = (IsUnderAgeScope(configScope) || CountryRouting.CountryOfScope(configScope) != null) ? (short)0 : (short)1;
             var users = await candidates
                 .Where(u => (u.Role == 3 || u.Role == 8) && u.IsActive)   // 8 = head TeleSales, also takes leads
                 .Select(u => new { u.Id, Name = u.FullNameAr != null && u.FullNameAr != "" ? u.FullNameAr : u.FullName })
@@ -184,9 +185,9 @@ namespace RecruitmentSaaS.Services
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentCrmContext>();
             var notifications = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
-            var waiting = await db.Leads
+            var waiting = await CountryRouting.EligibleLeads(db)
                 .Where(l => (l.AssignedSalesId == null && l.AssignedAiSalesAgentId == null)
-                         && l.TeamManagerId == null       // team forms: the manager decides
+                         && (l.TeamManagerId == null || l.AdCountry != null) // country ads use their own rotation
                          && l.LeadSource != 3             // reception walk-ins go to office sales
                          && !l.IsConverted
                          && !l.IsDuplicate)
@@ -202,14 +203,26 @@ namespace RecruitmentSaaS.Services
                 await db.Entry(lead).ReloadAsync(ct);
                 if (lead.AssignedSalesId != null || lead.AssignedAiSalesAgentId != null) continue;
                 var (candidates, stateScope) = await LeadDistributor.CandidatesForSheetAsync(db, lead.GoogleSheetId, ct);
-                var salesId = await LeadDistributor.NextTeleSalesAsync(db, candidates, LeadDistributor.AllScope, stateScope, ct);
+                var salesId = lead.AdCountry != null
+                    ? await CountryRouting.AssignAsync(db, lead, ct)
+                    : await LeadDistributor.NextTeleSalesAsync(db, candidates, LeadDistributor.AllScope, stateScope, ct);
                 if (salesId == null)
                 {
                     _logger.LogWarning("No active TeleSales (or all paused) to receive lead {LeadId}", lead.Id);
-                    break;
+                    continue;
                 }
 
                 lead.AssignedSalesId = salesId;
+                if (lead.AdCountry != null)
+                {
+                    var chats = await db.WhatsAppConversations.Where(c => c.LeadId == lead.Id && c.AssignedSalesAgentId == null && c.AssignedAiSalesAgentId == null).ToListAsync(ct);
+                    foreach (var chat in chats)
+                    {
+                        chat.AssignedSalesAgentId = salesId;
+                        chat.PendingTeamManagerId = null;
+                        chat.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
                 lead.UpdatedAt = DateTime.UtcNow;
                 db.LeadActivities.Add(new LeadActivity
                 {

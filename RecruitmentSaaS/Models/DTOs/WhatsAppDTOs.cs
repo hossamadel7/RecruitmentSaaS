@@ -26,6 +26,8 @@ namespace RecruitmentSaaS.Models.DTOs
 
     public class ConversationListItemDto
     {
+        public string? AdCountry { get; set; }
+        public string? RoutedCountry { get; set; }
         public Guid Id { get; set; }
         public string ContactName { get; set; } = string.Empty;
         public string ContactPhone { get; set; } = string.Empty;

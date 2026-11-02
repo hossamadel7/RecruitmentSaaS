@@ -1796,6 +1796,67 @@ namespace RecruitmentSaaS.Migrations
                     b.ToTable("ConversationNotes", "demorecruitment");
                 });
 
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.CountryRoutingRule", b =>
+                {
+                    b.Property<string>("Country")
+                        .HasMaxLength(20)
+                        .HasColumnType("citext");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("FallbackCountry")
+                        .HasMaxLength(20)
+                        .HasColumnType("citext");
+
+                    b.Property<int>("MaxAge")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MinAge")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Country");
+
+                    b.ToTable("CountryRoutingRules", "demorecruitment");
+
+                    b.HasData(
+                        new
+                        {
+                            Country = "سعودية",
+                            Enabled = false,
+                            MaxAge = 80,
+                            MinAge = 18
+                        },
+                        new
+                        {
+                            Country = "عمان",
+                            Enabled = false,
+                            MaxAge = 80,
+                            MinAge = 18
+                        },
+                        new
+                        {
+                            Country = "تركيا",
+                            Enabled = false,
+                            MaxAge = 80,
+                            MinAge = 18
+                        },
+                        new
+                        {
+                            Country = "ارمينيا",
+                            Enabled = false,
+                            MaxAge = 80,
+                            MinAge = 18
+                        },
+                        new
+                        {
+                            Country = "تأشيرات حرة",
+                            Enabled = false,
+                            MaxAge = 80,
+                            MinAge = 18
+                        });
+                });
+
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.Document", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2107,6 +2168,14 @@ namespace RecruitmentSaaS.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
+                    b.Property<string>("AdCountry")
+                        .HasMaxLength(20)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("AdText")
+                        .HasMaxLength(3000)
+                        .HasColumnType("citext");
+
                     b.Property<byte?>("Age")
                         .HasColumnType("smallint");
 
@@ -2214,6 +2283,10 @@ namespace RecruitmentSaaS.Migrations
 
                     b.Property<Guid>("RegisteredById")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("RoutedCountry")
+                        .HasMaxLength(20)
+                        .HasColumnType("citext");
 
                     b.Property<byte>("Status")
                         .ValueGeneratedOnAdd()
@@ -3347,6 +3420,33 @@ namespace RecruitmentSaaS.Migrations
                     b.ToTable("StageTypes", "demorecruitment");
                 });
 
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.TeamCountryRoutingRule", b =>
+                {
+                    b.Property<Guid>("ManagerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(20)
+                        .HasColumnType("citext");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("FallbackCountry")
+                        .HasMaxLength(20)
+                        .HasColumnType("citext");
+
+                    b.Property<int>("MaxAge")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MinAge")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ManagerId", "Country");
+
+                    b.ToTable("TeamCountryRoutingRules", "demorecruitment");
+                });
+
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.TeamLeadForm", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3749,6 +3849,10 @@ namespace RecruitmentSaaS.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("AdCountry")
+                        .HasMaxLength(20)
+                        .HasColumnType("citext");
 
                     b.Property<Guid?>("AssignedAiSalesAgentId")
                         .IsConcurrencyToken()
@@ -5156,6 +5260,15 @@ namespace RecruitmentSaaS.Migrations
                     b.Navigation("ReviewedBy");
 
                     b.Navigation("ToStage");
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.TeamCountryRoutingRule", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ManagerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.TeamLeadForm", b =>

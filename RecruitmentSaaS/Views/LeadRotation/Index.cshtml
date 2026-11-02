@@ -13,16 +13,26 @@
     var teams = ViewBag.Teams as List<(string Scope, string Name)> ?? new();
     var upcoming = ViewBag.Upcoming as List<string> ?? new();
     string? currentName = ViewBag.CurrentName;
-    bool isUnder = ViewBag.IsUnder ?? false;
-    string? mainScope = ViewBag.MainScope;
-    string? underScope = ViewBag.UnderScope;
-    byte ageLimit = ViewBag.Age;
+    string? selectedCountry = ViewBag.Country;
+    string? countryLabel = CountryRouting.DisplayName(selectedCountry);
+    Guid? managerId = ViewBag.ManagerId;
+    var rule = (RecruitmentSaaS.Models.Entities.CountryRoutingRule)ViewBag.CountryRule;
     int currentGiven = ViewBag.CurrentGiven;
     int currentShare = ViewBag.CurrentShare;
 }
 
 <style>
     .rr-wrap { padding: 24px; max-width: 900px; }
+    .rr-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
+    .rr-toggle-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .rr-toggle input { appearance: none; -webkit-appearance: none; direction: ltr; width: 54px; height: 32px; border: 2px solid #94a3b8; border-radius: 999px; background: #94a3b8; position: relative; cursor: pointer; margin: 0; transition: background .15s, border-color .15s; }
+    .rr-toggle input::before { content: ""; position: absolute; width: 24px; height: 24px; left: 2px; top: 2px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0003; transition: transform .15s; }
+    .rr-toggle input:checked { background: #16a34a; border-color: #16a34a; }
+    .rr-toggle input:checked::before { transform: translateX(22px); }
+    .rr-toggle input:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+    .rr-toggle-state { font-weight: 700; font-size: 13px; min-width: 36px; }
+    @@media (prefers-reduced-motion: reduce) { .rr-toggle input, .rr-toggle input::before { transition: none; } }
+    .rr-countries { display: flex; gap: 8px; flex-wrap: wrap; }
     .rr-help { font-size: 12.5px; color: #64748B; line-height: 1.9; }
     .rr-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border, #e2e8f0); border-radius: 12px; background: #fff; margin-bottom: 8px; transition: opacity .15s; }
     .rr-row.paused { opacity: .55; background: #f8fafc; }
@@ -49,44 +59,38 @@
 
     @if (isAdmin)
     {
-        <div class="card mb-3">
-            <div class="card-body p-3 d-flex align-items-center gap-2 flex-wrap">
-                <label class="fw-semibold" style="font-size:13px" for="scopePicker">التوزيع:</label>
-                <select id="scopePicker" class="form-select" style="max-width:420px" onchange="location.href='/LeadRotation/Index?scope='+encodeURIComponent(this.value)">
-                    <option value="@LeadDistributor.AllScope" selected="@(scope == LeadDistributor.AllScope)">التوزيع العام — كل التيلي سيلز (الموقع، فيسبوك، Google Sheets)</option>
-                    @foreach (var t in teams)
-                    {
-                        <option value="@t.Scope" selected="@(scope == t.Scope || mainScope == t.Scope)">فريق @t.Name — ليدز فورم الفريق</option>
-                    }
-                </select>
-            </div>
-        </div>
+        <div class="card mb-3"><div class="card-body p-3">
+            <label class="fw-semibold" for="scopePicker">الفريق</label>
+            <select id="scopePicker" class="form-select" onchange="location.href='/LeadRotation/Index?scope='+encodeURIComponent(this.value)+'&country='+encodeURIComponent('@selectedCountry')">
+                <option value="@CountryRouting.Scope(selectedCountry ?? CountryRouting.Countries[0])" selected="@(!isTeam && selectedCountry != null)">إعلانات — كل التيلي سيلز</option>
+                <option value="all" selected="@(scope == "all")">التوزيع العام</option>
+                @foreach (var t in teams)
+                {
+                    <option value="@t.Scope" selected="@(managerId == LeadDistributor.ManagerOfScope(t.Scope))">فريق @t.Name</option>
+                }
+            </select>
+        </div></div>
     }
 
-    @if (isTeam)
-    {
-        <ul class="nav nav-pills mb-3" style="gap:6px">
-            <li class="nav-item"><a class="nav-link @(!isUnder ? "active" : "")" href="/LeadRotation/Index?scope=@Uri.EscapeDataString(mainScope ?? "")">السن @ageLimit وأكبر</a></li>
-            <li class="nav-item"><a class="nav-link @(isUnder ? "active" : "")" href="/LeadRotation/Index?scope=@Uri.EscapeDataString(underScope ?? "")">أقل من @ageLimit</a></li>
-        </ul>
-    }
+    <nav class="rr-countries mb-3" aria-label="اختيار دولة الإعلان">
+        @foreach (var country in CountryRouting.Countries)
+        {
+            var countryScope = managerId == null ? CountryRouting.Scope(country) : CountryRouting.TeamScope(managerId.Value, country);
+            <a class="btn @(selectedCountry == country ? "btn-primary" : "btn-outline-primary")" aria-current="@(selectedCountry == country ? "page" : null)" href="/LeadRotation/Index?scope=@Uri.EscapeDataString(countryScope)">@CountryRouting.DisplayName(country)</a>
+        }
+    </nav>
 
     <div class="card mb-3">
         <div class="card-body p-4">
-            <div style="font-weight:800;font-size:16px;margin-bottom:6px">@scopeTitle @(isTeam ? (isUnder ? $"— أقل من {ageLimit} سنة" : $"— {ageLimit} سنة وأكبر") : "")</div>
+            <div style="font-weight:800;font-size:16px;margin-bottom:6px">@scopeTitle</div>
             <div class="rr-help">
-                @if (isTeam && isUnder)
+                @if (selectedCountry != null)
                 {
-                    <span>العملاء اللي سنهم <strong>أقل من @ageLimit</strong> (من فورم الفريق أو رقم واتساب الفريق) بيتوزعوا بالترتيب ده.
-                    <br />• <strong>لو الكل 0</strong>: مش بيتوزعوا، وبيفضلوا مستنيين مدير الفريق يوزعهم (ده الوضع لحد ما تحط أرقام).</span>
-                }
-                else if (isTeam)
-                {
-                    <span>الليدز اللي سنها يساوي أو أكبر من السن المحدد في فورم الفريق بتتوزع على الفريق بالترتيب ده.</span>
+                    <span>اختار السن من كام لكام، وبعده حدد نصيب كل موظف من ليدز @countryLabel. الحصة 0 تعني إن الموظف مش بيستقبل ليدز للدولة دي.</span>
                 }
                 else
                 {
-                    <span>ليدز الموقع العام وإعلانات فيسبوك و Google Sheets بتتوزع على التيلي سيلز بالترتيب ده.</span>
+                    <span>توزيع الليدز العامة على التيلي سيلز.</span>
                 }
                 <br />• رتّب الأسماء بالأسهم، وحدد كل واحد ياخد كام ليد ورا بعض قبل ما الدور ينتقل للي بعده.
                 <br />• مثال: ٣ للأول، ٢ للتاني، ١ للتالت… وبعد آخر واحد الدورة ترجع من الأول.
@@ -101,12 +105,47 @@
             @(isTeam ? "مفيش تيلي سيلز نشطين في الفريق ده." : "مفيش تيلي سيلز نشطين.")
         </div></div>
     }
-    else
-    {
+    <div>
         <form asp-action="Save" method="post" id="rrForm">
             @Html.AntiForgeryToken()
             <input type="hidden" name="scope" value="@scope" />
 
+            @if (selectedCountry != null)
+            {
+                <div class="card mb-3"><div class="card-body p-3">
+                    <h2 class="h6">أعمار عملاء @countryLabel</h2>
+                    <label class="rr-toggle mb-3" for="country-enabled">
+                        <span>توزيع ليدز @countryLabel</span>
+                        <span class="rr-toggle-control">
+                            <span class="rr-toggle-state" id="country-toggle-state">@(rule.Enabled ? "ON" : "OFF")</span>
+                            <input id="country-enabled" type="checkbox" role="switch" name="enabled" value="true" checked="@rule.Enabled" aria-describedby="country-enabled-status" data-saved-enabled="@(rule.Enabled ? "true" : "false")" />
+                        </span>
+                    </label>
+                    <div id="country-enabled-status" class="alert @(rule.Enabled ? "alert-success" : "alert-secondary") py-2" role="status" aria-live="polite" aria-atomic="true">
+                        <span id="country-saved-status">@(rule.Enabled ? $"توزيع ليدز {countryLabel} مفعّل الآن" : $"توزيع ليدز {countryLabel} متوقف حاليًا")</span>
+                        @if (rule.Enabled && !Model.Any(r => r.Share > 0))
+                        {
+                            <span class="d-block small mt-1">حدد حصة لموظف واحد على الأقل واحفظ عشان يبدأ استقبال الليدز.</span>
+                        }
+                    </div>
+                    <div id="country-enabled-pending" class="alert alert-warning py-2" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+                    <div class="row g-2">
+                        <div class="col-6"><label for="minAge">من سن</label><input id="minAge" class="form-control" type="number" name="minAge" min="16" max="100" required value="@rule.MinAge" /></div>
+                        <div class="col-6"><label for="maxAge">إلى سن</label><input id="maxAge" class="form-control" type="number" name="maxAge" min="16" max="100" required value="@rule.MaxAge" /></div>
+                        <div class="col-12"><label for="fallbackCountry">لو السن خارج النطاق</label>
+                            <select id="fallbackCountry" name="fallbackCountry" class="form-select">
+                                <option value="">بدون تحويل لدولة أخرى</option>
+                                @foreach (var country in CountryRouting.Countries.Where(c => c != selectedCountry))
+                                {
+                                    <option value="@country" selected="@(rule.FallbackCountry == country)">تحويل إلى @CountryRouting.DisplayName(country)</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <p class="rr-help mt-2 mb-0">التحويل يتطلب إن الدولة البديلة تكون مفعّلة والسن مناسب لها@(isTeam ? " داخل نفس الفريق" : ""). لو مفيش موظف متاح، العميل يفضل بدون تعيين.</p>
+                </div></div>
+            }
+            <h2 class="h6">توزيع الليدز على الموظفين</h2>
             <div id="rrList">
                 @foreach (var r in Model)
                 {
@@ -175,11 +214,23 @@
                 }
             </div>
         </div>
-    }
+    </div>
 </div>
 
 <script>
     (function () {
+        var toggle = document.getElementById('country-enabled');
+        if (toggle) {
+            var saved = toggle.dataset.savedEnabled === 'true';
+            var pending = document.getElementById('country-enabled-pending');
+            toggle.addEventListener('change', function () {
+                document.getElementById('country-toggle-state').textContent = toggle.checked ? 'ON' : 'OFF';
+                pending.hidden = toggle.checked === saved;
+                pending.textContent = toggle.checked
+                    ? 'اضغط حفظ لتفعيل التوزيع — التغيير لسه ما اتحفظش.'
+                    : 'اضغط حفظ لإيقاف التوزيع — التغيير لسه ما اتحفظش.';
+            });
+        }
         var list = document.getElementById('rrList');
         if (!list) return;
         var max = @maxShare;
@@ -198,7 +249,7 @@
             });
             cycle.innerHTML = html.length
                 ? html.join('<span class="rr-arrow"><i class="bi bi-arrow-left"></i></span>') + '<span class="rr-arrow"><i class="bi bi-arrow-repeat"></i> وترجع من الأول</span>'
-                : '@(isUnder ? Html.Raw("<span style=\"color:#64748B;font-size:13px\">الكل 0 — العملاء دول مش بيتوزعوا وبيفضلوا مستنيين مدير الفريق</span>") : Html.Raw("<span style=\"color:#dc2626;font-size:13px\">الكل موقوف — لازم شخص واحد على الأقل ياخد ليدز</span>"))';
+                : '@(selectedCountry != null ? Html.Raw("<span style=\"color:#64748B;font-size:13px\">الكل 0 — عملاء الدولة دي هيفضلوا بدون تعيين</span>") : Html.Raw("<span style=\"color:#dc2626;font-size:13px\">الكل موقوف — لازم شخص واحد على الأقل ياخد ليدز</span>"))';
         }
 
         list.addEventListener('click', function (e) {

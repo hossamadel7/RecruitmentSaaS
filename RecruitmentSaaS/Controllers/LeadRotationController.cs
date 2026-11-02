@@ -30,9 +30,9 @@ namespace RecruitmentSaaS.Controllers
         private bool IsAdmin => User.IsInRole("1");
 
         // ── GET /LeadRotation/Index?scope=all|team:{managerId} ───────────────
-        public async Task<IActionResult> Index(string? scope, bool under = false)
+        public async Task<IActionResult> Index(string? scope, bool under = false, string? country = null)
         {
-            var resolved = await ResolveScopeAsync(scope, under);
+            var resolved = await ResolveScopeAsync(scope, under, country);
             if (resolved == null) return RedirectToAction("Index", new { scope = (string?)null });
             var (key, candidates, title) = resolved.Value;
 
@@ -56,17 +56,17 @@ namespace RecruitmentSaaS.Controllers
                     .ToListAsync();
                 ViewBag.Teams = managers.Select(m => (Scope: LeadDistributor.TeamScope(m.Id), Name: m.FullName)).ToList();
             }
+            var teamManagerId = LeadDistributor.ManagerOfScope(key);
+            var selectedCountry = CountryRouting.CountryOfScope(key);
+            var rules = await CountryRouting.RulesAsync(_context, teamManagerId);
+            ViewBag.Country = selectedCountry;
+            ViewBag.CountryRule = rules.FirstOrDefault(r => r.Country == selectedCountry)
+                ?? new CountryRoutingRule { Country = selectedCountry ?? "" };
             ViewBag.Scope = key;
             ViewBag.ScopeTitle = title;
             ViewBag.IsAdmin = IsAdmin;
-            ViewBag.IsTeam = LeadDistributor.ManagerOfScope(key) != null;
-            // A team has two rotations: clients at/above the form's age, and clients under it
-            var teamManagerId = LeadDistributor.ManagerOfScope(key);
-            ViewBag.IsUnder = LeadDistributor.IsUnderAgeScope(key);
-            ViewBag.MainScope = teamManagerId == null ? null : LeadDistributor.TeamScope(teamManagerId.Value);
-            ViewBag.UnderScope = teamManagerId == null ? null : LeadDistributor.TeamUnderAgeScope(teamManagerId.Value);
-            var ageSetting = await _context.LeadFormSettings.AsNoTracking().Select(s => (byte?)s.SeniorAgeThreshold).FirstOrDefaultAsync();
-            ViewBag.Age = ageSetting is null or 0 ? HomeController.DefaultSeniorAgeThreshold : ageSetting.Value;
+            ViewBag.IsTeam = teamManagerId != null;
+            ViewBag.ManagerId = teamManagerId;
             ViewBag.MaxShare = MaxShare;
 
             return View(rotation);
@@ -76,11 +76,18 @@ namespace RecruitmentSaaS.Controllers
         // userIds in the new order, shares[i] = leads per turn for userIds[i] (0 = paused)
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Save(string scope, List<Guid> userIds, List<short> shares)
+        public async Task<IActionResult> Save(string scope, List<Guid> userIds, List<short> shares, int? minAge, int? maxAge, bool enabled = false, string? fallbackCountry = null)
         {
             var resolved = await ResolveScopeAsync(scope);
             if (resolved == null) return Forbid();
             var (key, candidates, _) = resolved.Value;
+            var country = CountryRouting.CountryOfScope(key);
+            if (country != null && (!ModelState.IsValid || minAge is null or < 16 || maxAge is null or > 100 || minAge > maxAge ||
+                (fallbackCountry != null && (!CountryRouting.Countries.Contains(fallbackCountry) || fallbackCountry == country))))
+            {
+                TempData["Error"] = "حدد السن من كام لكام بشكل صحيح (من 16 إلى 100)";
+                return RedirectToAction(nameof(Index), new { scope = key });
+            }
             await using var tx = await _context.Database.BeginTransactionAsync();
             await ConversationLock.LockTransactionAsync(_context, "rotation:" + key);
 
@@ -97,12 +104,37 @@ namespace RecruitmentSaaS.Controllers
                 return RedirectToAction("Index", new { scope = key });
             }
             // An under-age rotation may be all 0: those clients then wait with the team leader
-            if (shares.Count > 0 && shares.All(s => s == 0) && !LeadDistributor.IsUnderAgeScope(key))
+            if (shares.Count > 0 && shares.All(s => s == 0) && !LeadDistributor.IsUnderAgeScope(key) && country == null)
             {
                 TempData["Error"] = "لازم شخص واحد على الأقل ياخد ليدز — مينفعش توقف الكل";
                 return RedirectToAction("Index", new { scope = key });
             }
 
+            if (country != null)
+            {
+                var manager = LeadDistributor.ManagerOfScope(key);
+                if (manager == null)
+                {
+                    var rule = await _context.CountryRoutingRules.SingleAsync(r => r.Country == country);
+                    rule.Enabled = enabled;
+                    rule.MinAge = minAge!.Value;
+                    rule.MaxAge = maxAge!.Value;
+                    rule.FallbackCountry = fallbackCountry;
+                }
+                else
+                {
+                    var rule = await _context.TeamCountryRoutingRules.SingleOrDefaultAsync(r => r.ManagerId == manager && r.Country == country);
+                    if (rule == null)
+                    {
+                        rule = new TeamCountryRoutingRule { ManagerId = manager.Value, Country = country };
+                        _context.TeamCountryRoutingRules.Add(rule);
+                    }
+                    rule.Enabled = enabled;
+                    rule.MinAge = minAge!.Value;
+                    rule.MaxAge = maxAge!.Value;
+                    rule.FallbackCountry = fallbackCountry;
+                }
+            }
             await _context.LeadRotationMembers.Where(m => m.ScopeKey == key).ExecuteDeleteAsync();
             for (var i = 0; i < userIds.Count; i++)
             {
@@ -117,7 +149,10 @@ namespace RecruitmentSaaS.Controllers
             await _context.SaveChangesAsync();
             await tx.CommitAsync();
 
-            TempData["Success"] = "تم حفظ طريقة التوزيع — هتتطبق على الليدز الجاية";
+            TempData["Success"] = country == null ? "تم حفظ طريقة التوزيع — هتتطبق على الليدز الجاية"
+                : enabled ? $"تم الحفظ — توزيع ليدز {country} مفعّل الآن" +
+                    (shares.Any(s => s > 0) ? "" : "، حدد حصة لموظف واحد على الأقل لبدء استقبال الليدز")
+                : $"تم الحفظ — توزيع ليدز {country} متوقف الآن";
             return RedirectToAction("Index", new { scope = key });
         }
 
@@ -143,26 +178,26 @@ namespace RecruitmentSaaS.Controllers
         /// The rotation this user may see/edit. Managers are always pinned to their own team;
         /// admins get the general rotation by default or any active manager's team.
         /// </summary>
-        private async Task<(string Key, IQueryable<User> Candidates, string Title)?> ResolveScopeAsync(string? scope, bool under = false)
+        internal async Task<(string Key, IQueryable<User> Candidates, string Title)?> ResolveScopeAsync(string? scope, bool under = false, string? country = null)
         {
-            under = under || LeadDistributor.IsUnderAgeScope(scope);
+            country ??= CountryRouting.CountryOfScope(scope) ?? CountryRouting.Countries[0];
+            if (!CountryRouting.Countries.Contains(country)) return null;
             if (!IsAdmin)
             {
                 var me = CurrentUserId;
-                return (under ? LeadDistributor.TeamUnderAgeScope(me) : LeadDistributor.TeamScope(me), _context.Users.Where(u => (u.ManagerId == me || u.TeamMemberships.Any(m => m.ManagerId == me))), "فريقي");
+                return (CountryRouting.TeamScope(me, country), _context.Users.Where(u => u.ManagerId == me || u.TeamMemberships.Any(m => m.ManagerId == me)), "فريقي — " + CountryRouting.DisplayName(country));
             }
-
-            if (string.IsNullOrEmpty(scope) || scope == LeadDistributor.AllScope)
+            if (scope == LeadDistributor.AllScope)
                 return (LeadDistributor.AllScope, _context.Users, "التوزيع العام");
-
+            if (string.IsNullOrEmpty(scope) || scope.StartsWith("country:"))
+                return (CountryRouting.Scope(country), _context.Users, "إعلانات " + CountryRouting.DisplayName(country));
             var managerId = LeadDistributor.ManagerOfScope(scope);
             if (managerId == null) return null;
-            var manager = await _context.Users.AsNoTracking()
-                .FirstOrDefaultAsync(u => u.Id == managerId && u.Role == 7 && u.IsActive);
+            var manager = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == managerId && u.Role == 7 && u.IsActive);
             if (manager == null) return null;
-
-            return (under ? LeadDistributor.TeamUnderAgeScope(manager.Id) : LeadDistributor.TeamScope(manager.Id),
-                    _context.Users.Where(u => (u.ManagerId == manager.Id || u.TeamMemberships.Any(m => m.ManagerId == manager.Id))), "فريق " + manager.FullName);
+            return (CountryRouting.TeamScope(manager.Id, country),
+                _context.Users.Where(u => u.ManagerId == manager.Id || u.TeamMemberships.Any(m => m.ManagerId == manager.Id)),
+                "فريق " + manager.FullName + " — " + CountryRouting.DisplayName(country));
         }
     }
 }

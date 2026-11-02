@@ -12,7 +12,7 @@
         { key: 'followup', icon: 'bi-calendar-event', label: 'متابعة', needsTime: true, timeLabel: 'يوم ووقت المتابعة' },
         { key: 'booked', icon: 'bi-building-check', label: 'حجز', needsTime: true, timeLabel: 'يوم ووقت الحجز في المكتب' },
         { key: 'visited', icon: 'bi-person-check-fill', label: 'حضر للمكتب' },
-        { key: 'turkey', icon: 'bi-geo-alt-fill', label: 'متواجد في تركيا' },
+        { key: 'turkey', icon: 'bi-geo-alt-fill', label: 'متواجد في الدولة' },
         { key: 'lost', icon: 'bi-x-circle', label: 'خسارة', needsReason: true }
     ];
     function outcomeOf(key) { return OUTCOMES.filter(function (o) { return o.key === key; })[0] || null; }
@@ -33,6 +33,7 @@
         accounts: [],
         currentAccountId: null,
         currentFilter: 'all',
+        countryFilter: '',
         agentFilter: '',          // '' | 'agent:<id>' | 'team:<managerId>'  (admins/managers only)
         searchTerm: '',
         searchDebounce: null,
@@ -158,6 +159,7 @@
                 params.set('outcome', state.currentFilter); break;
         }
 
+        if (state.countryFilter) params.set('country', state.countryFilter);
         if (state.agentFilter === 'unassigned') params.set('assigned', 'unassigned');
         else if (state.agentFilter.indexOf('agent:') === 0) params.set('assigned', state.agentFilter.slice(6));
         else if (state.agentFilter.indexOf('team:') === 0) params.set('team', state.agentFilter.slice(5));
@@ -221,7 +223,7 @@
 
     function setFilterChip(filter) {
         state.currentFilter = filter;
-        document.querySelectorAll('.inbox-filter-chip').forEach(function (c) {
+        document.querySelectorAll('#filter-row .inbox-filter-chip').forEach(function (c) {
             c.classList.toggle('active', c.dataset.filter === filter);
         });
     }
@@ -251,6 +253,21 @@
         loadConversations();
     }
 
+    function inboxCountry(c) { return c.routedCountry || c.adCountry; }
+    function countryDisplayName(country) { return country === 'ارمينيا' ? 'أرمينا' : country; }
+
+    function countryAssignment(c) {
+        var html = countryBadge(inboxCountry(c));
+        if (c.routedCountry && c.adCountry && c.routedCountry !== c.adCountry) {
+            html += '<span class="country-transfer-note">تم التوزيع من ' + esc(countryDisplayName(c.adCountry)) + ' إلى ' + esc(countryDisplayName(c.routedCountry)) + '</span>';
+        }
+        return html;
+    }
+
+    function countryBadge(country) {
+        return '<span class="conv-country-pill' + (country ? '' : ' unknown') + '" title="الدولة الحالية">' + esc(countryDisplayName(country) || 'غير محدد') + '</span>';
+    }
+
     function renderConversationList() {
         var listEl = document.getElementById('conversation-list');
 
@@ -266,7 +283,7 @@
                 '<div class="conversation-row' + (c.unreadCount > 0 ? ' unread' : '') + (c.id === state.selectedConversationId ? ' selected' : '') + '" data-id="' + c.id + '">' +
                 '  <div class="conv-avatar">' + initials(name) + '</div>' +
                 '  <div class="conv-body">' +
-                '    <div class="conv-top-row"><span class="conv-name">' + esc(name) + '</span><span class="conv-time">' + listTime(c.lastMessageAt) + '</span></div>' +
+                '    <div class="conv-top-row"><span class="conv-name-group"><span class="conv-name">' + esc(name) + '</span>' + countryBadge(inboxCountry(c)) + '</span><span class="conv-time">' + listTime(c.lastMessageAt) + '</span></div>' +
                 '    <div class="conv-bottom-row">' +
                 '      <div class="conv-preview">' + (c.intakeStatus === 1 ? '<span class="conv-ai-badge" title="المساعد الآلي بيجمع البيانات">🤖</span>' : '') + listPreview(c) + '</div>' +
                 (c.unreadCount > 0 ? '<span class="conv-unread-badge">' + c.unreadCount + '</span>' : '') +
@@ -1409,9 +1426,10 @@
             intakeBox(c) +
             '<div class="customer-field"><span class="customer-field-label">السن</span><span class="customer-field-value">' + (c.age != null ? esc(c.age) + ' سنة' : 'غير معروف') + '</span></div>' +
             (c.job ? '<div class="customer-field"><span class="customer-field-label">الوظيفة</span><span class="customer-field-value">' + esc(c.job) + '</span></div>' : '') +
+            '<div class="customer-field"><span class="customer-field-label">دولة الإعلان</span><span class="customer-field-value">' + countryAssignment(c) + '</span></div>' +
             '<div class="customer-field"><span class="customer-field-label">رقم الواتساب المستقبِل</span><span class="customer-field-value">' + esc(c.whatsAppAccountName) + '</span></div>' +
             (c.referralSourceId ? '<div class="customer-field"><span class="customer-field-label">مصدر المحادثة</span><span class="customer-field-value">' +
-                esc(c.referralCampaignName || c.referralHeadline || 'إعلان Meta') +
+                esc((c.adCountry ? 'إعلان ' + countryDisplayName(c.adCountry) + ' — ' : '') + (c.referralCampaignName || c.referralHeadline || 'إعلان Meta')) +
                 '<small style="display:block;color:var(--text-muted);margin-top:3px">Ad ID: ' + esc(c.referralSourceId) + '</small></span></div>' : '') +
             '<div class="customer-field"><span class="customer-field-label">المندوب المسؤول</span>' + agentField + '</div>' +
             '<div class="customer-field"><span class="customer-field-label">حالة العميل</span>' +
@@ -1739,6 +1757,17 @@
 
     // ── Wiring ───────────────────────────────────────────────────────────────
     function bindEvents() {
+        document.getElementById('country-filter-row').addEventListener('click', function (e) {
+            var chip = e.target.closest('[data-country]');
+            if (!chip) return;
+            state.countryFilter = chip.dataset.country;
+            document.querySelectorAll('#country-filter-row [data-country]').forEach(function (c) {
+                var selected = c.dataset.country === state.countryFilter;
+                c.classList.toggle('active', selected);
+                c.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            });
+            loadConversations();
+        });
         document.getElementById('filter-row').addEventListener('click', function (e) {
             var chip = e.target.closest('.inbox-filter-chip');
             if (!chip) return;
