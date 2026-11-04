@@ -22,7 +22,7 @@ namespace RecruitmentSaaS.Tests;
 
 public sealed partial class FoundationTests
 {
-    private async Task<WebApplication> StartHttpAsync(Seed seed)
+    private async Task<WebApplication> StartHttpAsync(Seed seed, bool training = false, bool adminCoaching = false)
     {
         // Deliberately do not run production Program or load its settings/workers.
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing", ContentRootPath = Path.GetTempPath() });
@@ -31,6 +31,19 @@ public sealed partial class FoundationTests
         builder.Services.AddDbContext<RecruitmentCrmContext>(o => o.UseNpgsql(fixture.ConnectionString));
         builder.Services.Configure<AiSalesOptions>(o => { o.Enabled = true; o.TenantId = seed.Tenant; });
         builder.Services.AddScoped<AiSalesControlService>();
+        await using var trainingDb = fixture.Create();
+        var trainingAccount = await trainingDb.WhatsAppConversations.Where(c => c.Id == seed.Chat).Select(c => c.WhatsAppAccountId).SingleAsync();
+        builder.Services.Configure<AiSalesLearningOptions>(o => { o.Enabled = training; o.PrivacyApproved = true; o.ExternalProcessingApproved = true;
+            o.ApprovedAccountIds = [trainingAccount]; o.HoldoutPercentage = 0; });
+        builder.Services.AddScoped<AiLearningSourceService>();
+        builder.Services.AddScoped<AiSalesLearningService>();
+        builder.Services.AddScoped<AiSemanticKnowledgeService>();
+        builder.Services.AddScoped<AiSalesEvaluationService>();
+        builder.Services.AddScoped<AiSalesCrmActionService>();
+        builder.Services.Configure<AiAdminLearningOptions>(o => { o.Enabled = adminCoaching; o.PrivateRoutingEnabled = adminCoaching; o.ApprovedAccountIds = [trainingAccount]; });
+        builder.Services.AddScoped<AiAdminLearningService>();
+        builder.Services.AddScoped<AiAdminDraftResumer>();
+        builder.Services.AddSingleton<IAiLearningProvider>(LearningProvider().Object);
         builder.Services.Configure<AiSalesEngineOptions>(o => o.DraftsEnabled = true);
         builder.Services.AddScoped<AiSalesContextService>();
         builder.Services.AddScoped<AiSalesDraftService>();

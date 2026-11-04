@@ -13,10 +13,12 @@ public sealed record AiContextMessage(Guid Id, string Speaker, string Type, stri
 public sealed record AiContextFact(Guid Id, long Version, AiKnowledgeKind Kind, string Title, string Content, DateTime ValidUntil);
 public sealed record AiCustomerContext(string? Name, byte? Age, string? Profession, byte? LeadStatus, DateTime? AppointmentDate,
     string ReviewedSummary, long MemoryVersion, AiCustomerMemoryDetails? ReviewedDetails = null);
-public sealed record AiSalesContext(AiCustomerContext Customer, AiContextMessage[] RecentMessages, AiContextFact[] Knowledge);
+public sealed record AiSalesContext(AiCustomerContext Customer, AiContextMessage[] RecentMessages, AiContextFact[] Knowledge,
+    string? Language = null, string? SalesStage = null);
 
 /// <summary>Permitted CRM reads are composed by the server; the model cannot choose an arbitrary lead or SQL.</summary>
-public sealed class AiSalesContextService(RecruitmentCrmContext db)
+public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKnowledgeService? semantic = null,
+    Microsoft.Extensions.Options.IOptions<AiAdminLearningOptions>? adminOptions = null)
 {
     public async Task<AiSalesContext> ReadAsync(Guid tenant, WhatsAppConversation chat, CancellationToken ct)
     {
@@ -46,22 +48,38 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db)
                 ((WhatsAppMessageType)m.MessageType).ToString(), m.MessageType == (byte)WhatsAppMessageType.Text ? Redact(Trim(m.TextBody, 600)) : "[Media awaits staff review]", m.CreatedAt));
         }
         var history = entries.AsEnumerable().Reverse().ToArray();
-        var query = history.LastOrDefault(m => m.Speaker == "customer")?.Text ?? "";
-        var terms = Regex.Matches(IntakeScript.Normalize(query), @"[\p{L}]{2,}").Select(m => m.Value).Distinct().Take(30).ToArray();
+        var query = history.LastOrDefault(m => m.Speaker == "customer" && m.Type is "Text" or "TranscribedAudio" && !string.IsNullOrWhiteSpace(m.Text))?.Text ?? "";
+        var retrievalQuery = string.Join(" ", history.Where(m => m.Speaker == "customer" && m.Type is "Text" or "TranscribedAudio").TakeLast(5).Select(m => m.Text));
+        var terms = Regex.Matches(IntakeScript.Normalize(retrievalQuery), @"[\p{L}]{2,}").Select(m => m.Value).Distinct().Take(30).ToArray();
         var now = DateTime.UtcNow;
         // Bounded local lexical retrieval. Approved facts and playbook styles stay separate in the prompt.
         var candidates = await db.AiSalesKnowledge.AsNoTracking().Where(k => k.TenantId == tenant && k.WhatsAppAccountId == chat.WhatsAppAccountId
             && k.Status == AiKnowledgeStatus.Approved && k.ValidFrom <= now && k.ValidUntil > now)
-            .OrderByDescending(k => k.ApprovedAt).Take(500).ToListAsync(ct);
-        var ranked = candidates.OrderByDescending(k => terms.Count(t => IntakeScript.Normalize(k.Title + " " + k.Content).Contains(t)))
-            .ThenByDescending(k => k.ApprovedAt).ToArray();
+            .OrderByDescending(k => k.ApprovedAt).Take(semantic?.CandidateLimit ?? 500).ToListAsync(ct);
+        var ranked = semantic == null ? candidates.OrderByDescending(k => terms.Count(t => IntakeScript.Normalize(k.Title + " " + k.Content).Contains(t)))
+            .ThenByDescending(k => k.ApprovedAt).ToArray() : (await semantic.RankAsync(tenant, chat.WhatsAppAccountId,
+                AiLearningSourceService.Redact(retrievalQuery, [lead?.FullName, chat.IntakeName]), candidates.ToArray(), ct)).Select(x => x.Knowledge).ToArray();
         var knowledge = ranked.Where(k => k.Kind == AiKnowledgeKind.Fact).Take(6)
             .Concat(ranked.Where(k => k.Kind == AiKnowledgeKind.Playbook).Take(2))
             .Select(k => new AiContextFact(k.Id, k.Version, k.Kind, k.Title, Redact(k.Content), k.ValidUntil)).ToArray();
+        if (adminOptions?.Value is { Enabled: true, PrivateRoutingEnabled: true } admin && admin.ApprovedAccountIds.Contains(chat.WhatsAppAccountId))
+        {
+            var last = history.LastOrDefault();
+            var answer = last?.Speaker != "customer" ? null : await db.AiAdminClarifications.AsNoTracking().Where(r => r.TenantId == tenant &&
+                r.ConversationId == chat.Id && r.CustomerMessageId == last.Id && r.AgentId == chat.AssignedAiSalesAgentId &&
+                (r.State == AiAdminRequestState.Validated || r.State == AiAdminRequestState.ReviewReady) && r.ValidatedById != null && r.AnswerValidUntil > now &&
+                db.AiAdminChannels.Any(c => c.Id == r.ChannelId && !c.Paused && c.VerifiedAt != null && c.AdminUserId == r.ValidatedById &&
+                    db.Users.Any(u => u.Id == c.AdminUserId && u.IsActive && u.Role == 1)))
+                .FirstOrDefaultAsync(ct);
+            if (answer != null) knowledge = new[] { new AiContextFact(answer.Id, 1, AiKnowledgeKind.Fact,
+                "ADMIN_CUSTOMER_ONLY: verified answer for this customer question only", Redact(answer.Answer), answer.AnswerValidUntil) }
+                .Concat(knowledge.Take(5)).ToArray();
+        }
         return new(new(Redact(Trim(string.IsNullOrWhiteSpace(lead?.FullName) ? chat.IntakeName : lead.FullName, 100)), lead?.Age ?? chat.IntakeAge,
             Redact(Trim(string.IsNullOrWhiteSpace(lead?.InterestedJobTitle) ? chat.IntakeJob : lead.InterestedJobTitle, 100)), lead?.Status, lead?.AppointmentDate,
             Redact(memory?.ReviewedSummary ?? ""), memory?.Version ?? 0,
-            memory == null ? null : AiCustomerMemoryDetails.Read(memory.ReviewedDetailsJson).ForModel()), history, knowledge);
+            memory == null ? null : AiCustomerMemoryDetails.Read(memory.ReviewedDetailsJson).ForModel()), history, knowledge,
+            AiSalesLanguage.Detect(query), ((LeadStage)chat.LeadStage).ToString());
     }
 
     public static string Fingerprint(AiSalesContext context) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(context))));

@@ -73,6 +73,8 @@ public sealed class AiSalesEngineController(RecruitmentCrmContext db, AiSalesCon
         if (item.Version != request.ExpectedVersion) throw new AiSalesConflict("Knowledge changed; refresh first.");
         if (operation == "approve")
         {
+            if (item.SourceReference.StartsWith("Analysis ", StringComparison.Ordinal))
+                throw new AiSalesValidation("Review extracted knowledge through the training approval screen, including source freshness and privacy.");
             controls.RequireEnabled();
             if (item.Status != AiKnowledgeStatus.Draft || item.ValidUntil <= DateTime.UtcNow)
                 throw new AiSalesValidation("Only unexpired draft knowledge can be approved.");

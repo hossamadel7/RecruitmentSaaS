@@ -308,6 +308,8 @@ public partial class RecruitmentCrmContext
         ConfigureAiOfficeBooking(modelBuilder);
         ConfigureAiChatLearning(modelBuilder);
         ApplyPostgresConventions(modelBuilder);   // last, so it covers every entity above
+        ConfigureAiSalesLearning(modelBuilder); // restore explicit JSON/vector types after legacy string conventions
+        ConfigureAiAdminLearning(modelBuilder);
         modelBuilder.Entity<AiCustomerMemory>().Property(x => x.ReviewedDetailsJson).HasColumnType("jsonb");
         modelBuilder.Entity<AiChatFactCandidate>().Property(x => x.SourceFingerprint).HasColumnType("text");
         // Opaque operation keys are case-sensitive; never inherit the legacy citext convention.

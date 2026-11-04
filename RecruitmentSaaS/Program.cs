@@ -81,6 +81,29 @@ builder.Services.AddScoped<AiSalesControlService>();
 builder.Services.AddScoped<AiSalesContextService>();
 builder.Services.AddScoped<AiSalesDraftService>();
 builder.Services.AddScoped<AiSalesImprovementService>();
+builder.Services.AddScoped<AiLearningSourceService>();
+builder.Services.AddScoped<AiSalesLearningService>();
+builder.Services.AddScoped<AiSemanticKnowledgeService>();
+builder.Services.AddScoped<AiSalesEvaluationService>();
+builder.Services.AddScoped<AiSalesCrmActionService>();
+builder.Services.AddScoped<AiAdminLearningService>();
+builder.Services.AddScoped<AiAdminDraftResumer>();
+builder.Services.AddOptions<AiAdminLearningOptions>().BindConfiguration("AiAdminLearning")
+    .Validate(o => !o.Enabled || o.PrivateRoutingEnabled && o.ApprovedAccountIds.Length > 0 && o.ApprovedAccountIds.All(id => id != Guid.Empty), "Admin learning requires private routing and selected accounts.")
+    .Validate(o => o.DeadlineHours is >= 1 and <= 168 && o.MaxRequestsPerDay is >= 1 and <= 1000, "Invalid Admin coaching limits.")
+    .ValidateOnStart();
+if (!isolatedValidation) builder.Services.AddHostedService<AiAdminLearningWorker>();
+builder.Services.AddHttpClient<IAiLearningProvider, OpenAiLearningProvider>()
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+builder.Services.AddOptions<AiSalesLearningOptions>().BindConfiguration("AiSalesLearning")
+    .Validate(o => !o.Enabled || o.ApprovedAccountIds.Length > 0 && o.ApprovedAccountIds.All(id => id != Guid.Empty), "Learning requires explicitly selected accounts.")
+    .Validate(o => !o.ExternalProcessingApproved || o.PrivacyApproved, "External learning requires privacy approval.")
+    .Validate(o => o.ScanBatchSize is >= 1 and <= 100 && o.MaxMessagesPerConversation is >= 20 and <= 20000 &&
+        o.MaxCallsPerDay is >= 1 and <= 10000 && o.PollSeconds is >= 10 and <= 3600 && o.RetentionDays is >= 1 and <= 365 &&
+        o.MaxIndexedKnowledge is >= 8 and <= 10000 && o.HoldoutPercentage is >= 0 and <= 50 && o.EmbeddingDimensions is >= 64 and <= 1536 &&
+        o.InputCostPerMillion >= 0 && o.OutputCostPerMillion >= 0 && o.EmbeddingCostPerMillion >= 0, "Invalid learning budget/bounds.")
+    .ValidateOnStart();
+if (!isolatedValidation) builder.Services.AddHostedService<AiSalesLearningWorker>();
 builder.Services.AddScoped<AiSalesDispatchService>();
 builder.Services.AddScoped<AiAutomaticReplyService>();
 if (!isolatedValidation) builder.Services.AddHostedService<AiAutomaticReplyWorker>();

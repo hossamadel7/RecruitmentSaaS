@@ -13,7 +13,9 @@ using System.Text.Json;
 namespace RecruitmentSaaS.Controllers.Api;
 
 [ApiController, Route("api/ai-sales"), Authorize(Roles = "1,7,8"), AutoValidateAntiforgeryToken]
-public sealed class AiSalesController(RecruitmentCrmContext db, AiSalesControlService controls) : ControllerBase
+public sealed class AiSalesController(RecruitmentCrmContext db, AiSalesControlService controls,
+    Microsoft.Extensions.Options.IOptions<AiSalesEngineOptions>? engine = null,
+    Microsoft.Extensions.Options.IOptions<AiSalesDispatchOptions>? dispatch = null) : ControllerBase
 {
     private Guid Actor => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -51,10 +53,35 @@ public sealed class AiSalesController(RecruitmentCrmContext db, AiSalesControlSe
     public sealed record AssignRequest(Guid AgentId, Guid ConversationId, long ExpectedVersion, [Required, MaxLength(500)] string Reason, bool ConversationOnly = false);
     public sealed record ControlRequest(long ExpectedVersion, [Required, MaxLength(500)] string Reason);
 
+    [HttpGet("conversations/{id:guid}/transfer-options"), Authorize(Roles = "1")]
+    public async Task<IActionResult> TransferOptions(Guid id, CancellationToken ct)
+    {
+        if (!await CanSee(id, ct)) return NotFound();
+        var chat = await db.WhatsAppConversations.AsNoTracking().SingleAsync(c => c.Id == id, ct);
+        var team = await WhatsAppScope.TeamOfAccountAsync(db, chat.WhatsAppAccountId, ct);
+        return Ok(new { enabled = controls.Options.Enabled, currentAgentId = chat.AssignedAiSalesAgentId,
+            version = await db.ConversationControls.Where(c => c.ConversationId == id && c.TenantId == controls.Options.TenantId).Select(c => (long?)c.OwnershipVersion).SingleOrDefaultAsync(ct) ?? 0,
+            agents = await db.AiSalesAgents.AsNoTracking().Where(a => a.TenantId == controls.Options.TenantId && a.WhatsAppAccountId == chat.WhatsAppAccountId &&
+                a.TeamManagerId == team && a.Mode == AiSalesMode.Shadow).Select(a => new { a.Id, a.DisplayName, a.Paused,
+                    available = db.AiLeadAssignments.Count(x => x.AgentId == a.Id && x.EndedAt == null) < a.MaxActiveConversations }).ToArrayAsync(ct) });
+    }
+    public sealed record InboxAssignRequest(Guid AgentId, long ExpectedVersion);
+    [HttpPost("conversations/{id:guid}/assign"), Authorize(Roles = "1")]
+    public Task<IActionResult> AssignConversation(Guid id, InboxAssignRequest request, CancellationToken ct) => Run(async () => {
+        if (!await CanSee(id, ct)) return NotFound();
+        var chat = await db.WhatsAppConversations.AsNoTracking().SingleAsync(c => c.Id == id, ct);
+        return Ok(await controls.AssignAsync(chat.LeadId, id, request.AgentId, Actor, request.ExpectedVersion,
+            "Admin transferred this conversation from the shared inbox; existing lead owner retained.", Request.Headers["Idempotency-Key"].ToString(), ct, conversationOnly: true));
+    });
+
     [HttpGet("agents"), Authorize(Roles = "1")]
     public async Task<IActionResult> Agents(CancellationToken ct) => Ok(new
     {
-        enabled = controls.Options.Enabled, autonomousSendingAvailable = true, rotationAvailable = false,
+        enabled = controls.Options.Enabled, autonomousSendingAvailable = controls.Options.Enabled && engine?.Value.AutoReplyEnabled == true &&
+            engine.Value.DraftsEnabled && engine.Value.ExternalProcessingApproved && !string.IsNullOrWhiteSpace(engine.Value.ApiKey) &&
+            !string.IsNullOrWhiteSpace(engine.Value.Model) && engine.Value.AutoReplySinceUtc != null && engine.Value.AutoReplyAgentIds.Length > 0 &&
+            dispatch?.Value.Enabled == true && dispatch.Value.AutomaticEnabled && dispatch.Value.ReleaseApproved && dispatch.Value.ApprovedAccountIds.Length > 0,
+        rotationAvailable = false,
         agents = await db.AiSalesAgents.AsNoTracking().Where(a => a.TenantId == controls.Options.TenantId).OrderBy(a => a.DisplayName).ToListAsync(ct),
         deadLetters = await db.DurableWorkItems.CountAsync(w => w.CompletedAt == null && w.Attempts >= 8, ct)
     });

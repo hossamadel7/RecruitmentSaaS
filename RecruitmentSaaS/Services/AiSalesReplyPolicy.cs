@@ -9,6 +9,21 @@ public static class AiSalesReplyPolicy
     public static AiDraftProposal? Create(AiSalesContext context)
     {
         var latest = context.RecentMessages.LastOrDefault();
+        var language = context.Language ?? "ar-EG";
+        if (language == "ar-EG") return CreateEgyptian(context);
+        if (latest?.Speaker != "customer" || latest.Type is not ("Text" or "TranscribedAudio")) return null;
+        var text = IntakeScript.Normalize(latest.Text);
+        if (IntakeScript.NotInterested(text) || Regex.IsMatch(text, @"\b(?:unsubscribe|not interested|do not contact|stop messaging|stop contacting)\b|لا اريد التواصل|لا ارغب|mesh mehtam|msh mehtam"))
+            return Local(AiSalesLanguage.SafeLocal("stop", language), "stop", "Customer contact refusal; staff stop workflow required.");
+        if (IntakeScript.WantsPerson(text) || Regex.IsMatch(text, @"\b(?:speak to (?:a |an )?(?:human|person|agent)|talk to (?:a |an )?(?:human|person|agent)|human agent)\b|موظف بشري|التحدث الي موظف|akallem (?:7ad|had|mowazaf)"))
+            return Local(AiSalesLanguage.SafeLocal("handoff", language), "handoff", "Customer requested staff; no further intake required.");
+        if (Regex.IsMatch(text.Trim(), @"^(?:i(?:'ll| will) think (?:about it)?|let me think|hafakar|hafakkar|سافكر|سافكر في الامر)[.! ]*$"))
+            return new(AiSalesLanguage.SafeLocal("thinking", language), "acknowledgement", "Customer needs time; no pressure.", false, [], "local-policy");
+        return null; // Business replies must be generated in the customer's language from current facts.
+    }
+    private static AiDraftProposal? CreateEgyptian(AiSalesContext context)
+    {
+        var latest = context.RecentMessages.LastOrDefault();
         if (latest?.Speaker != "customer" || latest.Type is not ("Text" or "TranscribedAudio")) return null;
         var text = IntakeScript.Normalize(latest.Text);
         // A refusal takes precedence even if the same message also asks for a person.
@@ -53,9 +68,11 @@ public static class AiSalesReplyPolicy
                 : Local("المكتب مغلق يوم الجمعة يا فندم. نراجع مع الموظف يوم تاني مناسب للزيارة.", "handoff", "Approved Fact states Friday closure; no appointment created.", [fact.Id]);
         }
         // This is an information handoff, never rejection of the applicant or a hiring decision.
-        if (text.Contains("السعوديه"))
+        if (text.Contains("السعوديه") && !context.Knowledge.Any(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow &&
+            Has(IntakeScript.Normalize(k.Title + " " + k.Content), "السعوديه", "سعودي", "saudi")))
             return Local("استفسار حضرتك عن السعودية محتاج مراجعة من مسؤول الشركة قبل ما نأكد تفاصيل أي عرض.", "handoff", "Unsupported market request; do not infer that the company has no other-country vacancies.");
-        if (Has(text, "سواق", "سائق") && Has(text, "متاح", "شغل", "وظيفه", "فرصه"))
+        if (Has(text, "سواق", "سائق") && Has(text, "متاح", "شغل", "وظيفه", "فرصه") &&
+            !context.Knowledge.Any(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow && Has(IntakeScript.Normalize(k.Title), "سواق", "سائق", "driver")))
             return Local("توافر شغل سائق محتاج تأكيد من مسؤول التعاقدات يا فندم، قبل ما نأكد لحضرتك وظيفة معينة.", "handoff", "Specific driving availability requires contracts staff review; no job or future transfer promised.");
         // Route requests for individual matching to a person without deciding from age/nationality.
         // Questions about merely visiting or obtaining information remain ordinary enquiries.

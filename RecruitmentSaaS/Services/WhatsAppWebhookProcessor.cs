@@ -40,6 +40,7 @@ namespace RecruitmentSaaS.Services
         private readonly AiIntakeQueue _aiQueue;
         private readonly AiSalesControlService _controls;
         private readonly AiVoiceService _voice;
+        private readonly AiAdminLearningService? _adminLearning;
 
         public WhatsAppWebhookProcessor(
             RecruitmentCrmContext context,
@@ -48,13 +49,14 @@ namespace RecruitmentSaaS.Services
             IWhatsAppCloudApiService cloudApi,
             INotificationService notifications,
             AiIntakeService aiIntake,
-            AiIntakeQueue aiQueue, AiSalesControlService controls, AiVoiceService voice)
+            AiIntakeQueue aiQueue, AiSalesControlService controls, AiVoiceService voice, AiAdminLearningService? adminLearning = null)
         {
             _notifications = notifications;
             _aiIntake = aiIntake;
             _aiQueue = aiQueue;
             _controls = controls;
             _voice = voice;
+            _adminLearning = adminLearning;
             _context = context;
             _notifier = notifier;
             _logger = logger;
@@ -104,7 +106,7 @@ namespace RecruitmentSaaS.Services
                         await ProcessInboundMessageAsync(account, contactsJ, messageJ, ct);
 
                     foreach (var statusJ in statusesJ)
-                        await ProcessStatusUpdateAsync(statusJ, ct);
+                        await ProcessStatusUpdateAsync(statusJ, ct, account.Id);
 
                     // ── Coexistence: outgoing messages the salesperson sent from the
                     // WhatsApp Business mobile app itself, echoed back to us so the shared
@@ -131,6 +133,7 @@ namespace RecruitmentSaaS.Services
 
         private async Task ProcessInboundMessageAsync(WhatsAppAccount account, JArray contactsJ, JToken messageJ, CancellationToken ct)
         {
+            if (_adminLearning != null && messageJ is JObject adminMessage && await _adminLearning.ReceiveAsync(account.Id, adminMessage, ct)) return;
             var wamid = messageJ["id"]?.ToString();
             if (string.IsNullOrWhiteSpace(wamid))
                 return;
@@ -493,6 +496,7 @@ namespace RecruitmentSaaS.Services
 
                 var now = DateTime.UtcNow;
 
+                if (_adminLearning != null && await _adminLearning.IsPrivateAsync(account.Id, toWaId, ct)) return;
                 var contact = await FindOrCreateContactAsync(toWaId, null, now, ct);
                 var (conversation, isNewConversation) = await FindOrCreateConversationAsync(contact, account, now, ct);
             await using var chatGate = await ConversationLock.AcquireAsync(_context, "conversation:" + conversation.Id, ct);
@@ -574,6 +578,8 @@ namespace RecruitmentSaaS.Services
                     var messagesJ = thread["messages"] as JArray;
                     if (string.IsNullOrWhiteSpace(threadContactId) || messagesJ == null)
                         continue;
+
+                    if (_adminLearning != null && await _adminLearning.IsPrivateAsync(account.Id, threadContactId, ct)) continue;
 
                     var contact = await FindOrCreateContactAsync(threadContactId, null, now, ct);
                     var (conversation, _) = await FindOrCreateConversationAsync(contact, account, now, ct);
@@ -719,8 +725,9 @@ namespace RecruitmentSaaS.Services
             });
         }
 
-        private async Task ProcessStatusUpdateAsync(JToken statusJ, CancellationToken ct)
+        private async Task ProcessStatusUpdateAsync(JToken statusJ, CancellationToken ct, Guid accountId)
         {
+            if (_adminLearning != null && await _adminLearning.StatusAsync(accountId, statusJ, ct)) return;
             var wamid = statusJ["id"]?.ToString();
             var statusStr = statusJ["status"]?.ToString();
             if (string.IsNullOrWhiteSpace(wamid) || string.IsNullOrWhiteSpace(statusStr))

@@ -23,6 +23,226 @@ namespace RecruitmentSaaS.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiAdminChannel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AdminUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LastInboundAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("LastNotificationAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool>("Paused")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("VerificationAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("VerificationExpiresAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("VerificationHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("citext");
+
+                    b.Property<DateTime?>("VerifiedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("WhatsAppAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdminUserId");
+
+                    b.HasIndex("TenantId", "WhatsAppAccountId")
+                        .IsUnique();
+
+                    b.HasIndex("WhatsAppAccountId", "Phone")
+                        .IsUnique();
+
+                    b.ToTable("AiAdminChannels", "demorecruitment");
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiAdminClarification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Answer")
+                        .IsRequired()
+                        .HasMaxLength(3000)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid?>("AnswerMessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte>("AnswerScope")
+                        .HasColumnType("smallint");
+
+                    b.Property<DateTime>("AnswerValidUntil")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("ChannelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("CustomerMessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("Deadline")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid?>("KnowledgeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("OwnershipVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid?>("ReplyDraftId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte>("State")
+                        .HasColumnType("smallint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ValidatedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentId");
+
+                    b.HasIndex("ChannelId");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("ConversationId");
+
+                    b.HasIndex("CustomerMessageId");
+
+                    b.HasIndex("KnowledgeId");
+
+                    b.HasIndex("ReplyDraftId");
+
+                    b.HasIndex("TenantId", "ConversationId", "CustomerMessageId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "State", "Deadline");
+
+                    b.ToTable("AiAdminClarifications", "demorecruitment");
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiAdminMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChannelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<bool>("Incoming")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsTemplate")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("OperationKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("WhatsAppMessageId")
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestId");
+
+                    b.HasIndex("WhatsAppMessageId")
+                        .IsUnique()
+                        .HasFilter("\"WhatsAppMessageId\" IS NOT NULL");
+
+                    b.HasIndex("ChannelId", "OperationKey")
+                        .IsUnique();
+
+                    b.ToTable("AiAdminMessages", "demorecruitment");
+                });
+
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiChatFactCandidate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -166,6 +386,101 @@ namespace RecruitmentSaaS.Migrations
                     b.ToTable("AiControlRequests", "demorecruitment");
                 });
 
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiConversationAnalysis", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("AvailableAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Cohort")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("citext");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("ErrorCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("InferredStage")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("InsightsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<bool>("IsEvaluationHoldout")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("OutcomeEvidence")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid?>("SalespersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte>("State")
+                        .HasColumnType("smallint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VerifiedOutcome")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("citext");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("WhatsAppAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId");
+
+                    b.HasIndex("SalespersonId");
+
+                    b.HasIndex("WhatsAppAccountId");
+
+                    b.HasIndex("TenantId", "State", "AvailableAt");
+
+                    b.HasIndex("TenantId", "WhatsAppAccountId", "ConversationId", "Fingerprint")
+                        .IsUnique();
+
+                    b.ToTable("AiConversationAnalyses", "demorecruitment");
+                });
+
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiCustomerMemory", b =>
                 {
                     b.Property<Guid>("ConversationId")
@@ -202,6 +517,165 @@ namespace RecruitmentSaaS.Migrations
                     b.ToTable("AiCustomerMemories", "demorecruitment");
                 });
 
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiEvaluationCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AnalysisId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContextJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Dataset")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("Expected")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("citext");
+
+                    b.Property<bool>("PrivacyApproved")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Scenario")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WhatsAppAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AnalysisId");
+
+                    b.HasIndex("WhatsAppAccountId");
+
+                    b.HasIndex("TenantId", "WhatsAppAccountId", "Dataset");
+
+                    b.ToTable("AiEvaluationCases", "demorecruitment");
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiEvaluationResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Baseline")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid>("CaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Configuration")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool?>("Passed")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Reply")
+                        .IsRequired()
+                        .HasMaxLength(3000)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("ReviewJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorId");
+
+                    b.HasIndex("CaseId");
+
+                    b.HasIndex("TenantId", "RunId");
+
+                    b.ToTable("AiEvaluationResults", "demorecruitment");
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiKnowledgeIndex", b =>
+                {
+                    b.Property<Guid>("KnowledgeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AnalysisId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte>("Category")
+                        .HasColumnType("smallint");
+
+                    b.Property<double>("Confidence")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("citext");
+
+                    b.Property<float[]>("Embedding")
+                        .IsRequired()
+                        .HasColumnType("real[]");
+
+                    b.Property<string>("EmbeddingModel")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<long>("KnowledgeVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SourceFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("WhatsAppAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("KnowledgeId");
+
+                    b.HasIndex("AnalysisId");
+
+                    b.HasIndex("TenantId", "WhatsAppAccountId", "ContentHash");
+
+                    b.ToTable("AiKnowledgeIndexes", "demorecruitment");
+                });
+
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiLeadAssignment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -223,7 +697,7 @@ namespace RecruitmentSaaS.Migrations
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("timestamp without time zone");
 
-                    b.Property<Guid>("LeadId")
+                    b.Property<Guid?>("LeadId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("PreviousConversationSalesId")
@@ -265,6 +739,88 @@ namespace RecruitmentSaaS.Migrations
                         {
                             t.HasCheckConstraint("CK_AiAssignment_Actor", "\"AssignedById\" IS NOT NULL OR coalesce(length(trim(\"SourceReference\"::text)) > 0, false)");
                         });
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiLearningAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("Cursor")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid[]>("ExcludedConversationIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]");
+
+                    b.Property<bool>("IncludeOpenHistory")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastScanAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool>("Paused")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("WhatsAppAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WhatsAppAccountId");
+
+                    b.HasIndex("TenantId", "WhatsAppAccountId")
+                        .IsUnique();
+
+                    b.ToTable("AiLearningAccounts", "demorecruitment");
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiLearningUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("InputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("citext");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<int>("OutputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CreatedAt");
+
+                    b.ToTable("AiLearningUsage", "demorecruitment");
                 });
 
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiOfficeBooking", b =>
@@ -723,6 +1279,48 @@ namespace RecruitmentSaaS.Migrations
                         .IsUnique();
 
                     b.ToTable("AiSalesDrafts", "demorecruitment");
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiSalesFeedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("DraftId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EditedReply")
+                        .IsRequired()
+                        .HasMaxLength(3000)
+                        .HasColumnType("citext");
+
+                    b.Property<byte>("Kind")
+                        .HasColumnType("smallint");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("citext");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorId");
+
+                    b.HasIndex("DraftId");
+
+                    b.HasIndex("TenantId", "DraftId", "CreatedAt");
+
+                    b.ToTable("AiSalesFeedback", "demorecruitment");
                 });
 
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiSalesKnowledge", b =>
@@ -4190,6 +4788,72 @@ namespace RecruitmentSaaS.Migrations
                         });
                 });
 
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiAdminChannel", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdminUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.WhatsAppAccount", null)
+                        .WithMany()
+                        .HasForeignKey("WhatsAppAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiAdminClarification", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.AiSalesAgent", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.AiAdminChannel", null)
+                        .WithMany()
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.WhatsAppConversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.WhatsAppMessage", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerMessageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.AiSalesKnowledge", null)
+                        .WithMany()
+                        .HasForeignKey("KnowledgeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.AiSalesDraft", null)
+                        .WithMany()
+                        .HasForeignKey("ReplyDraftId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiAdminMessage", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.AiAdminChannel", null)
+                        .WithMany()
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.AiAdminClarification", null)
+                        .WithMany()
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiChatFactCandidate", b =>
                 {
                     b.HasOne("RecruitmentSaaS.Models.Entities.AiSalesKnowledge", null)
@@ -4223,6 +4887,26 @@ namespace RecruitmentSaaS.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiConversationAnalysis", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.WhatsAppConversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("SalespersonId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.WhatsAppAccount", null)
+                        .WithMany()
+                        .HasForeignKey("WhatsAppAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiCustomerMemory", b =>
                 {
                     b.HasOne("RecruitmentSaaS.Models.Entities.WhatsAppConversation", null)
@@ -4235,6 +4919,49 @@ namespace RecruitmentSaaS.Migrations
                         .WithMany()
                         .HasForeignKey("ReviewedById")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiEvaluationCase", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.AiConversationAnalysis", null)
+                        .WithMany()
+                        .HasForeignKey("AnalysisId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.WhatsAppAccount", null)
+                        .WithMany()
+                        .HasForeignKey("WhatsAppAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiEvaluationResult", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.AiEvaluationCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiKnowledgeIndex", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.AiConversationAnalysis", null)
+                        .WithMany()
+                        .HasForeignKey("AnalysisId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.AiSalesKnowledge", null)
+                        .WithOne()
+                        .HasForeignKey("RecruitmentSaaS.Models.Entities.AiKnowledgeIndex", "KnowledgeId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -4260,7 +4987,15 @@ namespace RecruitmentSaaS.Migrations
                     b.HasOne("RecruitmentSaaS.Models.Entities.Lead", null)
                         .WithMany()
                         .HasForeignKey("LeadId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiLearningAccount", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.WhatsAppAccount", null)
+                        .WithMany()
+                        .HasForeignKey("WhatsAppAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -4437,6 +5172,21 @@ namespace RecruitmentSaaS.Migrations
                         .WithMany()
                         .HasForeignKey("RequestedById")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiSalesFeedback", b =>
+                {
+                    b.HasOne("RecruitmentSaaS.Models.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RecruitmentSaaS.Models.Entities.AiSalesDraft", null)
+                        .WithMany()
+                        .HasForeignKey("DraftId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RecruitmentSaaS.Models.Entities.AiSalesKnowledge", b =>

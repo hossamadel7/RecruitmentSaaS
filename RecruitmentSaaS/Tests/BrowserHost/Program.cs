@@ -18,10 +18,13 @@ try
 {
     var officeDemo = args.Contains("--office-demo");
     var learningDemo = args.Contains("--learning-demo");
+    var trainingDemo = args.Contains("--training-demo");
+    var adminDemo = args.Contains("--admin-demo");
     var memoryDemo = args.Contains("--memory-demo");
     var dispatchDemo = args.Contains("--dispatch-demo");
     Guid dispatchConversation = Guid.Empty;
     Guid learningAccount = Guid.Empty;
+    Guid inboxConversation = Guid.Empty;
     var voiceDemo = args.Contains("--voice-demo") || officeDemo || memoryDemo;
     var root = Path.GetFullPath(args.First());
     var tenant = Guid.NewGuid();
@@ -36,12 +39,18 @@ try
         var contact = new WhatsAppContact { Id = Guid.NewGuid(), Name = "عميل التحقق", WhatsAppPhoneNumber = "201000000001" };
         var lead = new Lead { Id = Guid.NewGuid(), Branch = branch, RegisteredBy = admin, AssignedSales = human, FullName = contact.Name, Phone = contact.WhatsAppPhoneNumber, Age = 48, InterestedJobTitle = "لحام", Status = 1, LeadSource = 5 };
         var chat = new WhatsAppConversation { Id = Guid.NewGuid(), WhatsAppAccount = account, Contact = contact, Lead = lead, AssignedSalesAgent = human, IntakeStatus = (byte)IntakeStatus.Completed };
+        inboxConversation = chat.Id;
         db.AddRange(admin, human, chat);
         db.WhatsAppMessages.Add(new() { Id = Guid.NewGuid(), Conversation = chat, WhatsAppAccount = account,
             Direction = (byte)MessageDirection.Incoming, MessageType = (byte)WhatsAppMessageType.Text,
             TextBody = "ممكن أعرف التفاصيل؟", Status = (byte)MessageStatus.Received, MessageSource = (byte)MessageSource.Customer,
             CreatedAt = DateTime.UtcNow, WhatsAppTimestamp = DateTime.UtcNow });
         await db.SaveChangesAsync();
+        if (adminDemo)
+        {
+            db.AiSalesAgents.Add(new() { TenantId = tenant, WhatsAppAccountId = account.Id, DisplayName = "SalesAgent التجريبي", Mode = AiSalesMode.Shadow, Paused = false });
+            await db.SaveChangesAsync();
+        }
         if (dispatchDemo)
         {
             dispatchConversation = chat.Id;
@@ -124,10 +133,30 @@ try
     builder.Services.AddDbContext<RecruitmentCrmContext>(o => o.UseNpgsql(fixture.ConnectionString));
     builder.Services.Configure<AiSalesOptions>(o => { o.Enabled = true; o.TenantId = tenant; });
     builder.Services.AddScoped<AiSalesControlService>();
-    builder.Services.Configure<AiSalesEngineOptions>(o => o.DraftsEnabled = true);
+    builder.Services.Configure<AiSalesEngineOptions>(o => { o.DraftsEnabled = true; o.ExternalProcessingApproved = adminDemo; });
     builder.Services.AddScoped<AiSalesContextService>();
     builder.Services.AddScoped<AiSalesDraftService>();
     builder.Services.AddScoped<AiSalesImprovementService>();
+    builder.Services.Configure<AiSalesLearningOptions>(o => { o.Enabled = trainingDemo; o.PrivacyApproved = trainingDemo;
+        o.ExternalProcessingApproved = trainingDemo; o.ApprovedAccountIds = trainingDemo ? [learningAccount] : [];
+        o.HoldoutPercentage = 0; o.EmbeddingDimensions = 64; o.SemanticRetrievalEnabled = trainingDemo; });
+    builder.Services.AddScoped<AiLearningSourceService>();
+    builder.Services.AddScoped<AiSalesLearningService>();
+    builder.Services.AddScoped<AiSemanticKnowledgeService>();
+    builder.Services.AddScoped<AiSalesEvaluationService>();
+    builder.Services.AddScoped<AiSalesCrmActionService>();
+    builder.Services.Configure<AiAdminLearningOptions>(o => { o.Enabled = adminDemo; o.PrivateRoutingEnabled = adminDemo; o.ApprovedAccountIds = [learningAccount]; });
+    builder.Services.AddScoped<AiAdminLearningService>();
+    builder.Services.AddScoped<AiAdminDraftResumer>();
+    var fakeLearning = new Mock<IAiLearningProvider>(MockBehavior.Strict);
+    if (trainingDemo) {
+        fakeLearning.Setup(p => p.AnalyseAsync(It.IsAny<AiLearningMessage[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AiLearningMessage[] messages, CancellationToken _) => new AiLearningResponse(new("DISCOVERY", "ar-EG",
+                ["Fictional enquiry"], ["Fictional question"], ["Fictional objection"], ["Clarify first"], [], [], [], [], [], [],
+                [new(AiKnowledgeCategory.Strategy, "أسلوب توضيح تجريبي", "مثال خيالي: اسأل عن النقطة غير الواضحة فقط.", .75, [messages[0].Id])]), 20, 10));
+        fakeLearning.Setup(p => p.EmbedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new AiEmbeddingResponse([1, ..new float[63]], 5));
+    }
+    builder.Services.AddSingleton(fakeLearning.Object);
     builder.Services.Configure<AiSalesDispatchOptions>(o => { o.Enabled = dispatchDemo; o.ReleaseApproved = dispatchDemo;
         o.ApprovedAccountIds = dispatchDemo ? [learningAccount] : []; o.ApprovedConversationIds = dispatchDemo ? [dispatchConversation] : []; });
     builder.Services.AddScoped<AiSalesDispatchService>();
@@ -147,7 +176,13 @@ try
     builder.Services.AddScoped<AiVoiceService>();
     builder.Services.AddSingleton<IAiVoiceMediaDownloader>(Moq.Mock.Of<IAiVoiceMediaDownloader>(Moq.MockBehavior.Strict));
     builder.Services.AddSingleton<IAiVoiceTranscriber>(Moq.Mock.Of<IAiVoiceTranscriber>(Moq.MockBehavior.Strict));
-    builder.Services.AddSingleton<IAiSalesDraftProvider>(Moq.Mock.Of<IAiSalesDraftProvider>(Moq.MockBehavior.Strict));
+    var fakeDraft = new Mock<IAiSalesDraftProvider>(MockBehavior.Strict);
+    if (adminDemo) fakeDraft.Setup(p => p.GenerateAsync(It.IsAny<AiSalesContext>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync((AiSalesContext context, CancellationToken _) => new AiDraftProposal("تمت مراجعة طلبك، والاستثناء ده لحضرتك فقط.", "answer", "Synthetic reviewed Admin decision", false,
+            [context.Knowledge.First(k => k.Title.StartsWith("ADMIN_CUSTOMER_ONLY:")).Id], "synthetic-no-provider", 10, 5));
+    if (trainingDemo) fakeDraft.Setup(p => p.GenerateAsync(It.IsAny<AiSalesContext>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new AiDraftProposal("ممكن توضح النقطة اللي تقصدها؟", "acknowledgement", "Synthetic evaluation only", false, [], "synthetic-no-provider", 10, 5));
+    builder.Services.AddSingleton(fakeDraft.Object);
     builder.Services.AddScoped<ConversationMutationFilter>();
     builder.Services.AddScoped<INotificationService, NotificationService>();
     builder.Services.AddControllersWithViews(o => o.Filters.Add<ConversationMutationFilter>()).AddApplicationPart(typeof(AiSalesAdminController).Assembly);
@@ -164,6 +199,14 @@ try
     });
     app.MapGet("/validation/health", () => Results.Ok("Synthetic database only; no hosted workers or outbound transport registered."));
     app.MapPost("/validation/stop", (IHostApplicationLifetime lifetime) => { lifetime.StopApplication(); return Results.Ok(); });
+    if (adminDemo)
+    {
+        app.MapGet("/validation/admin-demo", () => Results.Ok(new { conversationId = inboxConversation, accountId = learningAccount }));
+        app.MapPost("/validation/admin-inbound", async (HttpContext http, [Microsoft.AspNetCore.Mvc.FromServices] AiAdminLearningService service) => {
+            using var reader = new StreamReader(http.Request.Body); var payload = Newtonsoft.Json.Linq.JObject.Parse(await reader.ReadToEndAsync());
+            return Results.Ok(await service.ReceiveAsync(learningAccount, payload, default));
+        });
+    }
     app.MapControllerRoute("default", "{controller=AiSalesAdmin}/{action=Index}/{id?}");
     Console.WriteLine("Validation login: http://127.0.0.1:5189/validation/login");
     Console.WriteLine("Disposable database: " + new Npgsql.NpgsqlConnectionStringBuilder(fixture.ConnectionString).Database);

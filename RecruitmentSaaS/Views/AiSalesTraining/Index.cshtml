@@ -1,0 +1,67 @@
+@{ ViewData["Title"] = "تدريب مساعد المبيعات"; }
+@Html.AntiForgeryToken()
+<section class="container-fluid py-3" dir="rtl" aria-label="تدريب مساعد المبيعات">
+    <h1 class="h3">تدريب مساعد المبيعات</h1>
+    <p class="text-muted">راجع ما تعلّمه المساعد من المحادثات قبل استخدامه. اقتراحات التعلم لا تُرسل للعملاء.</p>
+    <div id="training-status" class="alert alert-info" role="status">جارٍ تحميل الإعدادات…</div>
+    <div class="d-flex gap-2 flex-wrap mb-3">
+        <a href="/AiSalesAdmin/Index" class="btn btn-outline-secondary">إدارة المساعد والتحكم في الردود</a>
+        <a href="/AiSalesTraining/AdminChannel" class="btn btn-outline-primary">قناة المدير وأسئلة المساعد</a>
+        <select id="training-account" class="form-select w-auto" aria-label="حساب واتساب"></select>
+        <button id="training-refresh" class="btn btn-outline-primary">تحديث</button>
+        <button id="training-resume" class="btn btn-primary">بدء / استئناف التعلم</button>
+        <button id="training-pause" class="btn btn-outline-warning">إيقاف مؤقت</button>
+        <button id="training-scan" class="btn btn-outline-secondary">فحص دفعة محادثات</button>
+        <button id="training-index" class="btn btn-outline-secondary">تحديث البحث الدلالي</button>
+        <label class="form-check-label"><input id="training-open" type="checkbox" class="form-check-input"> تضمين المحادثات المفتوحة في الفحص التاريخي</label>
+    </div>
+    <div id="training-error" class="alert alert-danger d-none" role="alert"></div>
+    <section class="card p-3 mb-3"><h2 class="h5">المتابعة والنتائج</h2><div id="training-metrics" class="row g-2"></div>
+        <p class="small text-muted mt-2">التحويل المؤكد يستند إلى سجل CRM مرتبط، وليس إلى أسلوب الكلام. التقييمات اليدوية ليست قياس دقة مستقلًا.</p>
+        <p class="small text-muted">النتائج وفق آخر نسخة حللها النظام؛ تقارير CRM المباشرة تظل المرجع للعمليات الحالية.</p>
+        <p class="small text-muted">الأسئلة والاعتراضات أدناه من آخر 500 محادثة اكتمل تحليلها؛ إجماليات التغطية والنتائج تشمل الحساب كله.</p>
+        <div class="row"><div class="col-md-6"><h3 class="h6">الأسئلة المتكررة</h3><ul id="training-questions"></ul></div>
+        <div class="col-md-6"><h3 class="h6">الاعتراضات</h3><ul id="training-objections"></ul></div></div>
+    </section>
+    <section class="card p-3 mb-3"><h2 class="h5">مراجعة المعرفة</h2>
+        <p>صحّح المعلومات وتأكد من حداثتها وخصوصيتها. مراجعة الردود التاريخية لا تثبت صحة الأسعار أو الوعود.</p>
+        <div id="training-knowledge"></div>
+    </section>
+    <section class="card p-3 mb-3"><h2 class="h5">إضافة معلومات رسمية</h2>
+        <form id="training-official" class="row g-2">
+            <div class="col-md-4"><input id="official-title" class="form-control" maxlength="150" required placeholder="العنوان" aria-label="العنوان"></div>
+            <div class="col-md-4"><select id="official-category" class="form-select" aria-label="التصنيف">
+                <option value="0">العمل والخدمات</option><option value="1">الأسئلة الشائعة</option><option value="2">أسلوب البيع</option><option value="3">الاعتراضات</option>
+                <option value="4">أمثلة منقحة</option><option value="5">الأسعار والسياسات</option><option value="6">إجراءات الحجز</option><option value="7">التحويل لموظف</option></select></div>
+            <div class="col-md-4"><input id="official-source" class="form-control" maxlength="500" required placeholder="مرجع المعلومة" aria-label="مرجع المعلومة"></div>
+            <div class="col-12"><textarea id="official-content" class="form-control" maxlength="4000" required placeholder="المعلومة الحالية من مصدر رسمي" aria-label="المحتوى"></textarea></div>
+            <div class="col-md-6"><label>صالحة حتى <input id="official-expiry" type="date" required class="form-control"></label></div>
+            <div class="col-md-6"><label><input id="official-privacy" type="checkbox" required> راجعت المصدر والخصوصية وصحة المحتوى</label><br><button class="btn btn-primary">حفظ للمراجعة</button></div>
+        </form>
+    </section>
+    <section class="card p-3 mb-3"><h2 class="h5">فحص سبب اختيار المعرفة</h2>
+        <form id="training-search" class="d-flex gap-2"><input id="training-query" maxlength="1000" required class="form-control" placeholder="اكتب سؤال عميل" aria-label="سؤال البحث"><button class="btn btn-outline-primary">بحث</button></form>
+        <div id="training-matches" class="mt-2"></div>
+    </section>
+    <section class="card p-3 mb-3"><h2 class="h5">تحليل المحادثات</h2><div id="training-analyses"></div></section>
+    <section class="card p-3 mb-3"><h2 class="h5">ملاحظات على رد المساعد</h2>
+        <div id="training-drafts" class="mb-2"></div>
+        <form id="training-feedback" class="row g-2"><div class="col-md-5"><select id="feedback-draft" class="form-select" required aria-label="اختر ردًا لتقييمه"><option value="">اختر ردًا لتقييمه</option></select></div>
+        <div class="col-md-4"><select id="feedback-kind" class="form-select" aria-label="نوع الملاحظة"><option value="0">مفيد</option><option value="1">غير صحيح</option><option value="2">تعديل بشري</option><option value="3">تفاعل ناجح — يحتاج إثبات نتيجة</option><option value="4">تفاعل غير ناجح</option><option value="5">يحتاج تدخل موظف</option></select></div>
+        <div class="col-12"><textarea id="feedback-note" class="form-control" maxlength="1000" placeholder="التوضيح" aria-label="التوضيح"></textarea><textarea id="feedback-edit" class="form-control mt-2" maxlength="3000" placeholder="الرد المصحح عند اختيار تعديل بشري" aria-label="الرد المصحح"></textarea></div><div><button class="btn btn-outline-primary">حفظ الملاحظة</button></div></form>
+    </section>
+    <section class="card p-3 mb-3"><h2 class="h5">نتائج موظفي المبيعات حسب مصدر العملاء</h2><p class="small text-muted">نتائج وصفية وليست ترتيبًا سببيًا للأفضل. العملاء غير معروفين النتيجة والمتحدثون غير المنسوبين لموظف يظلون واضحين.</p><div id="training-performance"></div></section>
+    <section class="card p-3"><h2 class="h5">التقييم دون إرسال للعميل</h2><p>أنشئ حالات منقحة أو افتراضية ممثلة للاعتراضات واللغات والتصعيد. بعد أول تشغيل تُثبت المجموعة؛ التغييرات تحتاج اسم إصدار جديد. يلزم مراجعة بشرية لكل نتيجة.</p>
+        <form id="training-case" class="row g-2 mb-3">
+            <div class="col-12"><input id="case-analysis" type="hidden"><p id="case-source" class="text-muted small">حالة افتراضية جديدة، أو اختر محادثة تقييم محجوزة من قائمة التحليل.</p><button type="button" id="case-clear" class="btn btn-sm btn-outline-secondary">حالة افتراضية جديدة</button></div>
+            <div class="col-md-4"><input id="case-dataset" value="baseline-v1" maxlength="100" class="form-control" required aria-label="مجموعة الاختبار"></div>
+            <div class="col-md-4"><input id="case-scenario" maxlength="100" placeholder="نوع الحالة: سعر / لغة / تصعيد…" class="form-control" required aria-label="نوع الحالة"></div>
+            <div class="col-12"><textarea id="case-question" maxlength="4000" placeholder="سؤال منقح أو افتراضي" class="form-control" required aria-label="سؤال الاختبار"></textarea></div>
+            <div class="col-12"><textarea id="case-expected" maxlength="2000" placeholder="السلوك المتوقع ومعايير التقييم" class="form-control" required aria-label="السلوك المتوقع"></textarea></div>
+            <div><label><input id="case-privacy" type="checkbox" required> راجعت الخصوصية وأزلت بيانات العملاء</label> <button class="btn btn-outline-primary">إضافة حالة</button></div>
+        </form>
+        <form id="training-run" class="d-flex flex-wrap gap-2 mb-3"><input id="run-dataset" value="baseline-v1" class="form-control w-auto" required aria-label="المجموعة للتشغيل"><input id="run-config" placeholder="اسم إصدار الإعدادات" class="form-control w-auto" required aria-label="اسم الإعداد"><input id="run-baseline" placeholder="اسم الإصدار الأساسي" class="form-control w-auto" required aria-label="اسم الإصدار الأساسي"><button class="btn btn-outline-primary">تشغيل التقييم فقط</button></form>
+        <form id="training-compare" class="d-flex gap-2 flex-wrap"><input id="evaluation-dataset" class="form-control w-auto" value="baseline-v1" aria-label="مجموعة التقييم"><input id="evaluation-baseline" class="form-control w-auto" placeholder="الإعداد الأساسي" required aria-label="الإعداد الأساسي"><input id="evaluation-candidate" class="form-control w-auto" placeholder="الإعداد الجديد" required aria-label="الإعداد الجديد"><button class="btn btn-outline-primary">مقارنة ومراجعة النتائج</button></form><div id="training-results" class="mt-2"></div><pre id="training-comparison" dir="ltr" class="mt-2 text-wrap"></pre>
+    </section>
+</section>
+@section Scripts { <script src="~/js/ai-sales-training.js" asp-append-version="true"></script> }

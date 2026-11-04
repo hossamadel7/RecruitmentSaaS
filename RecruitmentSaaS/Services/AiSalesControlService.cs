@@ -20,7 +20,7 @@ public sealed class AiSalesControlService(RecruitmentCrmContext db, IOptions<AiS
             throw new AiSalesValidation("AI Sales is disabled or its deployment tenant is not configured.");
     }
 
-    public async Task<AiControlResult> AssignAsync(Guid leadId, Guid conversationId, Guid agentId,
+    public async Task<AiControlResult> AssignAsync(Guid? leadId, Guid conversationId, Guid agentId,
         Guid? actorId, long expectedVersion, string reason, string requestKey, CancellationToken ct,
         bool conversationOnly = false, string? sourceReference = null)
     {
@@ -37,21 +37,21 @@ public sealed class AiSalesControlService(RecruitmentCrmContext db, IOptions<AiS
         var agent = await db.AiSalesAgents.SingleOrDefaultAsync(a => a.Id == agentId && a.TenantId == Options.TenantId, ct)
             ?? throw new AiSalesValidation("Agent unavailable.");
         if (agent.Mode != AiSalesMode.Shadow) throw new AiSalesValidation("Select a shadow-mode agent first.");
-        var lead = await db.Leads.SingleOrDefaultAsync(l => l.Id == leadId, ct) ?? throw new AiSalesValidation("Lead unavailable.");
+        var lead = leadId == null ? null : await db.Leads.SingleOrDefaultAsync(l => l.Id == leadId, ct) ?? throw new AiSalesValidation("Lead unavailable.");
         var chat = await db.WhatsAppConversations.Include(c => c.WhatsAppAccount).SingleOrDefaultAsync(c => c.Id == conversationId, ct)
             ?? throw new AiSalesValidation("Conversation unavailable.");
-        if (chat.LeadId != leadId || lead.IsConverted || lead.IsDuplicate || lead.Status is 6 or 7 or 8 or 9)
+        if (chat.LeadId != leadId || lead == null && !conversationOnly || lead != null && (lead.IsConverted || lead.IsDuplicate || lead.Status is 6 or 7 or 8 or 9))
             throw new AiSalesValidation("Select an eligible, linked lead and conversation.");
         if (chat.WhatsAppAccountId != agent.WhatsAppAccountId || !chat.WhatsAppAccount.IsActive)
             throw new AiSalesValidation("Agent and conversation account must match and be active.");
-        var team = lead.TeamManagerId;
-        if (team == null && lead.AssignedSalesId != null)
+        var team = lead?.TeamManagerId;
+        if (team == null && lead?.AssignedSalesId != null)
             team = await db.Users.Where(u => u.Id == lead.AssignedSalesId).Select(u => u.ManagerId).SingleAsync(ct);
         var accountTeam = await WhatsAppScope.TeamOfAccountAsync(db, chat.WhatsAppAccountId, ct);
         if ((!conversationOnly && team != agent.TeamManagerId) || accountTeam != agent.TeamManagerId)
             throw new AiSalesValidation("Lead, account and agent must belong to the same team scope.");
-        if (lead.AssignedAiSalesAgentId != null || chat.AssignedAiSalesAgentId != null ||
-            await db.AiLeadAssignments.AnyAsync(a => a.LeadId == leadId && a.EndedAt == null && (!conversationOnly || !a.ConversationOnly), ct))
+        if (lead?.AssignedAiSalesAgentId != null || chat.AssignedAiSalesAgentId != null ||
+            leadId != null && await db.AiLeadAssignments.AnyAsync(a => a.LeadId == leadId && a.EndedAt == null && (!conversationOnly || !a.ConversationOnly), ct))
             throw new AiSalesConflict("Already AI assigned; take over or release the current assignment first.");
         if (!conversationOnly && await db.WhatsAppConversations.AnyAsync(c => c.LeadId == leadId && c.Id != conversationId, ct))
             throw new AiSalesValidation("Multiple conversations require human review before this pilot assignment.");
@@ -61,12 +61,12 @@ public sealed class AiSalesControlService(RecruitmentCrmContext db, IOptions<AiS
         CheckVersion(control, expectedVersion);
         db.AiLeadAssignments.Add(new()
         {
-            TenantId = Options.TenantId, LeadId = lead.Id, ConversationId = chat.Id, AgentId = agent.Id,
-            AssignedById = actorId, PreviousSalesId = lead.AssignedSalesId,
+            TenantId = Options.TenantId, LeadId = lead?.Id, ConversationId = chat.Id, AgentId = agent.Id,
+            AssignedById = actorId, PreviousSalesId = lead?.AssignedSalesId,
             PreviousConversationSalesId = chat.AssignedSalesAgentId, Reason = reason.Trim(),
             ConversationOnly = conversationOnly, SourceReference = sourceReference
         });
-        if (!conversationOnly) { lead.AssignedAiSalesAgentId = agent.Id; lead.AssignedSalesId = null; lead.UpdatedAt = DateTime.UtcNow; }
+        if (!conversationOnly && lead != null) { lead.AssignedAiSalesAgentId = agent.Id; lead.AssignedSalesId = null; lead.UpdatedAt = DateTime.UtcNow; }
         chat.AssignedAiSalesAgentId = agent.Id; chat.AssignedSalesAgentId = null;
         chat.PendingTeamManagerId = agent.TeamManagerId;
         chat.UpdatedAt = DateTime.UtcNow;
@@ -75,9 +75,9 @@ public sealed class AiSalesControlService(RecruitmentCrmContext db, IOptions<AiS
             chat.IntakeStatus == (byte)IntakeStatus.Collecting ? ConversationControllerMode.Intake : ConversationControllerMode.Assisted,
             actorId, "AssignedShadow", reason);
         // Seed known intake fields only from actual lead values. Do not reset the intake state.
-        chat.IntakeName ??= string.IsNullOrWhiteSpace(lead.FullName) ? null : lead.FullName;
-        chat.IntakeAge ??= lead.Age;
-        chat.IntakeJob ??= lead.InterestedJobTitle;
+        chat.IntakeName ??= string.IsNullOrWhiteSpace(lead?.FullName) ? null : lead.FullName;
+        chat.IntakeAge ??= lead?.Age;
+        chat.IntakeJob ??= lead?.InterestedJobTitle;
         var result = RecordRequest(requestKey, fingerprint, control);
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return result;
     }
@@ -120,8 +120,8 @@ public sealed class AiSalesControlService(RecruitmentCrmContext db, IOptions<AiS
                 var previousChat = assignment.ConversationOnly
                     ? await db.Users.Where(u => u.Id == assignment.PreviousConversationSalesId && u.IsActive).Select(u => (Guid?)u.Id).SingleOrDefaultAsync(ct)
                     : await ActiveUserAsync(assignment.PreviousConversationSalesId, agent.TeamManagerId, ct);
-                var lead = await db.Leads.SingleAsync(l => l.Id == assignment.LeadId, ct);
-                if (!assignment.ConversationOnly) { lead.AssignedAiSalesAgentId = null; lead.AssignedSalesId = previousLead; }
+                var lead = assignment.LeadId == null ? null : await db.Leads.SingleAsync(l => l.Id == assignment.LeadId, ct);
+                if (!assignment.ConversationOnly && lead != null) { lead.AssignedAiSalesAgentId = null; lead.AssignedSalesId = previousLead; }
                 chat.AssignedAiSalesAgentId = null; chat.AssignedSalesAgentId = previousChat;
                 assignment.EndedAt = DateTime.UtcNow;
                 if (previousChat != null) chat.PendingTeamManagerId = null;

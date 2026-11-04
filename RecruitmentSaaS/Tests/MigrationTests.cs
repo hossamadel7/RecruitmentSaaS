@@ -26,7 +26,11 @@ public sealed class MigrationTests(DatabaseFixture fixture) : IClassFixture<Data
         var structuredMemory = new AiStructuredCustomerMemory { ActiveProvider = db.Database.ProviderName! };
         var ownerApproval = new AiOwnerRecordedKnowledgeApproval { ActiveProvider = db.Database.ProviderName! };
         var scopedAssignment = new AiConversationScopedAssignments { ActiveProvider = db.Database.ProviderName! };
+        var continuousLearning = new AiSalesContinuousLearning { ActiveProvider = db.Database.ProviderName! };
+        var adminCoaching = new AiAdminWhatsAppCoaching { ActiveProvider = db.Database.ProviderName! };
         var sql = db.GetService<IMigrationsSqlGenerator>();
+        foreach (var command in sql.Generate(adminCoaching.DownOperations)) await db.Database.ExecuteSqlRawAsync(command.CommandText);
+        foreach (var command in sql.Generate(continuousLearning.DownOperations)) await db.Database.ExecuteSqlRawAsync(command.CommandText);
         // This fixture is a separately created disposable database, never an existing installation.
         foreach (var command in sql.Generate(scopedAssignment.DownOperations)) await db.Database.ExecuteSqlRawAsync(command.CommandText);
         foreach (var command in sql.Generate(ownerApproval.DownOperations)) await db.Database.ExecuteSqlRawAsync(command.CommandText);
@@ -47,6 +51,8 @@ public sealed class MigrationTests(DatabaseFixture fixture) : IClassFixture<Data
         foreach (var command in sql.Generate(structuredMemory.UpOperations)) await db.Database.ExecuteSqlRawAsync(command.CommandText.Replace("{", "{{").Replace("}", "}}"));
         foreach (var command in sql.Generate(ownerApproval.UpOperations)) await db.Database.ExecuteSqlRawAsync(command.CommandText);
         foreach (var command in sql.Generate(scopedAssignment.UpOperations)) await db.Database.ExecuteSqlRawAsync(command.CommandText);
+        foreach (var command in sql.Generate(continuousLearning.UpOperations)) await db.Database.ExecuteSqlRawAsync(command.CommandText);
+        foreach (var command in sql.Generate(adminCoaching.UpOperations)) await db.Database.ExecuteSqlRawAsync(command.CommandText);
         db.ChangeTracker.Clear();
         var preserved = await db.Leads.SingleAsync(l => l.Id == lead.Id);
         Assert.Equal(user.Id, preserved.AssignedSalesId); Assert.Equal((byte)46, preserved.Age);

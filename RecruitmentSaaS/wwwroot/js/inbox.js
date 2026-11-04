@@ -331,7 +331,7 @@
 
     // What the AI assistant has collected (and whether it's still talking)
     function intakeBox(c) {
-        if (c.assignedAiSalesAgentId) return '<div class="intake-box"><strong>🤖 المبيعات الافتراضية — مراقبة فقط</strong><p>أي رد منك يوقف تحكم المساعد.</p><a href="/AiSalesAdmin?conversationId=' + encodeURIComponent(c.id) + '">إدارة التحكم</a></div>';
+        if (c.assignedAiSalesAgentId) return '<div class="intake-box"><strong>🤖 مساعد المبيعات</strong><p>أي رد منك يوقف تحكم المساعد. الرد التلقائي حسب إعدادات التفعيل.</p><a href="/AiSalesAdmin?conversationId=' + encodeURIComponent(c.id) + '">إدارة التحكم</a>' + (String(USER.role) === '1' ? ' · <a href="/AiSalesTraining/AdminChannel?conversationId=' + encodeURIComponent(c.id) + '">اسأل المدير</a>' : '') + '</div>';
         if (!c.intakeStatus) return '';
         var state = { 1: '🤖 المساعد الآلي بيجمع البيانات', 2: '✅ المساعد الآلي جمع البيانات', 3: '⚠️ المساعد الآلي حوّل المحادثة', 4: '👤 موظف استلم المحادثة من المساعد' }[c.intakeStatus] || '';
         function row(label, v) { return '<div class="intake-row"><span>' + label + '</span><strong>' + (v != null && v !== '' ? esc(v) : '<span class="intake-missing">لسه</span>') + '</strong></div>'; }
@@ -1428,6 +1428,8 @@
             (c.job ? '<div class="customer-field"><span class="customer-field-label">الوظيفة</span><span class="customer-field-value">' + esc(c.job) + '</span></div>' : '') +
             '<div class="customer-field"><span class="customer-field-label">دولة الإعلان</span><span class="customer-field-value">' + countryAssignment(c) + '</span></div>' +
             '<div class="customer-field"><span class="customer-field-label">رقم الواتساب المستقبِل</span><span class="customer-field-value">' + esc(c.whatsAppAccountName) + '</span></div>' +
+            '<div class="customer-field"><span class="customer-field-label">أول رقم تواصل معه العميل</span><span class="customer-field-value">' +
+                (c.firstContactPhoneNumber ? esc(c.firstContactAccountName || '') + ' (<bdi dir="ltr">' + esc(c.firstContactPhoneNumber) + '</bdi>)' : 'لم يتواصل بعد') + '</span></div>' +
             (c.referralSourceId ? '<div class="customer-field"><span class="customer-field-label">مصدر المحادثة</span><span class="customer-field-value">' +
                 esc((c.adCountry ? 'إعلان ' + countryDisplayName(c.adCountry) + ' — ' : '') + (c.referralCampaignName || c.referralHeadline || 'إعلان Meta')) +
                 '<small style="display:block;color:var(--text-muted);margin-top:3px">Ad ID: ' + esc(c.referralSourceId) + '</small></span></div>' : '') +
@@ -1875,6 +1877,11 @@
         var c = state.selectedConversation;
         if (!c || !USER.canAssign) return;
         var agents = await getAgents();
+        var aiTransfer = null;
+        if (String(USER.role) === '1') {
+            try { aiTransfer = await api('/api/ai-sales/conversations/' + c.id + '/transfer-options'); }
+            catch (_) { /* Human transfers remain available when AI setup is unavailable. */ }
+        }
 
         document.getElementById('transfer-current').innerHTML = 'المسؤول دلوقتي: <strong>' +
             esc(c.assignedSalesAgentName || 'غير مخصص') + '</strong>';
@@ -1899,6 +1906,24 @@
                     '<i class="bi bi-chevron-left"></i></button>';
             }).join('');
         }).join('') || '<div class="text-muted text-center py-3">مفيش موظفين تانيين</div>';
+        if (aiTransfer) {
+            var aiGroup = document.createElement('div');
+            aiGroup.className = 'transfer-group'; aiGroup.textContent = 'مساعد المبيعات بالذكاء الاصطناعي';
+            list.prepend(aiGroup);
+            (aiTransfer.agents || []).forEach(function (a) {
+                var b = document.createElement('button'); b.type = 'button'; b.className = 'transfer-item';
+                b.dataset.id = a.id; b.dataset.name = a.displayName; b.dataset.ai = 'true';
+                b.disabled = !aiTransfer.enabled || !a.available || !!aiTransfer.currentAgentId;
+                var avatar = document.createElement('span'); avatar.className = 'conv-avatar'; avatar.textContent = '🤖';
+                var name = document.createElement('span'); name.className = 'transfer-name';
+                name.textContent = a.displayName + (a.id === aiTransfer.currentAgentId ? ' — المسؤول الحالي' : a.paused ? ' — متوقف مؤقتًا' : !a.available ? ' — مكتمل العدد' : '');
+                b.append(avatar, name); aiGroup.after(b);
+            });
+            if (!aiTransfer.agents?.length || !aiTransfer.enabled) {
+                var help = document.createElement('a'); help.className = 'd-block p-2'; help.href = '/AiSalesAdmin/Index';
+                help.textContent = 'إعداد مساعد المبيعات وتفعيله لهذا الحساب'; aiGroup.after(help);
+            }
+        }
 
         search.oninput = function () {
             var q = search.value.trim().toLowerCase();
@@ -1920,6 +1945,8 @@
             document.getElementById('tc-to').textContent = initials(item.dataset.name);
             document.getElementById('tc-text').innerHTML = 'تحويل محادثة <strong>' + esc(customer) + '</strong><br>من <strong>' +
                 esc(c.assignedSalesAgentName || 'غير مخصص') + '</strong> إلى <strong>' + esc(item.dataset.name) + '</strong>؟';
+            if (item.dataset.ai) document.getElementById('tc-text').append(document.createElement('br'),
+                document.createTextNode('سيتم تحويل هذه المحادثة فقط مع الاحتفاظ بمسؤول ملف العميل. الرد التلقائي يخضع لإعدادات التفعيل الحالية.'));
             document.getElementById('tc-error').hidden = true;
             pickParts.forEach(function (el) { if (el) el.hidden = true; });
             confirmBox.hidden = false;
@@ -1932,7 +1959,9 @@
             okBtn.disabled = true;
             okBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جارٍ التحويل...';
             try {
-                var res = await api('/api/conversations/' + c.id + '/assign', { method: 'POST', body: JSON.stringify({ agentId: item.dataset.id }) });
+                var res = item.dataset.ai
+                    ? await api('/api/ai-sales/conversations/' + c.id + '/assign', { method: 'POST', headers: { 'Idempotency-Key': 'inbox-ai:' + c.id + ':' + aiTransfer.version + ':' + item.dataset.id }, body: JSON.stringify({ agentId: item.dataset.id, expectedVersion: aiTransfer.version }) })
+                    : await api('/api/conversations/' + c.id + '/assign', { method: 'POST', body: JSON.stringify({ agentId: item.dataset.id }) });
                 modal.hide();
                 if (state.selectedConversationId === c.id) {
                     var detail = await api('/api/conversations/' + c.id);

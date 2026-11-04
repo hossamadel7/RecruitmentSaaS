@@ -7,7 +7,8 @@ using System.Text.Json;
 namespace RecruitmentSaaS.Services;
 
 public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControlService controls,
-    AiSalesContextService contextReader, IAiSalesDraftProvider provider, IOptions<AiSalesEngineOptions> options)
+    AiSalesContextService contextReader, IAiSalesDraftProvider provider, IOptions<AiSalesEngineOptions> options,
+    AiAdminLearningService? adminLearning = null)
 {
     public Task<AiSalesDraft> GenerateAsync(Guid chatId, Guid actor, long expectedVersion, string key, CancellationToken ct)
         => GenerateCoreAsync(chatId, actor, expectedVersion, key, ct);
@@ -73,17 +74,19 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
         try
         {
             proposal = AiSalesReplyPolicy.Create(context);
+            if (proposal?.NeedsHuman == true && proposal.Intent == "handoff" && context.Knowledge.Any(k => k.Title.StartsWith("ADMIN_CUSTOMER_ONLY:")) &&
+                !IntakeScript.WantsPerson(IntakeScript.Normalize(context.RecentMessages.Last().Text))) proposal = null;
             if (proposal == null && context.RecentMessages.Reverse().TakeWhile(m => m.Speaker == "customer").Any(m => m.Type is not ("Text" or "TranscribedAudio")))
             {
                 var voiceOnly = context.RecentMessages.Reverse().TakeWhile(m => m.Speaker == "customer")
                     .All(m => m.Type is "Text" or "TranscribedAudio" or "Audio");
                 proposal = voiceOnly
-                    ? new("ممكن توضح طلبك بالكتابة عشان نقدر نساعدك بدقة؟", "acknowledgement",
+                    ? new(AiSalesLanguage.SafeLocal("media", context.Language ?? "ar-EG"), "acknowledgement",
                         "Audio awaits interpretation; request written clarification without a staff handoff.", false, [], "local-policy")
-                    : new("ممكن توضح طلبك كتابة عشان نقدر نساعدك بدقة؟", "handoff", "Media has not been interpreted; human review required.", true, [], "local-policy");
+                    : new(AiSalesLanguage.SafeLocal("media", context.Language ?? "ar-EG"), "handoff", "Media has not been interpreted; human review required.", true, [], "local-policy");
             }
             else if (proposal == null && !context.Knowledge.Any(k => k.Kind == AiKnowledgeKind.Fact))
-                proposal = new("محتاجين نراجع المعلومة مع موظف قبل ما نأكد أي تفاصيل.", "handoff", "No currently approved facts for this account.", true, [], "local-policy");
+                proposal = new(AiSalesLanguage.SafeLocal("handoff", context.Language ?? "ar-EG"), "handoff", "No currently approved facts for this account.", true, [], "local-policy");
             else if (proposal == null)
             {
                 if (!settings.ExternalProcessingApproved) throw new AiSalesProviderException("ExternalProcessingDisabled");
@@ -119,6 +122,12 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
                 draft.SourceIdsJson = JsonSerializer.Serialize(proposal.SourceIds.Distinct());
             }
             await db.SaveChangesAsync(CancellationToken.None);
+        }
+        if (adminLearning != null && draft.Status == AiDraftStatus.ReviewRequired && draft.NeedsHuman && draft.Intent == "handoff")
+        {
+            // The draft is durable already; a changed/disabled coaching account must not discard its review result.
+            try { await adminLearning.AskAsync(chatId, null, null, ct); }
+            catch (AiSalesValidation) { }
         }
         return draft;
     }

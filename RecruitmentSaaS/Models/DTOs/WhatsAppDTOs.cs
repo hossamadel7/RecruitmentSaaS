@@ -57,6 +57,9 @@ namespace RecruitmentSaaS.Models.DTOs
 
     public class ConversationDetailDto : ConversationListItemDto
     {
+        /// <summary>Business number that received this contact's earliest recorded incoming message, across all chats.</summary>
+        public string? FirstContactAccountName { get; set; }
+        public string? FirstContactPhoneNumber { get; set; }
         public string? LostReason { get; set; }
         public Guid? LeadId { get; set; }
         public string? LeadFullName { get; set; }

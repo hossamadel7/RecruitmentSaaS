@@ -244,6 +244,19 @@ namespace RecruitmentSaaS.Controllers.Api
                 IntakeJob = conversation.IntakeJob,
                 IntakeHandoffReason = conversation.IntakeHandoffReason
             };
+            // Use the message's receiving account: the current chat/account may have changed
+            // and outbound templates do not mean the customer has contacted that number.
+            var firstContact = await _context.WhatsAppMessages.AsNoTracking()
+                .Where(m => m.Conversation.ContactId == conversation.ContactId
+                    && m.Direction == (byte)MessageDirection.Incoming)
+                .OrderBy(m => m.WhatsAppTimestamp)
+                .ThenBy(m => m.CreatedAt)
+                .ThenBy(m => m.Id)
+                .Select(m => new { m.WhatsAppAccount.Name, m.WhatsAppAccount.DisplayPhoneNumber })
+                .FirstOrDefaultAsync();
+            dto.FirstContactAccountName = firstContact?.Name;
+            dto.FirstContactPhoneNumber = firstContact?.DisplayPhoneNumber;
+
             var windowCloses = await WindowClosesAtAsync(conversation.Id);
             dto.CanSendFreeText = windowCloses != null;
             dto.WindowClosesAt = windowCloses;

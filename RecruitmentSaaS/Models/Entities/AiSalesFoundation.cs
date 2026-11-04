@@ -32,7 +32,7 @@ public sealed class AiLeadAssignment
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TenantId { get; set; }
-    public Guid LeadId { get; set; }
+    public Guid? LeadId { get; set; }
     public Guid ConversationId { get; set; }
     public Guid AgentId { get; set; }
     public Guid? AssignedById { get; set; }
