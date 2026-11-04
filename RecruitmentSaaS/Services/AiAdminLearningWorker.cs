@@ -19,27 +19,33 @@ public sealed class AiAdminLearningWorker(IServiceScopeFactory scopes, ILogger<A
                     var db = scope.ServiceProvider.GetRequiredService<RecruitmentCrmContext>();
                     var channels = await db.AiAdminChannels.AsNoTracking().Where(c => c.TenantId == admin.Tenant &&
                         admin.Options.ApprovedAccountIds.Contains(c.WhatsAppAccountId) && c.VerifiedAt != null && !c.Paused).Select(c => c.Id).ToArrayAsync(ct);
-                    foreach (var channel in channels) await admin.QueueQuestionsAsync(channel, ct);
+                    // Each item runs in its own scope so one failing channel/message cannot stall the others (head-of-line blocking).
+                    foreach (var channel in channels)
+                        await IsolatedAsync(async () => { using var s = scopes.CreateScope(); await s.ServiceProvider.GetRequiredService<AiAdminLearningService>().QueueQuestionsAsync(channel, ct); }, ct);
                     var messages = await db.AiAdminMessages.AsNoTracking().Where(m => channels.Contains(m.ChannelId) && !m.Incoming &&
                         (m.State == "Queued" || m.State == "Sending")).OrderBy(m => m.CreatedAt).Select(m => m.Id).Take(10).ToArrayAsync(ct);
-                    foreach (var message in messages) await admin.DeliverAsync(message, ct);
+                    foreach (var message in messages)
+                        await IsolatedAsync(async () => { using var s = scopes.CreateScope(); await s.ServiceProvider.GetRequiredService<AiAdminLearningService>().DeliverAsync(message, ct); }, ct);
                     var requests = await db.AiAdminClarifications.AsNoTracking().Where(r => r.TenantId == admin.Tenant && channels.Contains(r.ChannelId) &&
                         (r.State == AiAdminRequestState.Validated || (r.Deadline < DateTime.UtcNow &&
                         (r.State == AiAdminRequestState.Queued || r.State == AiAdminRequestState.AwaitingAdmin || r.State == AiAdminRequestState.AnswerReceived))))
                         .OrderBy(r => r.CreatedAt).Select(r => r.Id).Take(10).ToArrayAsync(ct);
                     foreach (var id in requests)
-                    {
-                        using var turn = scopes.CreateScope();
-                        try { await turn.ServiceProvider.GetRequiredService<AiAdminDraftResumer>().PrepareAsync(id, ct); }
-                        catch (AiSalesValidation) { }
-                        catch (AiSalesConflict) { }
-                    }
+                        await IsolatedAsync(async () => { using var turn = scopes.CreateScope(); await turn.ServiceProvider.GetRequiredService<AiAdminDraftResumer>().PrepareAsync(id, ct); }, ct);
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
             catch (Exception ex) { logger.LogError("Admin coaching worker failed ({ErrorType})", ex.GetType().Name); }
             await Task.Delay(TimeSpan.FromSeconds(15), ct);
         }
+    }
+    private async Task IsolatedAsync(Func<Task> work, CancellationToken ct)
+    {
+        try { await work(); }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (AiSalesValidation) { }
+        catch (AiSalesConflict) { }
+        catch (Exception ex) { logger.LogError("Admin coaching item failed ({ErrorType})", ex.GetType().Name); }
     }
 }
 
@@ -70,7 +76,17 @@ public sealed class AiAdminDraftResumer(RecruitmentCrmContext db, AiAdminLearnin
             admin.Change(r, AiAdminRequestState.Cancelled, null); r.ErrorCode = "CustomerContextChanged"; await db.SaveChangesAsync(ct); return r;
         }
         // The actor authorized use of this answer, not approval of the resulting customer wording.
-        var draft = await drafts.GenerateAsync(r.ConversationId, r.ValidatedById!.Value, r.OwnershipVersion, "admin-answer:" + r.Id + ":" + r.Version, ct);
+        AiSalesDraft draft;
+        try { draft = await drafts.GenerateAsync(r.ConversationId, r.ValidatedById!.Value, r.OwnershipVersion, "admin-answer:" + r.Id + ":" + r.Version, ct); }
+        catch (AiSalesValidation)
+        {
+            // Permanent refusal (drafts disabled, outside pilot, agent paused): escalate instead of retrying forever and starving later requests.
+            db.ChangeTracker.Clear();
+            r = await db.AiAdminClarifications.SingleAsync(x => x.Id == id, CancellationToken.None);
+            if (r.State != AiAdminRequestState.Validated) return r;
+            admin.Change(r, AiAdminRequestState.Escalated, null); r.ErrorCode = "DraftUnavailable";
+            await db.SaveChangesAsync(CancellationToken.None); return r;
+        }
         await db.Entry(r).ReloadAsync(ct);
         if (r.State != AiAdminRequestState.Validated) return r;
         r.ReplyDraftId = draft.Id;

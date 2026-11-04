@@ -121,7 +121,11 @@ public sealed class AiAdminLearningService(RecruitmentCrmContext db, AiSalesCont
             else if (replyId == null)
             {
                 var open = await db.AiAdminClarifications.Where(r => r.ChannelId == c.Id && (r.State == AiAdminRequestState.Queued || r.State == AiAdminRequestState.AwaitingAdmin)).Take(2).ToArrayAsync(ct);
-                if (open.Length == 1) request = open[0];
+                // A natural reply can only answer a question the Admin was actually sent; never an unseen queued one.
+                if (open.Length == 1 && open[0].State == AiAdminRequestState.AwaitingAdmin && await db.AiAdminMessages.AnyAsync(m =>
+                        m.ChannelId == c.Id && m.RequestId == open[0].Id && m.OperationKey == "question:" + open[0].Id &&
+                        (m.State == "Sent" || m.State == "Delivered" || m.State == "Read"), ct))
+                    request = open[0];
             }
             if (request != null && at != null && at >= request.CreatedAt.AddSeconds(-1) && request.Deadline > now &&
                 request.State is AiAdminRequestState.Queued or AiAdminRequestState.AwaitingAdmin or AiAdminRequestState.AnswerReceived)
@@ -179,7 +183,9 @@ public sealed class AiAdminLearningService(RecruitmentCrmContext db, AiSalesCont
         var channel = await db.AiAdminChannels.SingleAsync(c => c.Id == r.ChannelId, ct); Require(channel.WhatsAppAccountId);
         await using var gate = await ConversationLock.AcquireAsync(db, "admin-channel:" + Tenant + ":" + channel.WhatsAppAccountId, ct);
         await db.Entry(r).ReloadAsync(ct);
-        if (r.Version != version || r.State is not (AiAdminRequestState.AnswerReceived or AiAdminRequestState.AwaitingAdmin or AiAdminRequestState.Queued)) throw new AiSalesConflict("السؤال تغير؛ حدّث الصفحة.");
+        // A request escalated only because the Admin deadline passed can still be validated explicitly; the resumer re-checks customer freshness.
+        var lateButOpen = r.State == AiAdminRequestState.Escalated && r.ErrorCode == "AdminDeadlineExceeded";
+        if (r.Version != version || !lateButOpen && r.State is not (AiAdminRequestState.AnswerReceived or AiAdminRequestState.AwaitingAdmin or AiAdminRequestState.Queued)) throw new AiSalesConflict("السؤال تغير؛ حدّث الصفحة.");
         if (channel.VerifiedAt == null || channel.AdminUserId != actor) throw new AiSalesValidation("يلزم المدير الموثق لهذه القناة.");
         if (string.IsNullOrWhiteSpace(answer) || answer.Length > 3000 || scope == AiAdminAnswerScope.Incomplete || !Enum.IsDefined(scope) ||
             until <= DateTime.UtcNow || until > DateTime.UtcNow.AddDays(90)) throw new AiSalesValidation("حدد إجابة واضحة ونطاقها وتاريخ انتهاء خلال 90 يومًا.");
@@ -202,7 +208,7 @@ public sealed class AiAdminLearningService(RecruitmentCrmContext db, AiSalesCont
                 CreatedById = actor, ApprovedById = actor, ApprovedAt = DateTime.UtcNow, SourceReference = "ADMIN " + channel.Id + " " + r.Code + " message " + r.AnswerMessageId };
             db.AiSalesKnowledge.Add(k); r.KnowledgeId = k.Id; Audit("AdminKnowledgePublished", k.Id, actor);
         }
-        Change(r, AiAdminRequestState.Validated, actor); await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+        Change(r, AiAdminRequestState.Validated, actor); r.ErrorCode = null; await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
     }
     public void Change(AiAdminClarification r, AiAdminRequestState state, Guid? actor)
     {
