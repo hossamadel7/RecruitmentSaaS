@@ -50,6 +50,7 @@ public sealed partial class FoundationTests
         builder.Services.AddScoped<AiSalesImprovementService>();
         builder.Services.Configure<AiSalesDispatchOptions>(_ => { });
         builder.Services.AddScoped<AiSalesDispatchService>();
+        builder.Services.AddScoped<AiAutoReplyDiagnostics>();
         builder.Services.Configure<AiChatLearningOptions>(_ => { });
         builder.Services.AddScoped<AiChatLearningService>();
         builder.Services.AddScoped<AiChatFactService>();

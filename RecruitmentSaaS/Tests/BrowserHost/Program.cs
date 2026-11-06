@@ -160,6 +160,7 @@ try
     builder.Services.Configure<AiSalesDispatchOptions>(o => { o.Enabled = dispatchDemo; o.ReleaseApproved = dispatchDemo;
         o.ApprovedAccountIds = dispatchDemo ? [learningAccount] : []; o.ApprovedConversationIds = dispatchDemo ? [dispatchConversation] : []; });
     builder.Services.AddScoped<AiSalesDispatchService>();
+    builder.Services.AddScoped<AiAutoReplyDiagnostics>();
     var fakeTransport = new Moq.Mock<IWhatsAppCloudApiService>(Moq.MockBehavior.Strict);
     if (dispatchDemo) fakeTransport.Setup(x => x.SendTextMessageAsync(Moq.It.IsAny<string>(), Moq.It.IsAny<string>(), Moq.It.IsAny<string>(), Moq.It.IsAny<CancellationToken>()))
         .ReturnsAsync(new WhatsAppSendResult { Success = true, WhatsAppMessageId = "wamid.synthetic-browser-only" });

@@ -6,6 +6,11 @@
     <h1 class="h3 mb-2">مساعد المبيعات</h1>
     <p class="text-muted">اختار العميل، عيّنه للمساعد، وراجع الرد المقترح.</p>
     <p id="ai-status" role="status" aria-live="polite"></p>
+    <section id="auto-reply-card" class="card p-3 mb-3" hidden>
+        <h2 class="h5 mb-2">هل المساعد هيرد تلقائياً على العميل ده؟</h2>
+        <div id="auto-reply-summary" class="alert mb-2" role="status" aria-live="polite"></div>
+        <details id="auto-reply-details"><summary class="small">عرض كل الشروط</summary><ul id="auto-reply-checks" class="list-unstyled small mt-2 mb-0"></ul></details>
+    </section>
     <section class="card p-3 mb-3">
         <h2 class="h5 mb-3">العميل</h2>
         <form id="search-form" class="row g-2 mb-3">

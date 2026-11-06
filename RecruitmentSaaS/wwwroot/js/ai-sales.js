@@ -47,16 +47,37 @@
         $('agent-select').value = selected || '';
         $('agent-select').dispatchEvent(new Event('change'));
     }
+    // Opened from the inbox (?conversationId=…): load exactly that chat first, whatever its age.
+    let requested = new URLSearchParams(location.search).get('conversationId');
     async function search() {
-        chats = await api('candidates?search=' + encodeURIComponent($('search').value) + ($('search-account').value ? '&accountId=' + encodeURIComponent($('search-account').value) : ''));
+        const direct = requested && !$('search').value && !$('search-account').value;
+        chats = await api('candidates?search=' + encodeURIComponent($('search').value) + ($('search-account').value ? '&accountId=' + encodeURIComponent($('search-account').value) : '')
+            + (direct ? '&conversationId=' + encodeURIComponent(requested) : ''));
         $('chat-select').replaceChildren(); chats.forEach(c => option($('chat-select'), c.conversationId, (c.accountName || '') + ' — ' + (c.leadCode || '') + ' — ' + c.name + (c.assignedAiSalesAgentId ? ' — مساعد افتراضي' : '')));
-        const requested = new URLSearchParams(location.search).get('conversationId');
         if (chats.some(c => c.conversationId === requested)) $('chat-select').value = requested;
+        if (!direct) requested = null;
         await loadControl();
+    }
+    async function loadCheck() {
+        const card = $('auto-reply-card');
+        if (!current) { card.hidden = true; return; }
+        const id = current.id, report = await api('conversations/' + id + '/auto-reply-check');
+        if (current?.id !== id) return;
+        card.hidden = false;
+        $('auto-reply-summary').className = 'alert mb-2 ' + (report.willReply ? 'alert-success' : 'alert-warning');
+        $('auto-reply-summary').textContent = report.summary;
+        $('auto-reply-checks').replaceChildren(...report.checks.map(c => {
+            const li = document.createElement('li'); li.className = 'mb-1';
+            li.textContent = (c.ok ? '✓ ' : '✗ ') + c.label + (c.fix ? ' — ' + c.fix : '');
+            li.style.color = c.ok ? 'var(--bs-success)' : 'var(--bs-danger)';
+            return li;
+        }));
+        // Open the full list when something is wrong, so the reason is visible without an extra click.
+        $('auto-reply-details').open = !report.willReply;
     }
     async function loadControl() {
         const id = $('chat-select').value;
-        current = null; $('control-state').textContent = '';
+        current = null; $('control-state').textContent = ''; $('auto-reply-card').hidden = true;
         window.dispatchEvent(new CustomEvent('ai-sales-conversation', { detail: null }));
         assignmentStatus.textContent = ''; assignmentStatus.className = '';
         if (!id) { fillAgents(null, ''); $('control-state').textContent = 'لا توجد محادثات مطابقة للبحث.'; window.dispatchEvent(new CustomEvent('ai-sales-conversation', { detail: null })); return; }
@@ -72,6 +93,7 @@
         $('control-state').textContent = current.control ? names[current.control.controller] : 'لم يُعيّن العميل للمساعد بعد.';
         assignButton.disabled = !!current.assignedAiSalesAgentId;
         window.dispatchEvent(new CustomEvent('ai-sales-conversation', { detail: current }));
+        await loadCheck().catch(() => { $('auto-reply-card').hidden = true; });
     }
     async function guarded(work, status = $('ai-status')) {
         document.querySelectorAll('#ai-sales-page [data-action], #search-form button').forEach(b => b.disabled = true);
@@ -106,7 +128,8 @@
             if (!$('agent-select').value) throw new Error('اختار مساعداً محفوظاً.');
             if (agents.find(a => a.id === $('agent-select').value)?.whatsAppAccountId !== current.whatsAppAccountId)
                 throw new Error('اختار مساعد نفس رقم واتساب الخاص بالعميل.');
-            await api('leads/' + current.leadId + '/assign', 'POST', { agentId: $('agent-select').value, conversationId: current.id, expectedVersion: version, reason, conversationOnly: true });
+            if (current.leadId) await api('leads/' + current.leadId + '/assign', 'POST', { agentId: $('agent-select').value, conversationId: current.id, expectedVersion: version, reason, conversationOnly: true });
+            else await api('conversations/' + current.id + '/assign', 'POST', { agentId: $('agent-select').value, expectedVersion: version });
         } else await api('conversations/' + current.id + '/' + action, 'POST', { expectedVersion: version, reason });
         await loadControl(); $('ai-status').textContent = 'تم حفظ الإجراء.';
         assignmentStatus.className = 'alert alert-success';
@@ -115,5 +138,6 @@
             : 'تم حفظ الإجراء.';
         assignmentStatus.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, assignmentStatus)));
+    setInterval(() => { if (current && !document.hidden) loadCheck().catch(() => {}); }, 15000);
     guarded(async () => { accounts = await api('setup'); accounts.forEach(a => option($('search-account'), a.id, a.name)); await loadAgents(); await search(); });
 }());

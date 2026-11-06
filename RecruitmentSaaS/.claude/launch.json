@@ -4,8 +4,21 @@
     {
       "name": "recruitmentsaas-http",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--launch-profile", "http"],
+      "runtimeArgs": [
+        "run",
+        "--launch-profile",
+        "http"
+      ],
       "port": 5051
+    },
+    {
+      "name": "ai-sales-demo",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set AI_SALES_TEST_DATABASE=Host=127.0.0.1;Port=55439;Username=phase1_test;Database=postgres&& dotnet run --no-build --project Tests/BrowserHost -- C:/Users/hadel/source/repos/RecruitmentSaaS/RecruitmentSaaS --dispatch-demo"
+      ],
+      "port": 5189
     }
   ]
 }

@@ -31,8 +31,19 @@ public sealed class AiSalesController(RecruitmentCrmContext db, AiSalesControlSe
     }
 
     [HttpGet("candidates"), Authorize(Roles = "1")]
-    public async Task<IActionResult> Candidates([FromQuery] string? search, CancellationToken ct, [FromQuery] Guid? accountId = null)
+    public async Task<IActionResult> Candidates([FromQuery] string? search, CancellationToken ct, [FromQuery] Guid? accountId = null, [FromQuery] Guid? conversationId = null)
     {
+        // Opened from the inbox: show exactly that chat, even if it is older than the 50 most recent.
+        if (conversationId != null && string.IsNullOrWhiteSpace(search) && accountId == null)
+        {
+            if (!await CanSee(conversationId.Value, ct)) return NotFound();
+            return Ok(await db.WhatsAppConversations.AsNoTracking().Where(c => c.Id == conversationId).Select(c => new
+            {
+                conversationId = c.Id, c.LeadId, name = c.Lead != null ? c.Lead.FullName : (c.IntakeName ?? c.Contact.Name ?? c.Contact.WhatsAppPhoneNumber),
+                LeadCode = c.Lead != null ? c.Lead.LeadCode : null, c.AssignedAiSalesAgentId, c.WhatsAppAccountId, accountName = c.WhatsAppAccount.Name,
+                version = db.ConversationControls.Where(x => x.ConversationId == c.Id).Select(x => (long?)x.OwnershipVersion).FirstOrDefault() ?? 0
+            }).ToListAsync(ct));
+        }
         var query = db.WhatsAppConversations.AsNoTracking().Where(c => c.LeadId != null);
         if (accountId != null) query = query.Where(c => c.WhatsAppAccountId == accountId);
         if (!string.IsNullOrWhiteSpace(search))
@@ -139,6 +150,15 @@ public sealed class AiSalesController(RecruitmentCrmContext db, AiSalesControlSe
         return Ok(new { chat.Id, chat.LeadId, chat.WhatsAppAccountId, chat.AssignedAiSalesAgentId, control,
             audit = await db.AiControlAudits.AsNoTracking().Where(a => a.ConversationId == id && a.TenantId == controls.Options.TenantId)
                 .OrderByDescending(a => a.CreatedAt).Take(30).ToListAsync(ct) });
+    }
+
+    /// <summary>Plain-language answer to "will the AI reply automatically here, and if not, why?"</summary>
+    [HttpGet("conversations/{id:guid}/auto-reply-check"), Authorize(Roles = "1")]
+    public async Task<IActionResult> AutoReplyCheck(Guid id, [FromServices] AiAutoReplyDiagnostics diagnostics, CancellationToken ct)
+    {
+        if (!await CanSee(id, ct)) return NotFound();
+        Response.Headers.CacheControl = "no-store";
+        return Ok(await diagnostics.CheckAsync(id, ct));
     }
 
     [HttpPost("conversations/{id:guid}/{operation:regex(^(takeover|resume|release)$)}")]
