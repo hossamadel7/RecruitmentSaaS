@@ -152,7 +152,9 @@ public sealed class AiAdminLearningService(RecruitmentCrmContext db, AiSalesCont
         var chat = await db.WhatsAppConversations.AsNoTracking().Include(c => c.Contact).SingleAsync(c => c.Id == conversation, ct);
         if (!Options.ApprovedAccountIds.Contains(chat.WhatsAppAccountId)) return null;
         Require(chat.WhatsAppAccountId); if (actor != null) await RequireAdminAsync(actor.Value, ct);
-        var channel = await db.AiAdminChannels.SingleOrDefaultAsync(c => c.TenantId == Tenant && c.WhatsAppAccountId == chat.WhatsAppAccountId && c.VerifiedAt != null && !c.Paused, ct);
+        // One Admin number serves every company number: use this number's own channel if it has one, otherwise the company's linked channel.
+        var channel = await db.AiAdminChannels.Where(c => c.TenantId == Tenant && c.VerifiedAt != null && !c.Paused && Options.ApprovedAccountIds.Contains(c.WhatsAppAccountId))
+            .OrderByDescending(c => c.WhatsAppAccountId == chat.WhatsAppAccountId).ThenBy(c => c.VerifiedAt).FirstOrDefaultAsync(ct);
         if (channel == null || !await db.Users.AnyAsync(u => u.Id == channel.AdminUserId && u.Role == 1 && u.IsActive, ct)) return null;
         await using var gate = await ConversationLock.AcquireAsync(db, "admin-channel:" + Tenant + ":" + chat.WhatsAppAccountId, ct);
         var control = await db.ConversationControls.AsNoTracking().SingleOrDefaultAsync(c => c.TenantId == Tenant && c.ConversationId == conversation, ct);
@@ -196,7 +198,8 @@ public sealed class AiAdminLearningService(RecruitmentCrmContext db, AiSalesCont
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         if (replaces != null)
         {
-            var old = await db.AiSalesKnowledge.SingleOrDefaultAsync(k => k.Id == replaces && k.TenantId == Tenant && k.WhatsAppAccountId == channel.WhatsAppAccountId && k.Status == AiKnowledgeStatus.Approved, ct)
+            // Knowledge is shared by all company numbers, so a correction may replace a fact stored on any of them.
+            var old = await db.AiSalesKnowledge.SingleOrDefaultAsync(k => k.Id == replaces && k.TenantId == Tenant && k.Status == AiKnowledgeStatus.Approved, ct)
                 ?? throw new AiSalesValidation("المعلومة المراد تصحيحها غير متاحة.");
             old.Status = AiKnowledgeStatus.Retired; old.Version++;
         }

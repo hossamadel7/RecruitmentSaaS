@@ -58,6 +58,19 @@ public sealed partial class FoundationTests
         Assert.False(await service.IsPrivateAsync(Guid.NewGuid(),bound.Channel.Phone,default));
     }
     [Fact]
+    public async Task One_linked_Admin_number_receives_questions_from_every_company_number()
+    {
+        var (s,account,channel,options)=await AdminSeedAsync();await using var db=fixture.Create();
+        // The customer writes to a second company number that has no Admin channel of its own.
+        var second=new WhatsAppAccount{Id=Guid.NewGuid(),Name="Second company number",PhoneNumberId=Guid.NewGuid().ToString(),WabaId="test",DisplayPhoneNumber="201888888888",IsActive=true};
+        db.WhatsAppAccounts.Add(second);(await db.WhatsAppConversations.FindAsync(s.Chat))!.WhatsAppAccountId=second.Id;await db.SaveChangesAsync();
+        var service=AdminService(db,s,options);
+        Assert.Null(await service.AskAsync(s.Chat,null,s.Admin,default)); // only numbers approved for Admin coaching are routed
+        options.ApprovedAccountIds=[account,second.Id];
+        var request=(await service.AskAsync(s.Chat,null,s.Admin,default))!;
+        Assert.Equal(channel,request.ChannelId);
+    }
+    [Fact]
     public async Task AskAdmin_correlates_out_of_order_answers_and_never_guesses_between_pending_questions()
     {
         var (s,account,channel,options)=await AdminSeedAsync();await using var db=fixture.Create();var service=AdminService(db,s,options);
