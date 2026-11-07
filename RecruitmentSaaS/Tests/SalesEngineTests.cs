@@ -71,7 +71,7 @@ public sealed partial class FoundationTests
     }
 
     [Fact]
-    public async Task Context_retrieval_excludes_other_tenants_accounts_unapproved_and_expired_facts()
+    public async Task Context_retrieval_shares_the_tenants_numbers_but_excludes_other_tenants_unapproved_and_expired_facts()
     {
         var s = await SeedAsync(); var fact = await EngineSeedAsync(s); var other = await SeedAsync();
         await using var db = fixture.Create();
@@ -83,11 +83,20 @@ public sealed partial class FoundationTests
             ValidFrom = DateTime.UtcNow.AddDays(-3), ValidUntil = DateTime.UtcNow.AddDays(expired ? -1 : 1)
         };
         var accountId = fact.WhatsAppAccountId;
-        db.AddRange(Copy(other.Tenant, accountId, AiKnowledgeStatus.Approved), Copy(s.Tenant, (await db.WhatsAppConversations.FindAsync(other.Chat))!.WhatsAppAccountId, AiKnowledgeStatus.Approved),
+        // Approved on the company's other WhatsApp number: shared with this chat.
+        var shared = Copy(s.Tenant, (await db.WhatsAppConversations.FindAsync(other.Chat))!.WhatsAppAccountId, AiKnowledgeStatus.Approved);
+        shared.Title = "Shared"; shared.Content = "approved on another company number";
+        // The same fact approved again on this number appears only once.
+        var duplicate = Copy(s.Tenant, accountId, AiKnowledgeStatus.Approved);
+        duplicate.Title = shared.Title; duplicate.Content = shared.Content;
+        db.AddRange(Copy(other.Tenant, accountId, AiKnowledgeStatus.Approved), shared, duplicate,
             Copy(s.Tenant, accountId, AiKnowledgeStatus.Draft), Copy(s.Tenant, accountId, AiKnowledgeStatus.Approved, true));
         await db.SaveChangesAsync();
         var context = await new AiSalesContextService(db).ReadAsync(s.Tenant, (await db.WhatsAppConversations.FindAsync(s.Chat))!, default);
-        Assert.Single(context.Knowledge); Assert.Equal(fact.Id, context.Knowledge[0].Id);
+        Assert.Equal(2, context.Knowledge.Length);
+        Assert.Contains(context.Knowledge, k => k.Id == fact.Id);
+        Assert.Single(context.Knowledge, k => k.Title == "Shared");
+        Assert.DoesNotContain(context.Knowledge, k => k.Title == "Excluded");
         Assert.Equal((byte)48, context.Customer.Age); Assert.Equal("Welder", context.Customer.Profession);
         Assert.DoesNotContain("Password", JsonSerializer.Serialize(context));
     }

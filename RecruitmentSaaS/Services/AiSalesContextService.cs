@@ -53,9 +53,11 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
         var terms = Regex.Matches(IntakeScript.Normalize(retrievalQuery), @"[\p{L}]{2,}").Select(m => m.Value).Distinct().Take(30).ToArray();
         var now = DateTime.UtcNow;
         // Bounded local lexical retrieval. Approved facts and playbook styles stay separate in the prompt.
-        var candidates = await db.AiSalesKnowledge.AsNoTracking().Where(k => k.TenantId == tenant && k.WhatsAppAccountId == chat.WhatsAppAccountId
+        // All of the company's WhatsApp numbers share one knowledge base, whichever number the fact was approved on.
+        var candidates = (await db.AiSalesKnowledge.AsNoTracking().Where(k => k.TenantId == tenant
             && k.Status == AiKnowledgeStatus.Approved && k.ValidFrom <= now && k.ValidUntil > now)
-            .OrderByDescending(k => k.ApprovedAt).Take(semantic?.CandidateLimit ?? 500).ToListAsync(ct);
+            .OrderByDescending(k => k.ApprovedAt).Take(semantic?.CandidateLimit ?? 500).ToListAsync(ct))
+            .DistinctBy(k => (k.Kind, IntakeScript.Normalize(k.Title), IntakeScript.Normalize(k.Content))).ToList();
         var ranked = semantic == null ? candidates.OrderByDescending(k => terms.Count(t => IntakeScript.Normalize(k.Title + " " + k.Content).Contains(t)))
             .ThenByDescending(k => k.ApprovedAt).ToArray() : (await semantic.RankAsync(tenant, chat.WhatsAppAccountId,
                 AiLearningSourceService.Redact(retrievalQuery, [lead?.FullName, chat.IntakeName]), candidates.ToArray(), ct)).Select(x => x.Knowledge).ToArray();

@@ -48,7 +48,8 @@ public sealed class AiSemanticKnowledgeService(RecruitmentCrmContext db, AiSales
     {
         if (tenant != controls.Options.TenantId) throw new AiSalesValidation("Invalid retrieval tenant.");
         var now = DateTime.UtcNow;
-        candidates = candidates.Where(k => k.TenantId == tenant && k.WhatsAppAccountId == account && k.Status == AiKnowledgeStatus.Approved && k.ValidFrom <= now && k.ValidUntil > now).ToArray();
+        // Knowledge is shared by all of the tenant's WhatsApp numbers; `account` only decides whether this chat may use semantic search.
+        candidates = candidates.Where(k => k.TenantId == tenant && k.Status == AiKnowledgeStatus.Approved && k.ValidFrom <= now && k.ValidUntil > now).ToArray();
         if (!options.Value.Enabled && candidates.All(k => !k.SourceReference.StartsWith("Analysis ", StringComparison.Ordinal)))
         {
             var words = IntakeScript.Normalize(query).Split(' ', StringSplitOptions.RemoveEmptyEntries).Distinct().Take(30).ToArray();
@@ -56,7 +57,7 @@ public sealed class AiSemanticKnowledgeService(RecruitmentCrmContext db, AiSales
                 .ThenByDescending(k => k.ApprovedAt).Select(k => new AiKnowledgeMatch(k, null, "Learning disabled; existing lexical retrieval")).ToArray();
         }
         var ids = candidates.Select(k => k.Id).ToArray();
-        var indexes = await db.AiKnowledgeIndexes.AsNoTracking().Where(i => i.TenantId == tenant && i.WhatsAppAccountId == account && ids.Contains(i.KnowledgeId)).ToListAsync(ct);
+        var indexes = await db.AiKnowledgeIndexes.AsNoTracking().Where(i => i.TenantId == tenant && ids.Contains(i.KnowledgeId)).ToListAsync(ct);
         var current = new List<AiSalesKnowledge>();
         foreach (var k in candidates)
         {

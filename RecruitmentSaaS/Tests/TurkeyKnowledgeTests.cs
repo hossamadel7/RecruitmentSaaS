@@ -75,13 +75,14 @@ public sealed partial class FoundationTests
     }
 
     [Fact]
-    public async Task Turkey_knowledge_is_account_scoped_and_retiring_owner_fact_invalidates_review()
+    public async Task Turkey_knowledge_is_shared_by_the_companys_numbers_and_retiring_owner_fact_invalidates_review()
     {
         var (s, entries) = await TurkeySeedAsync("المرتب كام؟"); var other = await SeedAsync();
         await using var db = fixture.Create(); var reader = new AiSalesContextService(db);
         var otherChat = (await db.WhatsAppConversations.FindAsync(other.Chat))!;
-        // Same tenant lookup must still not expose this company's pack to another account.
-        Assert.Empty((await reader.ReadAsync(s.Tenant, otherChat, default)).Knowledge);
+        // The company's other WhatsApp number uses the same approved pack.
+        var packIds = entries.Values.Select(e => e.Id).ToHashSet();
+        Assert.Contains((await reader.ReadAsync(s.Tenant, otherChat, default)).Knowledge, k => packIds.Contains(k.Id));
         var provider = GoodProvider(entries["turkey_pay_and_work"].Id);
         var engine = Engine(db, s, provider.Object);
         var draft = await engine.GenerateAsync(s.Chat, s.Admin, 1, "turkey-retired-pay", default);
