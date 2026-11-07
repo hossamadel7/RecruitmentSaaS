@@ -10,7 +10,7 @@ From the workspace root in PowerShell, with the dedicated test cluster running:
 
 ```powershell
 $env:AI_SALES_TEST_DATABASE='Host=127.0.0.1;Port=55439;Username=phase1_test;Database=postgres'
-dotnet run --project Tests/ReplayRunner/ReplayRunner.csproj -- 'C:\Users\hadel\source\repos\RecruitmentSaaS\RecruitmentSaaS'
+dotnet run --project Tests/ReplayRunner/ReplayRunner.csproj -- 'D:\source\repos\RecruitmentSaaS\RecruitmentSaaS'
 ```
 
 The runner reads `docs/evaluation/synthetic-sales-cases.json`, requires its synthetic-only marker and known bounded schema, and rejects playbook-as-fact citation allowances. It creates isolated tenants/accounts for each scenario, runs all 16 cases three times, and then runs eight independent sessions concurrently. The concurrency burst is an in-process/local PostgreSQL probe across separate synthetic tenants, not representative production traffic or a shared-tenant provider admission test. A separate regression test holds two fake provider calls pending in one tenant and confirms that a third generation is rejected before a provider call or reservation.

@@ -29,7 +29,7 @@ With the dedicated PostgreSQL test cluster running:
 
 ```powershell
 $env:AI_SALES_TEST_DATABASE = 'Host=127.0.0.1;Port=55439;Username=phase1_test;Database=postgres'
-dotnet run --project Tests/BrowserHost/BrowserHost.csproj -- 'C:\Users\hadel\source\repos\RecruitmentSaaS\RecruitmentSaaS'
+dotnet run --project Tests/BrowserHost/BrowserHost.csproj -- 'D:\source\repos\RecruitmentSaaS\RecruitmentSaaS'
 ```
 
 Visit `http://127.0.0.1:5189/validation/login`. Create a Shadow agent, unpause it, manually assign the synthetic customer, pause it, unpause and explicitly resume, take over, then release. Confirm the control display and audit after each action.
