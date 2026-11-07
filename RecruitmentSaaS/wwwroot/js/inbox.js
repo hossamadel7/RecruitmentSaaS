@@ -713,7 +713,10 @@
 
     async function markRead(id) {
         if (USER.readOnly) return;
-        try { await api('/api/conversations/' + id + '/read', { method: 'POST' }); } catch (e) { /* non-fatal */ }
+        var result = null;
+        try { result = await api('/api/conversations/' + id + '/read', { method: 'POST' }); } catch (e) { /* non-fatal */ }
+        // The server keeps an assigned chat unread until its own salesperson opens it.
+        if (result && result.cleared === false) return;
         patchListRow(id, { unreadCount: 0 });
         loadAccounts();
     }

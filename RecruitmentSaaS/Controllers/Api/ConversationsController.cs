@@ -757,6 +757,11 @@ namespace RecruitmentSaaS.Controllers.Api
             if (!await CanSeeAsync(conversation))
                 return Forbid();
 
+            // An assigned chat stays unread until its own salesperson opens it, so an Admin or manager
+            // looking at it does not hide new customer messages from the salesperson.
+            if (conversation.AssignedSalesAgentId != null && conversation.AssignedSalesAgentId != CurrentUserId)
+                return Ok(new { success = true, cleared = false, unreadCount = conversation.UnreadCount });
+
             if (conversation.UnreadCount != 0)
             {
                 conversation.UnreadCount = 0;
@@ -765,7 +770,7 @@ namespace RecruitmentSaaS.Controllers.Api
                 await _notifier.UnreadCountUpdatedAsync(conversation.Id, conversation.WhatsAppAccountId, 0, conversation.AssignedSalesAgentId);
             }
 
-            return Ok(new { success = true });
+            return Ok(new { success = true, cleared = true, unreadCount = 0 });
         }
 
         // ── POST /api/conversations/{id}/assign ───────────────────────────────
