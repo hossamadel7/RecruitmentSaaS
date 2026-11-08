@@ -161,6 +161,7 @@
 
         if (state.countryFilter) params.set('country', state.countryFilter);
         if (state.agentFilter === 'unassigned') params.set('assigned', 'unassigned');
+        else if (state.agentFilter === 'ai') params.set('assigned', 'ai');
         else if (state.agentFilter.indexOf('agent:') === 0) params.set('assigned', state.agentFilter.slice(6));
         else if (state.agentFilter.indexOf('team:') === 0) params.set('team', state.agentFilter.slice(5));
 
@@ -196,7 +197,8 @@
         order.sort(function (x, y) { return teams[x].name.localeCompare(teams[y].name, 'ar'); });
 
         var html = '<option value="">كل المندوبين</option>' +
-            '<option value="unassigned" id="pending-option">⏳ في انتظار التعيين</option>';
+            '<option value="unassigned" id="pending-option">⏳ في انتظار التعيين</option>' +
+            '<option value="ai">🤖 مساعد المبيعات (AI)</option>';
         if (USER.role === '7' && teams[USER.id]) html += '<option value="team:' + esc(USER.id) + '">👥 فريقي</option>';
         if (USER.role === '8') html += '<option value="agent:' + esc(USER.id) + '">💬 محادثاتي أنا</option>'; // the head's own chats
         order.forEach(function (mgrId) {

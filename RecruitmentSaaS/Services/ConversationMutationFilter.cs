@@ -24,9 +24,14 @@ public sealed class ConversationMutationFilter(RecruitmentCrmContext db, AiSales
         var visibility = await WhatsAppScope.ForUserAsync(db, user.FindFirstValue(ClaimTypes.Role), actor);
         if (!await db.WhatsAppConversations.ApplyVisibility(visibility).AnyAsync(c => c.Id == id))
         { context.Result = new ForbidResult(); return; }
-        if (chat.AssignedAiSalesAgentId != null && context.RouteData.Values["action"]?.ToString() == "Assign")
-        { context.Result = new ConflictObjectResult(new { error = "Release the AI assignment from AI Sales before assigning a human owner." }); return; }
+        var transfer = context.RouteData.Values["action"]?.ToString() == "Assign";
+        if (transfer && !WhatsAppAuthorization.CanAssignOrTransfer(user.FindFirstValue(ClaimTypes.Role)))
+        { context.Result = new ForbidResult(); return; }
         await controls.TakeOverLockedAsync(chat, actor, "Staff initiated an inbox message or assignment.", context.HttpContext.RequestAborted);
+        // Transferring an AI-handled chat to a person ends the AI assignment in the same step.
+        if (transfer && chat.AssignedAiSalesAgentId != null && !await controls.ReleaseLockedAsync(chat, actor,
+                "Transferred from the inbox to a staff member.", context.HttpContext.RequestAborted))
+            chat.AssignedAiSalesAgentId = null;
         await db.SaveChangesAsync(context.HttpContext.RequestAborted);
         await next();
     }

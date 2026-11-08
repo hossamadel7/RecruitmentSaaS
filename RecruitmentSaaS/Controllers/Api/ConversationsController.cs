@@ -133,6 +133,8 @@ namespace RecruitmentSaaS.Controllers.Api
                     query = query.Where(c => c.AssignedSalesAgentId == userId);
                 else if (assigned == "unassigned")
                     query = query.Where(c => c.AssignedSalesAgentId == null && c.AssignedAiSalesAgentId == null);
+                else if (assigned == "ai")
+                    query = query.Where(c => c.AssignedAiSalesAgentId != null); // every chat the AI sales assistant handles
                 else if (Guid.TryParse(assigned, out var agentId))
                     query = query.Where(c => c.AssignedSalesAgentId == agentId);
             }

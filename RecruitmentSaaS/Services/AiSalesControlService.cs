@@ -110,26 +110,32 @@ public sealed class AiSalesControlService(RecruitmentCrmContext db, IOptions<AiS
         else
         {
             await TakeOverLockedAsync(chat, actorId, reason, ct);
-            if (action == "release")
-            {
-                var assignment = await db.AiLeadAssignments.SingleOrDefaultAsync(a => a.ConversationId == chat.Id && a.EndedAt == null, ct);
-                if (assignment == null) throw new AiSalesValidation("No active assignment.");
-                // Explicit admin release restores an active former owner, otherwise leaves the scoped review queue.
-                var agent = await db.AiSalesAgents.SingleAsync(a => a.Id == assignment.AgentId, ct);
-                var previousLead = await ActiveUserAsync(assignment.PreviousSalesId, agent.TeamManagerId, ct);
-                var previousChat = assignment.ConversationOnly
-                    ? await db.Users.Where(u => u.Id == assignment.PreviousConversationSalesId && u.IsActive).Select(u => (Guid?)u.Id).SingleOrDefaultAsync(ct)
-                    : await ActiveUserAsync(assignment.PreviousConversationSalesId, agent.TeamManagerId, ct);
-                var lead = assignment.LeadId == null ? null : await db.Leads.SingleAsync(l => l.Id == assignment.LeadId, ct);
-                if (!assignment.ConversationOnly && lead != null) { lead.AssignedAiSalesAgentId = null; lead.AssignedSalesId = previousLead; }
-                chat.AssignedAiSalesAgentId = null; chat.AssignedSalesAgentId = previousChat;
-                assignment.EndedAt = DateTime.UtcNow;
-                if (previousChat != null) chat.PendingTeamManagerId = null;
-                Change(control, ConversationControllerMode.Human, actorId, "ReleasedToHumanWorkflow", reason);
-            }
+            if (action == "release" && !await ReleaseLockedAsync(chat, actorId, reason, ct))
+                throw new AiSalesValidation("No active assignment.");
         }
         var result = RecordRequest(requestKey, fingerprint, control);
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return result;
+    }
+
+    /// <summary>Ends the AI assignment and hands the chat back to its former human owner (if still active).
+    /// Caller holds the conversation lock. Returns false when there was no active assignment.</summary>
+    public async Task<bool> ReleaseLockedAsync(WhatsAppConversation chat, Guid? actorId, string reason, CancellationToken ct)
+    {
+        var assignment = await db.AiLeadAssignments.SingleOrDefaultAsync(a => a.ConversationId == chat.Id && a.EndedAt == null, ct);
+        if (assignment == null) return false;
+        var agent = await db.AiSalesAgents.SingleAsync(a => a.Id == assignment.AgentId, ct);
+        var previousLead = await ActiveUserAsync(assignment.PreviousSalesId, agent.TeamManagerId, ct);
+        var previousChat = assignment.ConversationOnly
+            ? await db.Users.Where(u => u.Id == assignment.PreviousConversationSalesId && u.IsActive).Select(u => (Guid?)u.Id).SingleOrDefaultAsync(ct)
+            : await ActiveUserAsync(assignment.PreviousConversationSalesId, agent.TeamManagerId, ct);
+        var lead = assignment.LeadId == null ? null : await db.Leads.SingleAsync(l => l.Id == assignment.LeadId, ct);
+        if (!assignment.ConversationOnly && lead != null) { lead.AssignedAiSalesAgentId = null; lead.AssignedSalesId = previousLead; }
+        chat.AssignedAiSalesAgentId = null; chat.AssignedSalesAgentId = previousChat;
+        assignment.EndedAt = DateTime.UtcNow;
+        if (previousChat != null) chat.PendingTeamManagerId = null;
+        var control = await db.ConversationControls.SingleOrDefaultAsync(c => c.ConversationId == chat.Id && c.TenantId == Options.TenantId, ct);
+        if (control != null) Change(control, ConversationControllerMode.Human, actorId, "ReleasedToHumanWorkflow", reason);
+        return true;
     }
 
     // Caller holds the conversation lock. Also used for ordinary staff sends and mobile-app echoes.
