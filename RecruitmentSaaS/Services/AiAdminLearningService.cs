@@ -82,16 +82,20 @@ public sealed class AiAdminLearningService(RecruitmentCrmContext db, AiSalesCont
             ? DateTimeOffset.FromUnixTimeSeconds(timestamp).UtcDateTime : (DateTime?)null;
         // Store redacted private text, not a reusable instruction or customer message.
         var message = new AiAdminMessage { ChannelId = c.Id, WhatsAppMessageId = wamid, OperationKey = "in:" + wamid,
-            Incoming = true, Text = text.TrimStart().StartsWith("LINK-", StringComparison.OrdinalIgnoreCase) ? "[رمز توثيق]" : AiLearningSourceService.Redact(text, []), State = "Received" };
+            Incoming = true, Text = Regex.IsMatch(text, "LINK-", RegexOptions.IgnoreCase) ? "[رمز توثيق]" : AiLearningSourceService.Redact(text, []), State = "Received" };
         db.AiAdminMessages.Add(message);
         var active = await db.Users.AnyAsync(u => u.Id == c.AdminUserId && u.IsActive && u.Role == 1, ct);
         if (!active) { await db.SaveChangesAsync(ct); return true; }
         if (at != null && at > c.LastInboundAt.GetValueOrDefault()) c.LastInboundAt = at;
         if (c.VerifiedAt == null)
         {
+            // Pick the code out of the message: phones add invisible direction marks or surrounding text when it is copied
+            // from the Arabic page. Only messages that contain a code use up one of the five attempts.
+            var candidate = Regex.Match(text, @"LINK-[A-F0-9]{24}", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase).Value.ToUpperInvariant();
+            if (candidate.Length == 0) { c.Version++; await db.SaveChangesAsync(ct); return true; }
             c.VerificationAttempts++;
             if (at != null && c.VerificationAttempts <= 5 && now < c.VerificationExpiresAt &&
-                CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(Hash(text.Trim())), Encoding.ASCII.GetBytes(c.VerificationHash)))
+                CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(Hash(candidate)), Encoding.ASCII.GetBytes(c.VerificationHash)))
             {
                 c.VerifiedAt = now; c.VerificationHash = ""; c.Paused = false;
                 Queue(c, "تم توثيق قناة المدير. الأسئلة هنا خاصة، ولا تُرسل الإجابات للعملاء قبل المراجعة. للإيقاف اكتب: إيقاف التدريب", "verified:" + c.Id);

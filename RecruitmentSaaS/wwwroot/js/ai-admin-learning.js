@@ -32,9 +32,12 @@
         }));
         el('admin-messages').replaceChildren(...d.messages.map(m=>node('p',`${m.incoming?'المدير':'المساعد'}: ${m.text} (${m.state})`,'border-bottom pb-2 text-break')));
     }
-    el('admin-refresh').onclick=guard(refresh);el('admin-account').onchange=guard(async()=>{el('admin-code').textContent='';await refresh();});
-    el('admin-bind').onsubmit=guard(async()=>{const r=await api('bind',{accountId:account(),phone:el('admin-phone').value});el('admin-code').textContent='أرسل هذا الرمز من رقمك إلى رقم الشركة خلال 15 دقيقة: '+r.verificationCode;await refresh();});
-    el('admin-renew').onclick=guard(async()=>{const r=await api('renew-verification',{accountId:account()});el('admin-code').textContent='أرسل هذا الرمز من رقمك خلال 15 دقيقة: '+r.verificationCode;});
+    // Show the code on its own (left-to-right) with a copy button, so copying from the Arabic page adds nothing to it.
+    const showCode=(intro,code)=>{el('admin-code').textContent=intro;el('admin-code-value').textContent=code||'';el('admin-code-box').hidden=!code;};
+    el('admin-code-copy').onclick=async()=>{const code=el('admin-code-value').textContent;try{await navigator.clipboard.writeText(code);el('admin-code-copy').textContent='تم النسخ';}catch{getSelection().selectAllChildren(el('admin-code-value'));}};
+    el('admin-refresh').onclick=guard(refresh);el('admin-account').onchange=guard(async()=>{showCode('',null);await refresh();});
+    el('admin-bind').onsubmit=guard(async()=>{const r=await api('bind',{accountId:account(),phone:el('admin-phone').value});showCode('أرسل الرمز ده لوحده من رقمك إلى رقم الشركة خلال 15 دقيقة:',r.verificationCode);await refresh();});
+    el('admin-renew').onclick=guard(async()=>{const r=await api('renew-verification',{accountId:account()});showCode('أرسل الرمز ده لوحده من رقمك إلى رقم الشركة خلال 15 دقيقة:',r.verificationCode);});
     for(const [id,paused]of [['admin-pause',true],['admin-resume',false]])el(id).onclick=guard(async()=>{if(!channel)throw new Error('اربط رقم المدير أولًا');await api('pause',{accountId:account(),expectedVersion:channel.version,paused});await refresh();});
     el('admin-pump').onclick=guard(async()=>{await api('pump',{accountId:account()});await refresh();});
     el('admin-ask').onsubmit=guard(async()=>{await api('ask',{conversationId:el('admin-conversation').value,question:el('admin-question').value||null});await refresh();});

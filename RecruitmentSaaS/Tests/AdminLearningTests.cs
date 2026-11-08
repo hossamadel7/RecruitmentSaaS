@@ -58,6 +58,18 @@ public sealed partial class FoundationTests
         Assert.False(await service.IsPrivateAsync(Guid.NewGuid(),bound.Channel.Phone,default));
     }
     [Fact]
+    public async Task Admin_code_copied_with_direction_marks_or_extra_text_still_verifies_and_chat_does_not_use_attempts()
+    {
+        var s=await SeedAsync();await using var db=fixture.Create();var account=await db.WhatsAppConversations.Where(c=>c.Id==s.Chat).Select(c=>c.WhatsAppAccountId).SingleAsync();
+        var options=AdminOptions(account);var service=AdminService(db,s,options);var bound=await service.BindAsync(account,s.Admin,"+201099900013",default);
+        for(var i=0;i<6;i++)await service.ReceiveAsync(account,AdminInbound(bound.Channel.Phone,"Test"),default);
+        Assert.Equal(0,bound.Channel.VerificationAttempts);Assert.Null(bound.Channel.VerifiedAt);
+        // As pasted on a phone from the Arabic page: right-to-left marks, the sentence around it and lower case.
+        await service.ReceiveAsync(account,AdminInbound(bound.Channel.Phone,"‏الرمز: "+bound.Code.ToLowerInvariant()+"‏."),default);
+        Assert.NotNull(bound.Channel.VerifiedAt);Assert.Equal(1,bound.Channel.VerificationAttempts);
+        Assert.DoesNotContain(bound.Code,string.Join(" ",await db.AiAdminMessages.Where(m=>m.ChannelId==bound.Channel.Id).Select(m=>m.Text).ToArrayAsync()),StringComparison.OrdinalIgnoreCase);
+    }
+    [Fact]
     public async Task One_linked_Admin_number_receives_questions_from_every_company_number()
     {
         var (s,account,channel,options)=await AdminSeedAsync();await using var db=fixture.Create();

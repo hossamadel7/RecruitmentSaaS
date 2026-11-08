@@ -9,7 +9,13 @@
     <section class="card p-3 mb-3"><h2 class="h5">ربط رقم المدير</h2>
         <p>اربط رقمك بحساب المدير الحالي ثم أرسل رمز التوثيق من نفس الرقم إلى رقم الشركة. لا تستخدم رقمًا له محادثة عميل موجودة.</p>
         <form id="admin-bind" class="d-flex gap-2 flex-wrap"><input id="admin-phone" class="form-control w-auto" type="tel" dir="ltr" placeholder="+201012345678" aria-label="رقم المدير" required maxlength="20"><button class="btn btn-primary">ربط رقمي</button></form>
-        <p id="admin-code" class="mt-2 text-break" role="status"></p>
+        <div id="admin-code-box" class="mt-2 mb-3" role="status" hidden>
+            <p id="admin-code" class="mb-1"></p>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                <code id="admin-code-value" dir="ltr" class="fs-5 user-select-all"></code>
+                <button id="admin-code-copy" type="button" class="btn btn-sm btn-outline-primary">نسخ الرمز</button>
+            </div>
+        </div>
         <div class="d-flex gap-2 flex-wrap"><button id="admin-renew" class="btn btn-outline-secondary">تجديد رمز التوثيق</button><button id="admin-pause" class="btn btn-outline-warning">إيقاف التدريب</button><button id="admin-resume" class="btn btn-outline-success">استئناف التدريب</button><button id="admin-pump" class="btn btn-outline-primary">معالجة رسائل المدير المعلقة</button></div>
     </section>
     <section class="card p-3 mb-3"><h2 class="h5">سؤال المدير عن محادثة عميل</h2>
