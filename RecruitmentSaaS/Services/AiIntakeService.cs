@@ -313,7 +313,8 @@ namespace RecruitmentSaaS.Services
             }
             conversation.LeadId = lead.Id;
 
-            if (lead.AssignedAiSalesAgentId != null)
+            // A chat the AI sales agent owns stays with it: a chat can't have a salesperson and the AI at once.
+            if (lead.AssignedAiSalesAgentId != null || conversation.AssignedAiSalesAgentId != null)
             {
                 conversation.IntakeStatus = (byte)IntakeStatus.Completed;
                 lead.Age ??= conversation.IntakeAge;
@@ -472,19 +473,20 @@ namespace RecruitmentSaaS.Services
             var afterAge = TimeSpan.FromMinutes(settings.AiWaitAfterAgeMinutes > 0 ? settings.AiWaitAfterAgeMinutes : LeadFormSetting.DefaultAiWaitAfterAgeMinutes);
             var noAge = TimeSpan.FromHours(settings.AiWaitNoAgeHours > 0 ? settings.AiWaitNoAgeHours : LeadFormSetting.DefaultAiWaitNoAgeHours);
 
-            var waiting = await _context.WhatsAppConversations
-                .Include(c => c.Contact).Include(c => c.WhatsAppAccount)
+            var waiting = await _context.WhatsAppConversations.AsNoTracking()
                 .Where(c => c.IntakeStatus == (byte)IntakeStatus.Collecting)
-                .ToListAsync(ct);
-            foreach (var c in waiting)
+                .Select(c => c.Id).ToListAsync(ct);
+            foreach (var id in waiting)
             {
-                var quietSince = c.IntakeLastCustomerAt ?? c.IntakeStartedAt ?? now;
+                // Each chat starts clean, so one chat that fails to save can't make every later chat fail too.
+                _context.ChangeTracker.Clear();
                 try
                 {
-                    await using var gate = await ConversationLock.AcquireAsync(_context, "conversation:" + c.Id, ct);
-                    await _context.Entry(c).ReloadAsync(ct);
-                    if (c.IntakeStatus != (byte)IntakeStatus.Collecting) continue;
-                    quietSince = c.IntakeLastCustomerAt ?? c.IntakeStartedAt ?? now;
+                    await using var gate = await ConversationLock.AcquireAsync(_context, "conversation:" + id, ct);
+                    var c = await _context.WhatsAppConversations.Include(x => x.Contact).Include(x => x.WhatsAppAccount)
+                        .SingleOrDefaultAsync(x => x.Id == id, ct);
+                    if (c == null || c.IntakeStatus != (byte)IntakeStatus.Collecting) continue;
+                    var quietSince = c.IntakeLastCustomerAt ?? c.IntakeStartedAt ?? now;
                     if (c.IntakeAge != null && now - quietSince >= afterAge)
                         await CompleteAsync(c, settings, ct);
                     else if (c.IntakeAge == null && now - quietSince >= noAge)
@@ -492,7 +494,7 @@ namespace RecruitmentSaaS.Services
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    _logger.LogError(ex, "AI assistant timeout handling failed for {ConversationId}", c.Id);
+                    _logger.LogError(ex, "AI assistant timeout handling failed for {ConversationId}", id);
                 }
             }
         }
