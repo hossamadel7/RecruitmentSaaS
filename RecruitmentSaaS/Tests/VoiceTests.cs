@@ -187,6 +187,30 @@ public sealed partial class FoundationTests
     }
 
     [Fact]
+    public async Task Media_download_tries_the_next_number_token_when_Meta_answers_400_for_another_accounts_media()
+    {
+        var data = "OggSsynthetic"u8.ToArray(); var tokens = new List<string>();
+        using var http = new HttpClient(new VoiceHandler(request =>
+        {
+            var token = request.Headers.Authorization!.Parameter!;
+            if (request.RequestUri!.Host == "graph.facebook.com")
+            {
+                tokens.Add(token);
+                if (token == "other-account-token") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = JsonContent.Create(new { error = new { code = 100 } }) });
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
+                    Content = JsonContent.Create(new { id = "123", url = "https://lookaside.fbsbx.com/audio", mime_type = "audio/ogg; codecs=opus", file_size = data.Length, sha256 = Convert.ToBase64String(SHA256.HashData(data)) }) });
+            }
+            var content = new ByteArrayContent(data); content.Headers.ContentType = new("audio/ogg");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
+        }));
+        var credentials = new Mock<IMetaCredentialStore>();
+        credentials.Setup(c => c.GetAccessTokensAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { "other-account-token", "right-account-token" });
+        var downloader = new MetaVoiceMediaDownloader(http, credentials.Object, new ConfigurationBuilder().Build(), Options.Create(VoiceOptions()));
+        Assert.Equal(data, (await downloader.DownloadAsync("123", default)).Data);
+        Assert.Equal(["other-account-token", "right-account-token"], tokens);
+    }
+
+    [Fact]
     public async Task Transcription_contract_requests_Arabic_json_logprobs_and_preserves_unknown_confidence()
     {
         using var http = new HttpClient(new VoiceHandler(async request =>

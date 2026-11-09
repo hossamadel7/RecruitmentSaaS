@@ -26,7 +26,8 @@ public sealed class MetaVoiceMediaDownloader(HttpClient http, IMetaCredentialSto
             using var metadataRequest = new HttpRequestMessage(HttpMethod.Get, $"https://graph.facebook.com/{version}/{mediaId}");
             metadataRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             using var metadataResponse = await http.SendAsync(metadataRequest, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-            if ((int)metadataResponse.StatusCode is 401 or 403 or 404) continue;
+            // Media belongs to one WABA; another account's token gets a 4xx (Meta often answers 400), so try the next token.
+            if ((int)metadataResponse.StatusCode is >= 400 and < 500) continue;
             if (!metadataResponse.IsSuccessStatusCode) throw new AiVoiceException("MediaMetadataHttp" + (int)metadataResponse.StatusCode);
             using var metadata = JsonDocument.Parse(await ReadBoundedAsync(metadataResponse.Content, 16384, timeout.Token));
             var m = metadata.RootElement;
