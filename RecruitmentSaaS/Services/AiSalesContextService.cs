@@ -44,6 +44,8 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
                 if (emitted.Add(voice.Id)) entries.Add(new(m.Id, "customer", "TranscribedAudio", Redact(voice.ReviewedText), m.CreatedAt,
                     voice.Id, voice.Version, references.Where(r => r.TurnId == voice.Id).Select(r => r.MessageId).Order().ToArray()));
             }
+            else if (m.Direction == (byte)MessageDirection.Incoming && m.MessageType == (byte)WhatsAppMessageType.Audio && !string.IsNullOrWhiteSpace(m.TextBody))
+                entries.Add(new(m.Id, "customer", "TranscribedAudio", Redact(Trim(m.TextBody, 600)), m.CreatedAt)); // automatic voice-note text
             else entries.Add(new(m.Id, m.Direction == (byte)MessageDirection.Incoming ? "customer" : "staff_or_script",
                 ((WhatsAppMessageType)m.MessageType).ToString(), m.MessageType == (byte)WhatsAppMessageType.Text ? Redact(Trim(m.TextBody, 600)) : "[Media awaits staff review]", m.CreatedAt));
         }

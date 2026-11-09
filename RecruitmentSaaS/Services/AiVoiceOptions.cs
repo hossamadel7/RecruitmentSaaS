@@ -5,6 +5,8 @@ public sealed class AiVoiceOptions
     public bool Enabled { get; set; }
     public bool ExternalProcessingApproved { get; set; }
     public bool AutoQueueIncoming { get; set; }
+    /// <summary>Transcribe every incoming voice note automatically and let the AI answer it like text.</summary>
+    public bool TranscribeAllIncoming { get; set; }
     public string ApiKey { get; set; } = "";
     public string Model { get; set; } = "";
     public int MaxBytes { get; set; } = 10 * 1024 * 1024;

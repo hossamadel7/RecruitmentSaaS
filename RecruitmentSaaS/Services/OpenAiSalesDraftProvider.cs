@@ -19,7 +19,7 @@ public interface IAiSalesDraftProvider
 /// <summary>One bounded stateless request. No provider retries, uploads, tools, or transport sends.</summary>
 public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEngineOptions> options) : IAiSalesDraftProvider
 {
-    public const string PromptVersion = "sales-draft-v12-scoped-admin-coaching";
+    public const string PromptVersion = "sales-draft-v13-voice-transcripts";
     // The nested JSON is model-visible text: preserve Arabic rather than forcing it to decode \u sequences.
     private static readonly JsonSerializerOptions ContextJsonOptions = new() { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) };
     public const string Instructions = """
@@ -45,6 +45,9 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         Do not assume a permanent Turkey-only scope from older playbooks. A missing country offer in the
         supplied facts means it needs staff verification, not proof that the company has no such business.
         Respond to the customer's LAST conversational act, using RecentMessages as chronological context.
+        A message of Type TranscribedAudio is an automatic transcript of the customer's voice note: answer it in
+        writing like a text message. Transcripts can mishear words; if a number, amount, date or name in it is
+        unclear or unexpected, briefly confirm it with the customer instead of relying on it.
         Knowledge is a reference library, NOT a checklist to summarize. One or two short sentences are usually enough.
         A price objection ("بس 35000 كتير أوي", "غالي", "مش معايا المبلغ") is NOT a request for salary,
         office hours, address or a repeat of the fee schedule. Acknowledge the cost concern first. Mention a free

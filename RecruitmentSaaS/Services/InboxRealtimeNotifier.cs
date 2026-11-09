@@ -20,6 +20,9 @@ namespace RecruitmentSaaS.Services
         Task ConversationAssignedAsync(Guid conversationId, Guid whatsAppAccountId, Guid? previousAgentId, Guid? newAgentId);
 
         Task UnreadCountUpdatedAsync(Guid conversationId, Guid whatsAppAccountId, int unreadCount, Guid? assignedAgentId);
+
+        /// <summary>A voice note's text is ready (empty when it could not be transcribed).</summary>
+        Task MessageTranscribedAsync(Guid messageId, Guid conversationId, string text, Guid? assignedAgentId);
     }
 
     public class InboxRealtimeNotifier : IInboxRealtimeNotifier
@@ -82,6 +85,12 @@ namespace RecruitmentSaaS.Services
         {
             var payload = new { conversationId, whatsAppAccountId, unreadCount };
             await BroadcastAsync("UnreadCountUpdated", conversationId, assignedAgentId, payload);
+        }
+
+        public async Task MessageTranscribedAsync(Guid messageId, Guid conversationId, string text, Guid? assignedAgentId)
+        {
+            var payload = new { messageId, conversationId, text };
+            await BroadcastAsync("MessageTranscribed", conversationId, assignedAgentId, payload);
         }
 
         // Groups (see InboxHub): "org-all" = admin, "org-admin" = admin only,

@@ -612,6 +612,8 @@
         var text = (type === 1 || type === 7 || type === 8 || type === 9 || !hasMediaShown)
             ? (m.textBody || (hasMediaShown ? '' : mediaPlaceholderText(m)))
             : (type === 5 ? '' : (m.textBody || ''));
+        // A customer's voice note shows its automatic transcript under the player
+        var transcript = type === 4 && !isOut && hasMediaShown && !!text;
 
         var failure = isOut && m.status === 6
             ? '<div class="bubble-error"><i class="bi bi-exclamation-triangle-fill"></i> ' + failureText(m.errorMessage) + '</div>'
@@ -627,7 +629,7 @@
         return '<div class="chat-bubble-row ' + (isOut ? 'outgoing' : 'incoming') + '" data-message-id="' + m.id + '"' +
             (isOut && m.senderUserName ? ' data-sender="' + esc(m.senderUserName) + '"' : '') + '>' +
             '<div class="' + classes + '" dir="' + (text && !hasMediaShown ? textDir(text) : 'rtl') + '">' + sender + media +
-            (text ? '<span class="bubble-text">' + linkify(text) + '</span>' : '') +
+            (text ? '<span class="bubble-text' + (transcript ? ' voice-transcript' : '') + '">' + (transcript ? '<i class="bi bi-mic-fill" title="نص الرسالة الصوتية"></i> ' : '') + linkify(text) + '</span>' : '') +
             meta + failure +
             '</div>' +
             (!USER.readOnly && m.id && m.status !== 6 && m.status !== 2 && (text || hasMediaShown)
@@ -697,6 +699,18 @@
     function mediaPlaceholderText(m) {
         var labels = { 2: '📷 صورة', 3: '🎥 فيديو', 4: '🎤 رسالة صوتية', 5: '📄 مستند', 6: 'ملصق', 7: '📍 موقع', 8: '👤 جهة اتصال', 9: 'رد تفاعلي' };
         return labels[m.messageType] || 'رسالة مش ظاهرة (نوعها مش بيوصل عن طريق واتساب API)';
+    }
+
+    // A voice note's text arrived a few seconds after the voice note itself
+    function showTranscript(payload) {
+        if (!payload || !payload.text) return;
+        var bubble = document.querySelector('.chat-bubble-row[data-message-id="' + payload.messageId + '"] .chat-bubble');
+        if (!bubble || bubble.querySelector('.bubble-text')) return;
+        var span = document.createElement('span');
+        span.className = 'bubble-text voice-transcript';
+        span.innerHTML = '<i class="bi bi-mic-fill" title="نص الرسالة الصوتية"></i> ' + linkify(payload.text);
+        bubble.insertBefore(span, bubble.querySelector('.bubble-meta'));
+        bubble.classList.add('has-text');
     }
 
     function updateBubbleStatus(payload) {
@@ -1736,6 +1750,7 @@
         });
 
         state.hub.on('MessageStatusUpdated', function (payload) { updateBubbleStatus(payload); });
+        state.hub.on('MessageTranscribed', function (payload) { showTranscript(payload); });
 
         state.hub.on('UnreadCountUpdated', function (payload) {
             var conv = state.conversations.find(function (c) { return c.id === payload.conversationId; });

@@ -22,10 +22,13 @@ namespace RecruitmentSaaS.Services
         private readonly IInboxRealtimeNotifier _notifier;
         private readonly INotificationService _notifications;
         private readonly ILogger<AiIntakeService> _logger;
+        private readonly AiVoiceOptions? _voice;
 
         public AiIntakeService(RecruitmentCrmContext context, IWhatsAppCloudApiService cloudApi, IInboxRealtimeNotifier notifier,
-                               INotificationService notifications, ILogger<AiIntakeService> logger, AiSalesControlService controls)
+                               INotificationService notifications, ILogger<AiIntakeService> logger, AiSalesControlService controls,
+                               Microsoft.Extensions.Options.IOptions<AiVoiceOptions>? voiceOptions = null)
         {
+            _voice = voiceOptions?.Value;
             _context = context;
             _controls = controls;
             _cloudApi = cloudApi;
@@ -112,6 +115,8 @@ namespace RecruitmentSaaS.Services
                                         && m.MessageType != (byte)WhatsAppMessageType.Unsupported
                                         && (lastOut == null || m.WhatsAppTimestamp >= lastOut.WhatsAppTimestamp)).ToList();
             if (fresh.Count == 0) return;
+            // A voice note is still being turned into text: answer once it is ready (the transcriber queues this turn again).
+            if (fresh.Any(m => VoiceTranscriptionService.IsPending(_voice, m, DateTime.UtcNow))) return;
             if (fresh.All(m => string.IsNullOrWhiteSpace(m.TextBody)))
             {
                 conversation.IntakeNoTextCount++;

@@ -126,11 +126,15 @@ builder.Services.AddScoped<AiSalesOperationsService>();
 builder.Services.AddOptions<AiOfficeBookingOptions>().BindConfiguration("AiOfficeBooking")
     .Validate(o => o.MaxDaysAhead is >= 1 and <= 90, "Booking horizon must be between 1 and 90 days.").ValidateOnStart();
 if (!isolatedValidation) builder.Services.AddHostedService<AiVoiceWorker>();
+builder.Services.AddScoped<VoiceTranscriptionService>();
+if (!isolatedValidation) builder.Services.AddHostedService<VoiceTranscriptionWorker>();
 builder.Services.AddHttpClient<IAiVoiceMediaDownloader, MetaVoiceMediaDownloader>()
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
 builder.Services.AddHttpClient<IAiVoiceTranscriber, OpenAiVoiceTranscriber>()
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
 builder.Services.AddOptions<AiVoiceOptions>().BindConfiguration("AiVoice")
+    // Voice notes use the same OpenAI key as the sales replies unless a separate one is set.
+    .PostConfigure(o => { if (string.IsNullOrWhiteSpace(o.ApiKey)) o.ApiKey = builder.Configuration["AiSalesEngine:ApiKey"] ?? ""; })
     .Validate(o => o.MaxBytes is >= 1024 and <= 25 * 1024 * 1024 && o.MaxPartsPerTurn is >= 1 and <= 4 &&
         o.MaxProviderAttemptsPerDay is >= 1 and <= 1000 && o.GroupGapSeconds is >= 1 and <= 120 &&
         o.QuietSeconds is >= 1 and <= 60 && o.MaxMessageAgeMinutes is >= 1 and <= 60 &&

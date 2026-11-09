@@ -8,7 +8,8 @@ namespace RecruitmentSaaS.Services;
 /// <summary>One durable draft/intent per inbound message and ownership version. Never attributes human review.</summary>
 public sealed class AiAutomaticReplyService(RecruitmentCrmContext db, AiSalesControlService controls,
     AiSalesDraftService drafts, AiSalesDispatchService dispatch, IOptions<AiSalesEngineOptions> engine,
-    IOptions<AiSalesDispatchOptions> release, IOptions<AiAdminLearningOptions>? adminOptions = null)
+    IOptions<AiSalesDispatchOptions> release, IOptions<AiAdminLearningOptions>? adminOptions = null,
+    IOptions<AiVoiceOptions>? voiceOptions = null)
 {
     public async Task RunConversationAsync(Guid id, CancellationToken ct)
     {
@@ -30,6 +31,8 @@ public sealed class AiAutomaticReplyService(RecruitmentCrmContext db, AiSalesCon
         var now = DateTime.UtcNow;
         if (incoming == null || (!settings.AutoReplyAnyAssignedConversation && incoming.CreatedAt < settings.AutoReplySinceUtc) || incoming.CreatedAt > now.AddSeconds(-4) ||
             incoming.WhatsAppTimestamp < now.AddHours(-24).AddMinutes(5)) return;
+        // Wait (up to two minutes) for the customer's voice notes to be turned into text, then answer them.
+        if (await VoiceTranscriptionService.AnyPendingAsync(db, voiceOptions?.Value, id, ct)) return;
         if (adminOptions?.Value.PrivateRoutingEnabled == true && await db.AiAdminClarifications.AnyAsync(r => r.TenantId == controls.Options.TenantId &&
             r.ConversationId == id && r.CustomerMessageId == incoming.Id, ct)) return; // This turn requires the reviewed AskAdmin path.
         // Ignore delivery/read receipts and do not answer a turn already followed by a staff or AI message.
