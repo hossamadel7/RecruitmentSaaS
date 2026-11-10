@@ -73,14 +73,29 @@ public static class CountryRouting
                          ((l.Age < r.MinAge || l.Age > r.MaxAge) && db.TeamCountryRoutingRules.Any(f =>
                              f.ManagerId == l.TeamManagerId && f.Country == r.FallbackCountry && f.Enabled && l.Age >= f.MinAge && l.Age <= f.MaxAge))))));
 
+    /// <summary>The customer never gave the age, so the age ranges can't choose: the ad's own country takes them when it is on.</summary>
+    public static string? DestinationWithoutAge(IEnumerable<CountryRoutingRule> rules, string country) =>
+        rules.Any(r => r.Country == country && r.Enabled) ? country : null;
+
+    private static (IQueryable<User> Candidates, string Scope) RotationOf(RecruitmentCrmContext db, Guid? manager, string country) =>
+        manager == null ? (db.Users, Scope(country))
+        : (db.Users.Where(u => u.ManagerId == manager || u.TeamMemberships.Any(m => m.ManagerId == manager)), TeamScope(manager.Value, country));
+
+    /// <summary>A lead without the age can go to this country now: the country is on and someone in its rotation takes leads.</summary>
+    public static async Task<bool> TakesLeadsWithoutAgeAsync(RecruitmentCrmContext db, string country, Guid? manager, CancellationToken ct)
+    {
+        if (DestinationWithoutAge(await RulesAsync(db, manager, ct), country) == null) return false;
+        var (candidates, scope) = RotationOf(db, manager, country);
+        return (await LeadDistributor.RotationAsync(db, candidates, scope, ct)).Any(r => r.Share > 0);
+    }
+
     public static async Task<Guid?> AssignAsync(RecruitmentCrmContext db, Lead lead, CancellationToken ct)
     {
         var rules = await RulesAsync(db, lead.TeamManagerId, ct);
-        lead.RoutedCountry = Destination(rules, lead.AdCountry!, lead.Age);
+        // Only the assistant's timeout sends a lead without the age here; EligibleLeads keeps them out of the automatic assigner.
+        lead.RoutedCountry = lead.Age == null ? DestinationWithoutAge(rules, lead.AdCountry!) : Destination(rules, lead.AdCountry!, lead.Age);
         if (lead.RoutedCountry == null) return null;
-        var manager = lead.TeamManagerId;
-        var candidates = manager == null ? db.Users : db.Users.Where(u => u.ManagerId == manager || u.TeamMemberships.Any(m => m.ManagerId == manager));
-        return await LeadDistributor.NextTeleSalesAsync(db, candidates,
-            manager == null ? Scope(lead.RoutedCountry) : TeamScope(manager.Value, lead.RoutedCountry), ct);
+        var (candidates, scope) = RotationOf(db, lead.TeamManagerId, lead.RoutedCountry);
+        return await LeadDistributor.NextTeleSalesAsync(db, candidates, scope, ct);
     }
 }

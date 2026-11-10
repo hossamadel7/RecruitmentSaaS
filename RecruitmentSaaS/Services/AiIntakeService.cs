@@ -308,7 +308,7 @@ namespace RecruitmentSaaS.Services
             lead.Age ??= conversation.IntakeAge;
             if (referral != null && lead.AdCountry == null)
             {
-                lead.AdText = Cut(string.Join("\n", new[] { referral.ReferralHeadline, referral.ReferralBody }.Where(t => !string.IsNullOrWhiteSpace(t))), 3000);
+                lead.AdText = AdText(referral.ReferralHeadline, referral.ReferralBody);
                 lead.AdCountry = CountryRouting.Detect(lead.AdText);
             }
             conversation.LeadId = lead.Id;
@@ -354,13 +354,15 @@ namespace RecruitmentSaaS.Services
                 lead.AssignedSalesId = agentId;
                 conversation.AssignedSalesAgentId = agentId;
                 conversation.PendingTeamManagerId = null;
+                if (conversation.IntakeAge == null) conversation.IntakeHandoffReason = NoAgeReason + " — اتوزع على دولة الإعلان";
                 var agent = await _context.Users.AsNoTracking().FirstAsync(u => u.Id == agentId, ct);
                 _context.LeadActivities.Add(new LeadActivity
                 {
                     Id = Guid.NewGuid(),
                     LeadId = lead.Id,
                     ActivityType = 8,
-                    Description = $"سجّل عن طريق المساعد الآلي على واتساب واتعيّن لـ {agent.FullName} (توزيع بالدور)",
+                    Description = $"سجّل عن طريق المساعد الآلي على واتساب واتعيّن لـ {agent.FullName} (توزيع بالدور"
+                                  + (conversation.IntakeAge == null ? " — من غير السن، حسب دولة الإعلان)" : ")"),
                     ActorType = 2,
                     CreatedAt = now
                 });
@@ -377,6 +379,7 @@ namespace RecruitmentSaaS.Services
             {
                 // Under the age (or no salesperson available): waits with the team leader, like the form
                 conversation.PendingTeamManagerId = team;
+                if (conversation.IntakeAge == null) conversation.IntakeHandoffReason = NoAgeReason;
                 await _context.SaveChangesAsync(ct);
                 await assignmentTransaction.CommitAsync(ct);
                 await SendAsync(conversation, AiMessages.Get(settings, AiMessages.DoneWaiting), ct);
@@ -461,9 +464,32 @@ namespace RecruitmentSaaS.Services
 
         // ── Timeouts ────────────────────────────────────────────────────────
 
+        private const string NoAgeReason = "العميل ما ردش على السن";
+
+        private static string? AdText(string? headline, string? body) =>
+            Cut(string.Join("\n", new[] { headline, body }.Where(t => !string.IsNullOrWhiteSpace(t))), 3000);
+
+        /// <summary>
+        /// The customer never gave the age but came from a country ad whose rotation takes leads (the ad and team
+        /// a new lead from this chat gets in CompleteAsync). Chats the AI sales agent owns keep the team-leader hand-off.
+        /// </summary>
+        private async Task<bool> CanRouteByAdCountryAsync(WhatsAppConversation conversation, CancellationToken ct)
+        {
+            if (conversation.AssignedAiSalesAgentId != null) return false;
+            var ad = await _context.WhatsAppMessages.AsNoTracking()
+                .Where(m => m.ConversationId == conversation.Id && m.ReferralSourceId != null)
+                .OrderByDescending(m => m.WhatsAppTimestamp)
+                .Select(m => new { m.ReferralHeadline, m.ReferralBody })
+                .FirstOrDefaultAsync(ct);
+            var country = ad == null ? null : CountryRouting.Detect(AdText(ad.ReferralHeadline, ad.ReferralBody));
+            if (country == null) return false;
+            var team = await TeamOfAccountAsync(conversation.WhatsAppAccount, ct);
+            return await CountryRouting.TakesLeadsWithoutAgeAsync(_context, country, team, ct);
+        }
+
         /// <summary>
         /// Customers who stopped answering: with the age → routed after AiWaitAfterAgeMinutes;
-        /// without it → team leader after AiWaitNoAgeHours.
+        /// without it → after AiWaitNoAgeHours, the ad country's rotation (country ads) or else the team leader.
         /// </summary>
         public async Task SweepTimeoutsAsync(CancellationToken ct)
         {
@@ -490,7 +516,11 @@ namespace RecruitmentSaaS.Services
                     if (c.IntakeAge != null && now - quietSince >= afterAge)
                         await CompleteAsync(c, settings, ct);
                     else if (c.IntakeAge == null && now - quietSince >= noAge)
-                        await HandOffAsync(c, "العميل ما ردش على السن", ct);
+                    {
+                        // No age, so the age rules can't route them, but a chat from a country ad goes to that country's rotation
+                        if (await CanRouteByAdCountryAsync(c, ct)) await CompleteAsync(c, settings, ct);
+                        else await HandOffAsync(c, NoAgeReason, ct);
+                    }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

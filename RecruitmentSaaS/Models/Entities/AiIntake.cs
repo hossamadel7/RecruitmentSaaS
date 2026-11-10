@@ -67,7 +67,7 @@ public partial class LeadFormSetting
     /// <summary>Customer gave the age but stopped answering: route them after this many minutes.</summary>
     public int AiWaitAfterAgeMinutes { get; set; }
 
-    /// <summary>Customer never gave the age: hand to the team leader after this many hours.</summary>
+    /// <summary>Customer never gave the age: after this many hours, the ad country's rotation (country ads) or else the team leader.</summary>
     public int AiWaitNoAgeHours { get; set; }
 
     /// <summary>Under-age WhatsApp customers go to the team's rotation instead of waiting with the team leader.</summary>

@@ -54,6 +54,15 @@ public class CountryRoutingTests
         Assert.Equal(expected, CountryRouting.Destination(Rules(), "سعودية", age));
 
     [Fact]
+    public void Without_the_age_only_the_ads_own_enabled_country_takes_the_lead()
+    {
+        var rules = Rules();
+        Assert.Equal("سعودية", CountryRouting.DestinationWithoutAge(rules, "سعودية")); // no fallback to عمان
+        Assert.Null(CountryRouting.DestinationWithoutAge(rules, "تركيا"));             // switched off
+        Assert.Null(CountryRouting.DestinationWithoutAge(rules, "ارمينيا"));           // no rule
+    }
+
+    [Fact]
     public void Free_visas_use_their_own_age_range_and_rotation()
     {
         var rules = Rules().Append(new CountryRoutingRule
