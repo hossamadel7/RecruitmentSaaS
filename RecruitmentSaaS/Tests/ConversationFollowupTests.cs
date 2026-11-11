@@ -26,7 +26,7 @@ public sealed partial class FoundationTests
         Assert.Equal(AiDraftStatus.ReviewRequired, draft.Status);
         Assert.Equal(handoff, draft.NeedsHuman);
         Assert.Equal(handoff ? "handoff" : "acknowledgement", draft.Intent);
-        if (!handoff) Assert.Equal("ممكن توضح طلبك بالكتابة عشان نقدر نساعدك بدقة؟", draft.Reply);
+        if (!handoff) Assert.Equal("معلش يا فندم ممكن تكتبلي اللي حضرتك عايزه كتابة عشان أفيدك صح؟", draft.Reply);
         provider.VerifyNoOtherCalls();
         var account = message.WhatsAppAccountId;
         var transport = AcceptedTransport();

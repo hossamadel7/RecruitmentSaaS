@@ -37,7 +37,7 @@ public static class AiSalesReplyPolicy
         var plain = Regex.Replace(text, @"[^\p{L}\p{N}\s]", " ");
         plain = Regex.Replace(plain, @"\s+", " ").Trim();
         if (Regex.IsMatch(plain, @"^(?:طيب |تمام |انا )?(?:هفكر|حافكر|هفكر شويه|هفكر وارد عليك|هفكر و ارد عليك|محتاج وقت افكر|محتاج وقت|خليني افكر)(?: يا فندم)?$"))
-            return new("تمام يا فندم، خد وقتك. لو احتجت توضيح أي نقطة أنا معاك.",
+            return new("تمام يا فندم خد وقتك براحتك، وأنا معاك في أي وقت 🤝",
                 "acknowledgement", "Customer requests time; no sales pitch or contact-stop action.", false, [], "local-policy");
 
         var previousReply = context.RecentMessages.LastOrDefault(m => m.Speaker != "customer")?.Text ?? "";
