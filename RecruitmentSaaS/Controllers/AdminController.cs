@@ -202,7 +202,8 @@ namespace RecruitmentSaaS.Controllers
             foreach (var off in users.Where(u => !u.IsActive && (u.Role == 3 || u.Role == 8)))
             {
                 var note = ReleasedNote(off);
-                var n = await _context.Leads.CountAsync(l => !l.IsConverted && (l.AssignedSalesId == off.Id
+                // Leads the AI agent is handling aren't waiting: they go to a person when the AI hands them back
+                var n = await _context.Leads.CountAsync(l => !l.IsConverted && l.AssignedAiSalesAgentId == null && (l.AssignedSalesId == off.Id
                     || (l.AssignedSalesId == null && _context.LeadActivities.Any(a => a.LeadId == l.Id && a.Description == note))));
                 if (n > 0) waitingOf[off.Id] = n;
             }
@@ -376,9 +377,10 @@ namespace RecruitmentSaaS.Controllers
                 var leadsOf = user.Role == 3 || user.Role == 8
                     ? await _context.Leads.Where(l => l.AssignedSalesId == user.Id).ToListAsync()
                     : new List<Lead>();
-                var (movedChats, movedLeads) = await MoveWorkAsync(user, target, chatsOf, leadsOf, "بعد تعطيله");
+                var (movedChats, movedLeads, aiHeldOf) = await MoveWorkAsync(user, target, chatsOf, leadsOf, "بعد تعطيله");
                 TempData["Success"] = $"تم تعطيل {user.FullName} — تم تسجيل خروجه من النظام"
-                    + (movedChats + movedLeads > 0 ? $". اتنقل {movedChats} محادثة و {movedLeads} عميل لـ {target.FullName}" : "");
+                    + (movedChats + movedLeads > 0 ? $". اتنقل {movedChats} محادثة و {movedLeads} عميل لـ {target.FullName}" : "")
+                    + AiHeldNote(aiHeldOf, target);
                 return RedirectToAction("Users");
             }
 
@@ -387,6 +389,11 @@ namespace RecruitmentSaaS.Controllers
                 + (chats + leads > 0 ? $". اتشال منه {chats} محادثة و {leads} عميل وفي انتظار التعيين من مدير الفريق" : "");
             return RedirectToAction("Users");
         }
+
+        /// <summary>Tells the admin how many chats/leads stayed with the AI agent and who gets them when it hands them back.</summary>
+        private static string AiHeldNote(int aiHeld, User target) => aiHeld > 0
+            ? $". {aiHeld} (محادثة/عميل) مع مساعد المبيعات الذكي دلوقتي — هيروحوا لـ {target.FullName} لما يسلّمهم"
+            : "";
 
         /// <summary>The note written on each lead when a deactivated person's clients were released to their team.</summary>
         private static string ReleasedNote(User user) => $"تم إلغاء تعيين العميل بعد تعطيل {user.FullName} — في انتظار التعيين";
@@ -429,10 +436,10 @@ namespace RecruitmentSaaS.Controllers
             }
 
             var (chatsOf, leadsOf) = await ReleasedWorkOfAsync(user);
-            var (chats, leads) = await MoveWorkAsync(user, target, chatsOf, leadsOf, "بعد تعطيله");
-            TempData["Success"] = chats + leads > 0
+            var (chats, leads, aiHeld) = await MoveWorkAsync(user, target, chatsOf, leadsOf, "بعد تعطيله");
+            TempData["Success"] = (chats + leads > 0
                 ? $"اتنقل {chats} محادثة و {leads} عميل من {user.FullName} لـ {target.FullName}"
-                : $"مفيش عملاء أو محادثات من {user.FullName} مستنية تعيين";
+                : $"مفيش عملاء أو محادثات من {user.FullName} مستنية تعيين") + AiHeldNote(aiHeld, target);
             return RedirectToAction("Users", new { status = "inactive" });
         }
 
@@ -456,9 +463,30 @@ namespace RecruitmentSaaS.Controllers
         }
 
         /// <summary>Gives chats and leads to <paramref name="target"/>, notes it on each lead and tells them.</summary>
-        private async Task<(int Chats, int Leads)> MoveWorkAsync(User from, User target, List<WhatsAppConversation> chats, List<Lead> leads, string why)
+        private async Task<(int Chats, int Leads, int AiHeld)> MoveWorkAsync(User from, User target, List<WhatsAppConversation> chats, List<Lead> leads, string why)
         {
             var now = DateTime.UtcNow;
+
+            // A chat or lead the AI sales agent is handling right now can't also have a person
+            // (CK_Conversation_SalesOwner / CK_Lead_SalesOwner). It stays with the AI, and its
+            // AI assignment remembers the new person so the AI hands it back to them, not to nobody.
+            var aiChatIds = chats.Where(c => c.AssignedAiSalesAgentId != null).Select(c => c.Id).ToList();
+            var aiLeadIds = leads.Where(l => l.AssignedAiSalesAgentId != null).Select(l => l.Id).ToList();
+            chats = chats.Where(c => c.AssignedAiSalesAgentId == null).ToList();
+            leads = leads.Where(l => l.AssignedAiSalesAgentId == null).ToList();
+            if (aiChatIds.Count + aiLeadIds.Count > 0)
+            {
+                var aiAssignments = await _context.AiLeadAssignments.Where(a => a.EndedAt == null
+                    && (aiChatIds.Contains(a.ConversationId) || (a.LeadId != null && aiLeadIds.Contains(a.LeadId.Value)))).ToListAsync();
+                foreach (var assignment in aiAssignments)
+                {
+                    if (aiChatIds.Contains(assignment.ConversationId)) assignment.PreviousConversationSalesId = target.Id;
+                    if (!assignment.ConversationOnly && assignment.LeadId != null && aiLeadIds.Contains(assignment.LeadId.Value))
+                        assignment.PreviousSalesId = target.Id;
+                }
+            }
+            var aiHeld = aiChatIds.Count + aiLeadIds.Count;
+
             // Pending links and AI release snapshots must follow the transfer too.
             var handoffs = await _context.WhatsAppHandoffs.Where(h => h.AssignedSalesAgentId == from.Id
                 && (h.Status == (byte)HandoffStatus.Generated || h.Status == (byte)HandoffStatus.Sent)).ToListAsync();
@@ -508,7 +536,7 @@ namespace RecruitmentSaaS.Controllers
                 }
                 catch { /* the move is saved; a failed notification must not undo it */ }
             }
-            return (chats.Count, leads.Count);
+            return (chats.Count, leads.Count, aiHeld);
         }
 
         /// <summary>

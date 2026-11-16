@@ -128,3 +128,56 @@ public sealed partial class FoundationTests
         Assert.Equal(target.Id, aiChat.AssignedSalesAgentId);
     }
 }
+
+public sealed partial class FoundationTests
+{
+    [Fact]
+    public async Task Moving_released_clients_leaves_ai_held_chats_with_the_ai_and_hands_them_back_to_the_new_owner()
+    {
+        var s = await SeedAsync(); await using var db = fixture.Create();
+        var former = (await db.Users.FindAsync(s.Human))!;
+        var target = new User { Id = Guid.NewGuid(), BranchId = former.BranchId, FullName = "New owner",
+            Email = Guid.NewGuid() + "@example.test", PasswordHash = "unused", Role = 3, IsActive = true };
+        db.Users.Add(target);
+        var lead = (await db.Leads.FindAsync(s.Lead))!;
+        var chat = (await db.WhatsAppConversations.FindAsync(s.Chat))!;
+        // A second chat of the same lead that the AI sales agent is handling.
+        var aiContact = new WhatsAppContact { Id = Guid.NewGuid(), Name = "AI chat", WhatsAppPhoneNumber = Guid.NewGuid().ToString("N") };
+        var aiChat = new WhatsAppConversation { Id = Guid.NewGuid(), Contact = aiContact,
+            WhatsAppAccountId = chat.WhatsAppAccountId, LeadId = lead.Id, AssignedSalesAgentId = former.Id };
+        db.WhatsAppConversations.Add(aiChat); await db.SaveChangesAsync();
+        await Control(db, s).AssignAsync(s.Lead, aiChat.Id, s.Agent, s.Admin, 0, "Prepare", "released-ai-" + Guid.NewGuid().ToString("N"), default,
+            conversationOnly: true);
+
+        // The former owner was deactivated without a transfer: everything released and waiting.
+        former.IsActive = false;
+        lead.AssignedSalesId = null;
+        chat.AssignedSalesAgentId = null;
+        var snapshot = await db.AiLeadAssignments.SingleAsync(a => a.ConversationId == aiChat.Id && a.EndedAt == null);
+        snapshot.PreviousConversationSalesId = null;
+        db.LeadActivities.Add(new LeadActivity { Id = Guid.NewGuid(), LeadId = lead.Id, ActivityType = 8, ActorType = 1,
+            Description = $"تم إلغاء تعيين العميل بعد تعطيل {former.FullName} — في انتظار التعيين", CreatedAt = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+
+        using var services = new ServiceCollection().AddMemoryCache()
+            .AddSingleton(Mock.Of<IInboxRealtimeNotifier>()).BuildServiceProvider();
+        var http = new DefaultHttpContext { RequestServices = services,
+            User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, s.Admin.ToString()),
+                new Claim(ClaimTypes.Name, "Admin") }, "test")) };
+        var controller = new AdminController(db, Mock.Of<IWebHostEnvironment>(), Mock.Of<INotificationService>())
+        {
+            Url = Mock.Of<IUrlHelper>(),
+            ControllerContext = new ControllerContext { HttpContext = http },
+            TempData = new TempDataDictionary(http, Mock.Of<ITempDataProvider>())
+        };
+        await controller.TransferReleasedWork(former.Id, target.Id);
+
+        Assert.Equal(target.Id, lead.AssignedSalesId);
+        Assert.Equal(target.Id, chat.AssignedSalesAgentId);
+        Assert.Null(aiChat.AssignedSalesAgentId);
+        Assert.NotNull(aiChat.AssignedAiSalesAgentId);
+        Assert.Equal(target.Id, snapshot.PreviousConversationSalesId);
+        await Control(db, s).ControlAsync(aiChat.Id, s.Admin, 1, "release", "Return to staff", "released-ai-release-" + Guid.NewGuid().ToString("N"), default);
+        Assert.Equal(target.Id, aiChat.AssignedSalesAgentId);
+    }
+}
