@@ -19,6 +19,12 @@ namespace RecruitmentSaaS.Services
 
         Task ConversationAssignedAsync(Guid conversationId, Guid whatsAppAccountId, Guid? previousAgentId, Guid? newAgentId);
 
+        /// <summary>
+        /// Many chats changed hands at once (a salesperson deactivated / their clients moved):
+        /// works out everyone who can see any of them with a few queries and sends each one a single event.
+        /// </summary>
+        Task ConversationsAssignedAsync(IReadOnlyCollection<Guid> conversationIds, Guid? previousAgentId, Guid? newAgentId);
+
         Task UnreadCountUpdatedAsync(Guid conversationId, Guid whatsAppAccountId, int unreadCount, Guid? assignedAgentId);
 
         /// <summary>A voice note's text is ready (empty when it could not be transcribed).</summary>
@@ -79,6 +85,51 @@ namespace RecruitmentSaaS.Services
             if (previousAgentId.HasValue)
                 await _hub.Clients.User(previousAgentId.Value.ToString()).SendAsync("ConversationAssigned", payload);
 
+        }
+
+        public async Task ConversationsAssignedAsync(IReadOnlyCollection<Guid> conversationIds, Guid? previousAgentId, Guid? newAgentId)
+        {
+            if (conversationIds.Count == 0) return;
+            var ids = conversationIds.Distinct().ToList();
+            var chats = await _context.WhatsAppConversations.AsNoTracking()
+                .Where(c => ids.Contains(c.Id))
+                .Select(c => new { c.Id, c.WhatsAppAccountId, c.LeadId, c.AssignedSalesAgentId, c.AssignedAiSalesAgentId, c.PendingTeamManagerId })
+                .ToListAsync();
+            if (chats.Count == 0) return;
+
+            // Same team rule as BroadcastAsync, but each lookup is done once for the whole batch.
+            var leadIds = chats.Where(c => c.LeadId != null).Select(c => c.LeadId!.Value).Distinct().ToList();
+            var leadTeams = await _context.Leads.AsNoTracking().Where(l => leadIds.Contains(l.Id))
+                .Select(l => new { l.Id, l.TeamManagerId }).ToDictionaryAsync(l => l.Id, l => l.TeamManagerId);
+            var ownerIds = chats.Where(c => c.AssignedSalesAgentId != null).Select(c => c.AssignedSalesAgentId!.Value).Distinct().ToList();
+            var ownerTeams = await _context.Users.AsNoTracking().Where(u => ownerIds.Contains(u.Id))
+                .Select(u => new { u.Id, u.ManagerId }).ToDictionaryAsync(u => u.Id, u => u.ManagerId);
+            var accountTeams = new Dictionary<Guid, Guid?>();
+            foreach (var accountId in chats.Select(c => c.WhatsAppAccountId).Distinct())
+                accountTeams[accountId] = await WhatsAppScope.TeamOfAccountAsync(_context, accountId);
+
+            var teams = new HashSet<Guid>();
+            var agents = new HashSet<Guid>();
+            foreach (var chat in chats)
+            {
+                var leadTeam = chat.LeadId != null && leadTeams.TryGetValue(chat.LeadId.Value, out var lt) ? lt : null;
+                var ownerTeam = chat.AssignedSalesAgentId != null && ownerTeams.TryGetValue(chat.AssignedSalesAgentId.Value, out var ot) ? ot : null;
+                var team = chat.PendingTeamManagerId ?? leadTeam ?? accountTeams[chat.WhatsAppAccountId] ?? ownerTeam;
+                if (team != null) teams.Add(team.Value);
+                if (chat.AssignedSalesAgentId != null) agents.Add(chat.AssignedSalesAgentId.Value);
+            }
+
+            var teamList = teams.ToList();
+            var agentList = agents.ToList();
+            var recipients = await _context.Users.AsNoTracking().Where(u => u.IsActive &&
+                (u.Role == 1 || u.Role == 9 || agentList.Contains(u.Id) ||
+                 (u.Role == 7 && teamList.Contains(u.Id)) || (u.Role == 8 && u.ManagerId != null && teamList.Contains(u.ManagerId.Value))))
+                .Select(u => u.Id.ToString()).ToListAsync();
+            if (previousAgentId.HasValue) recipients.Add(previousAgentId.Value.ToString());
+
+            // The inbox only refreshes its list on this event, so one event per person is enough.
+            var payload = new { conversationIds = ids, previousAgentId, newAgentId, count = ids.Count };
+            await _hub.Clients.Users(recipients.Distinct().ToList()).SendAsync("ConversationAssigned", payload);
         }
 
         public async Task UnreadCountUpdatedAsync(Guid conversationId, Guid whatsAppAccountId, int unreadCount, Guid? assignedAgentId)

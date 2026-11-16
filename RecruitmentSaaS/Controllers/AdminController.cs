@@ -436,6 +436,25 @@ namespace RecruitmentSaaS.Controllers
             return RedirectToAction("Users", new { status = "inactive" });
         }
 
+        /// <summary>
+        /// Tells open inboxes that these chats changed hands — one batched event, not one per chat.
+        /// Runs after the move is saved, so a realtime failure is logged and never turns into an error page.
+        /// </summary>
+        private async Task NotifyChatsReassignedAsync(List<WhatsAppConversation> chats, Guid previousAgentId, Guid? newAgentId)
+        {
+            if (chats.Count == 0) return;
+            try
+            {
+                var notifier = HttpContext.RequestServices.GetRequiredService<RecruitmentSaaS.Services.IInboxRealtimeNotifier>();
+                await notifier.ConversationsAssignedAsync(chats.Select(c => c.Id).ToList(), previousAgentId, newAgentId);
+            }
+            catch (Exception ex)
+            {
+                HttpContext.RequestServices.GetService<ILogger<AdminController>>()?
+                    .LogWarning(ex, "Realtime notice for {Count} reassigned chats failed (the move itself is saved)", chats.Count);
+            }
+        }
+
         /// <summary>Gives chats and leads to <paramref name="target"/>, notes it on each lead and tells them.</summary>
         private async Task<(int Chats, int Leads)> MoveWorkAsync(User from, User target, List<WhatsAppConversation> chats, List<Lead> leads, string why)
         {
@@ -453,7 +472,6 @@ namespace RecruitmentSaaS.Controllers
                 if (snapshot.PreviousSalesId == from.Id) snapshot.PreviousSalesId = target.Id;
                 if (snapshot.PreviousConversationSalesId == from.Id) snapshot.PreviousConversationSalesId = target.Id;
             }
-            var previous = chats.ToDictionary(c => c.Id, c => c.AssignedSalesAgentId);
             foreach (var chat in chats)
             {
                 chat.AssignedSalesAgentId = target.Id;
@@ -479,9 +497,7 @@ namespace RecruitmentSaaS.Controllers
             }
             await _context.SaveChangesAsync();
 
-            var notifier = HttpContext.RequestServices.GetRequiredService<RecruitmentSaaS.Services.IInboxRealtimeNotifier>();
-            foreach (var chat in chats)
-                await notifier.ConversationAssignedAsync(chat.Id, chat.WhatsAppAccountId, previous[chat.Id], target.Id);
+            await NotifyChatsReassignedAsync(chats, from.Id, target.Id);
 
             if (chats.Count + leads.Count > 0)
             {
@@ -506,11 +522,20 @@ namespace RecruitmentSaaS.Controllers
             var team = user.ManagerId;
 
             var chats = await _context.WhatsAppConversations.Where(c => c.AssignedSalesAgentId == user.Id).ToListAsync();
+
+            // Look up each lead's team and each number's team once for all chats, not per chat.
+            var chatLeadIds = chats.Where(c => c.LeadId != null).Select(c => c.LeadId!.Value).Distinct().ToList();
+            var leadTeams = await _context.Leads.AsNoTracking().Where(l => chatLeadIds.Contains(l.Id))
+                .Select(l => new { l.Id, l.TeamManagerId }).ToDictionaryAsync(l => l.Id, l => l.TeamManagerId);
+            var accountTeams = new Dictionary<Guid, Guid?>();
+            foreach (var accountId in chats.Select(c => c.WhatsAppAccountId).Distinct())
+                accountTeams[accountId] = await WhatsAppScope.TeamOfAccountAsync(_context, accountId);
+
             foreach (var chat in chats)
             {
                 chat.AssignedSalesAgentId = null;
-                var leadTeam = chat.LeadId == null ? null : await _context.Leads.Where(l => l.Id == chat.LeadId).Select(l => l.TeamManagerId).SingleOrDefaultAsync();
-                chat.PendingTeamManagerId = leadTeam ?? await WhatsAppScope.TeamOfAccountAsync(_context, chat.WhatsAppAccountId) ?? team;
+                var leadTeam = chat.LeadId != null && leadTeams.TryGetValue(chat.LeadId.Value, out var lt) ? lt : null;
+                chat.PendingTeamManagerId = leadTeam ?? accountTeams[chat.WhatsAppAccountId] ?? team;
                 chat.UpdatedAt = now;
             }
 
@@ -542,9 +567,7 @@ namespace RecruitmentSaaS.Controllers
             }
             await _context.SaveChangesAsync();
 
-            var notifier = HttpContext.RequestServices.GetRequiredService<RecruitmentSaaS.Services.IInboxRealtimeNotifier>();
-            foreach (var chat in chats)
-                await notifier.ConversationAssignedAsync(chat.Id, chat.WhatsAppAccountId, user.Id, null);
+            await NotifyChatsReassignedAsync(chats, user.Id, null);
 
             if (team != null && chats.Count + leads.Count > 0)
             {
