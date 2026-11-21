@@ -106,4 +106,22 @@ public sealed class ReplyPolicyTests
         Assert.Null(AiSalesReplyPolicy.Create(context));
         Assert.Null(AiSalesReplyPolicy.Create(context with { RecentMessages = context.RecentMessages[..2] }));
     }
+
+    [Theory]
+    [InlineData("احجزلي بكرة الساعة 3")]
+    [InlineData("عايز احجز ميعاد")]
+    [InlineData("هاجي بكرة الساعة 10")]
+    public void Booking_requests_go_to_staff_without_claiming_a_booking(string text)
+    {
+        var reply = AiSalesReplyPolicy.Create(Followup(text))!;
+        Assert.Equal("handoff", reply.Intent);
+        Assert.True(reply.NeedsHuman);
+        Assert.False(AiSalesDraftService.ClaimsBooking(reply.Reply));
+    }
+
+    [Theory]
+    [InlineData("الحجز بيبقى إزاي؟")]
+    [InlineData("المرتب كام؟")]
+    public void Questions_about_booking_or_salary_are_not_routed_as_booking(string text)
+        => Assert.Null(AiSalesReplyPolicy.Create(Followup(text)));
 }

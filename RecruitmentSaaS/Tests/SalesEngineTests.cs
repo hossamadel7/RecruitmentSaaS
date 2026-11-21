@@ -239,6 +239,39 @@ public sealed class ProviderContractTests
         history.Add(new(Guid.NewGuid(), "customer", "Text", "المرتب كام؟", DateTime.UtcNow));
         await provider.GenerateAsync(new(new(null, null, null, null, null, reviewedMemory ? "Previously introduced assistant" : "", reviewedMemory ? 1 : 0), history.ToArray(), []), default);
     }
+    [Theory]
+    [InlineData("لو حابب تفاصيل أكتر، خليني أظبط لحضرتك ميعاد مقابلة، أنسب يوم لك إمتى؟", true)]
+    [InlineData("الرسوم 35000 جنيه في مصر و10000 بعد الوصول.", false)]
+    public async Task Recent_visit_invitation_is_flagged_and_default_closing_question_is_forbidden(string priorReply, bool expectedInvited)
+    {
+        using var http = new HttpClient(new Handler(async request =>
+        {
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            using var context = JsonDocument.Parse(body.RootElement.GetProperty("input")[0].GetProperty("content").GetString()!);
+            Assert.Equal(expectedInvited, context.RootElement.GetProperty("ConversationState").GetProperty("VisitInvitedRecently").GetBoolean());
+            var instructions = body.RootElement.GetProperty("instructions").GetString()!;
+            Assert.Contains("Do NOT end replies with a question or call to action by", instructions);
+            Assert.Contains("ConversationState.VisitInvitedRecently is false", instructions);
+            Assert.DoesNotContain("Drive toward the next step", instructions);
+            Assert.DoesNotContain("Offer one relevant next step after answering", instructions);
+            return new(HttpStatusCode.OK) { Content = JsonContent.Create(new { status = "completed", model = "synthetic-model",
+                output = new[] { new { type = "message", content = new[] { new { type = "output_text", text = "{\"reply\":\"تمام\",\"intent\":\"acknowledgement\",\"reviewNote\":\"mock\",\"needsHuman\":false,\"sourceIds\":[]}" } } } } }) };
+        }));
+        var provider = new OpenAiSalesDraftProvider(http, Options.Create(new AiSalesEngineOptions { DraftsEnabled = true, ExternalProcessingApproved = true, ApiKey = "synthetic", Model = "synthetic" }));
+        AiContextMessage[] history =
+        [
+            new(Guid.NewGuid(), "assistant", "Text", priorReply, DateTime.UtcNow.AddMinutes(-1)),
+            new(Guid.NewGuid(), "customer", "Text", "طب ينفع أدفع جزء؟", DateTime.UtcNow)
+        ];
+        await provider.GenerateAsync(new(new(null, null, null, null, null, "", 0), history, []), default);
+    }
+    [Theory]
+    [InlineData("تمام يا أحمد، تم حجز موعد لك بكرة الساعة 3 في المكتب. نورتنا 🤝", true)]
+    [InlineData("حجزتلك ميعاد السبت يا فندم", true)]
+    [InlineData("تمام يا فندم، هبلغ الموظف المسؤول يأكد مع حضرتك الميعاد.", false)]
+    [InlineData("الحجز المبدئي 5000 جنيه.", false)]
+    public void Booking_claims_are_detected(string reply, bool claims)
+        => Assert.Equal(claims, AiSalesDraftService.ClaimsBooking(reply));
     [Fact]
     public async Task Responses_contract_disables_storage_and_uses_strict_schema()
     {

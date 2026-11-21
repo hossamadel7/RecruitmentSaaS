@@ -67,6 +67,11 @@ public static class AiSalesReplyPolicy
                 ? Local("موعد الزيارة محتاج مراجعة من الموظف قبل ما نأكد أي حجز يا فندم.", "handoff", "Friday visit requested without an explicit approved closure fact; review the actual office schedule.")
                 : Local("المكتب مغلق يوم الجمعة يا فندم. نراجع مع الموظف يوم تاني مناسب للزيارة.", "handoff", "Approved Fact states Friday closure; no appointment created.", [fact.Id]);
         }
+        // A request to book, or a specific time, is never booked from chat text: staff confirm it in the CRM.
+        if (Has(text, "احجزلي", "احجز لي", "احجزيلي", "عايز احجز", "عاوز احجز", "ممكن احجز", "احجز ميعاد", "احجز معاد", "احجز موعد") ||
+            (Regex.IsMatch(text, @"الساعه\s*\d") && Has(text, "اجي", "هجي", "جاي", "ميعاد", "معاد", "موعد", "بكره", "النهارده")))
+            return Local("تمام يا فندم، هبلغ الموظف المسؤول يأكد مع حضرتك الميعاد.", "handoff",
+                "Customer asked to book or named a visit time; staff must confirm in the CRM. No appointment created.");
         // This is an information handoff, never rejection of the applicant or a hiring decision.
         if (text.Contains("السعوديه") && !context.Knowledge.Any(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow &&
             Has(IntakeScript.Normalize(k.Title + " " + k.Content), "السعوديه", "سعودي", "saudi")))

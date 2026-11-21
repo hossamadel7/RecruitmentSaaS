@@ -212,5 +212,14 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
             throw new AiSalesProviderException("MissingEvidence");
         if ((p.Intent is "handoff" or "stop") && !p.NeedsHuman) throw new AiSalesProviderException("InvalidHandoff");
         if (AiSalesContextService.Redact(p.Reply) != p.Reply) throw new AiSalesProviderException("SensitiveOutput");
+        // The model cannot book; a reply claiming a saved appointment must never reach the customer.
+        if (ClaimsBooking(p.Reply)) throw new AiSalesProviderException("UnverifiedBookingClaim");
+    }
+
+    public static bool ClaimsBooking(string reply)
+    {
+        var text = IntakeScript.Normalize(reply);
+        return new[] { "تم حجز", "تم الحجز", "حجزتلك", "حجزت لك", "حجزت لحضرتك", "اتحجز", "تم تاكيد الميعاد", "تم تاكيد الموعد",
+            "تم تاكيد الحجز", "ميعادك اتاكد", "موعدك اتاكد", "حجزك اتاكد" }.Any(text.Contains);
     }
 }
