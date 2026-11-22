@@ -19,7 +19,7 @@ public static class AiSalesReplyPolicy
             return Local(AiSalesLanguage.SafeLocal("handoff", language), "handoff", "Customer requested staff; no further intake required.");
         if (Regex.IsMatch(text.Trim(), @"^(?:i(?:'ll| will) think (?:about it)?|let me think|hafakar|hafakkar|سافكر|سافكر في الامر)[.! ]*$"))
             return new(AiSalesLanguage.SafeLocal("thinking", language), "acknowledgement", "Customer needs time; no pressure.", false, [], "local-policy");
-        if (language == "arabizi" && (Location(text, context) ?? Thanks(text, context) ?? Booking(text)) is { } local) return local;
+        if (language == "arabizi" && (Location(text, context) ?? Thanks(text, context)) is { } local) return local;
         return null; // Business replies must be generated in the customer's language from current facts.
     }
     private static AiDraftProposal? CreateEgyptian(AiSalesContext context)
@@ -64,22 +64,16 @@ public static class AiSalesReplyPolicy
             var fact = context.Knowledge.FirstOrDefault(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow &&
                 IntakeScript.Normalize(k.Content).Contains("المكتب") &&
                 Has(IntakeScript.Normalize(k.Content), "والجمعه مغلق", "ومغلق يوم الجمعه"));
-            return fact == null
-                ? Local("موعد الزيارة محتاج مراجعة من الموظف قبل ما نأكد أي حجز يا فندم.", "handoff", "Friday visit requested without an explicit approved closure fact; review the actual office schedule.")
-                : Local("المكتب مغلق يوم الجمعة يا فندم. نراجع مع الموظف يوم تاني مناسب للزيارة.", "handoff", "Approved Fact states Friday closure; no appointment created.", [fact.Id]);
+            return fact == null ? null
+                : new("المكتب مغلق يوم الجمعة يا فندم، تقدر تيجي أي يوم من السبت للخميس.", "answer",
+                    "Approved Fact states Friday closure; no appointment created.", false, [fact.Id], "local-policy");
         }
-        if ((Location(text, context) ?? Thanks(text, context) ?? Booking(text)) is { } local) return local;
+        if ((Location(text, context) ?? Thanks(text, context)) is { } local) return local;
         // This is an information handoff, never rejection of the applicant or a hiring decision.
         if (text.Contains("السعوديه") && !context.Knowledge.Any(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow &&
             Has(IntakeScript.Normalize(k.Title + " " + k.Content), "السعوديه", "سعودي", "saudi")))
             return Local("استفسار حضرتك عن السعودية محتاج مراجعة من مسؤول الشركة قبل ما نأكد تفاصيل أي عرض.", "handoff", "Unsupported market request; do not infer that the company has no other-country vacancies.");
-        if (Has(text, "سواق", "سائق") && Has(text, "متاح", "شغل", "وظيفه", "فرصه") &&
-            !context.Knowledge.Any(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow && Has(IntakeScript.Normalize(k.Title), "سواق", "سائق", "driver")))
-            return Local("توافر شغل سائق محتاج تأكيد من مسؤول التعاقدات يا فندم، قبل ما نأكد لحضرتك وظيفة معينة.", "handoff", "Specific driving availability requires contracts staff review; no job or future transfer promised.");
-        // Route requests for individual matching to a person without deciding from age/nationality.
-        // Questions about merely visiting or obtaining information remain ordinary enquiries.
-        if (text.Contains("ينفع") && !Has(text, "اجي", "ازور", "زياره", "المكتب", "معاد", "موعد", "اعرف", "مواعيد", "المرتب", "الراتب", "بدفع"))
-            return Local("مناسبة العرض لحضرتك محتاجة مراجعة من مسؤول التعاقدات يا فندم قبل ما نأكد أي فرصة.", "handoff", "Individual matching question routed to staff; no eligibility or hiring decision made.");
+        // Driver and "ينفع" questions are answered by the agent itself (positively, without inventing a salary).
         return null;
     }
 

@@ -35,7 +35,7 @@ public sealed partial class FoundationTests
         var s = await SeedAsync(); var fact = await EngineSeedAsync(s);
         await using var db = fixture.Create();
         var message = await db.WhatsAppMessages.SingleAsync(m => m.ConversationId == s.Chat);
-        message.CreatedAt = DateTime.UtcNow.AddSeconds(-10); message.WhatsAppTimestamp = message.CreatedAt;
+        message.CreatedAt = DateTime.UtcNow.AddSeconds(-20); message.WhatsAppTimestamp = message.CreatedAt;
         if (oldAssignment) (await db.AiLeadAssignments.SingleAsync(a => a.ConversationId == s.Chat)).StartedAt = DateTime.UtcNow.AddMinutes(-5);
         await db.SaveChangesAsync();
         var settings = new AiSalesEngineOptions { DraftsEnabled = true, ExternalProcessingApproved = true,
@@ -71,7 +71,7 @@ public sealed partial class FoundationTests
         var s = await SeedAsync(); var fact = await EngineSeedAsync(s);
         await using var db = fixture.Create();
         var message = await db.WhatsAppMessages.SingleAsync(m => m.ConversationId == s.Chat);
-        message.CreatedAt = DateTime.UtcNow.AddSeconds(-10); message.WhatsAppTimestamp = message.CreatedAt; await db.SaveChangesAsync();
+        message.CreatedAt = DateTime.UtcNow.AddSeconds(-20); message.WhatsAppTimestamp = message.CreatedAt; await db.SaveChangesAsync();
         var settings = new AiSalesEngineOptions { DraftsEnabled = true, ExternalProcessingApproved = true, AutoReplyEnabled = true,
             AutoReplySinceUtc = DateTime.UtcNow.AddMinutes(-1), AutoReplyAgentIds = [s.Agent], ApprovedConversationIds = [s.Chat] };
         var provider = GoodProvider(fact.Id);

@@ -250,8 +250,8 @@ public sealed class ProviderContractTests
             using var context = JsonDocument.Parse(body.RootElement.GetProperty("input")[0].GetProperty("content").GetString()!);
             Assert.Equal(expectedInvited, context.RootElement.GetProperty("ConversationState").GetProperty("VisitInvitedRecently").GetBoolean());
             var instructions = body.RootElement.GetProperty("instructions").GetString()!;
-            Assert.Contains("Do NOT end replies with a question or call to action by", instructions);
-            Assert.Contains("ConversationState.VisitInvitedRecently is false", instructions);
+            Assert.Contains("Not in every reply", instructions);
+            Assert.Contains("ConversationState.VisitInvitedRecently is false, end with ONE short natural", instructions);
             Assert.DoesNotContain("Drive toward the next step", instructions);
             Assert.DoesNotContain("Offer one relevant next step after answering", instructions);
             return new(HttpStatusCode.OK) { Content = JsonContent.Create(new { status = "completed", model = "synthetic-model",

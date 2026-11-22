@@ -26,7 +26,7 @@ public sealed partial class FoundationTests
         return total;
     }
 
-    private async Task<Guid> VoiceNoteAsync(Seed s, int secondsAgo = 10)
+    private async Task<Guid> VoiceNoteAsync(Seed s, int secondsAgo = 20)
     {
         await using var db = fixture.Create();
         var chat = (await db.WhatsAppConversations.FindAsync(s.Chat))!;

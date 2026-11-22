@@ -12,10 +12,7 @@ public sealed partial class FoundationTests
     [InlineData("مش مهتم، متبعتليش تاني", "stop")]
     [InlineData("مش مهتم وعايز أكلم موظف", "stop")]
     [InlineData("عايز أكلم موظف", "handoff")]
-    [InlineData("هجيلكم الجمعة الساعة 10", "handoff")]
     [InlineData("عندكم السعودية؟", "handoff")]
-    [InlineData("متاح شغل سواق في تركيا؟", "handoff")]
-    [InlineData("أنا سوداني ينفع؟", "handoff")]
     public async Task Restricted_requests_bypass_provider_and_remain_review_drafts_without_CRM_actions(string question, string intent)
     {
         var (s, _) = await TurkeySeedAsync(question); await using var db = fixture.Create();
@@ -24,7 +21,6 @@ public sealed partial class FoundationTests
         Assert.Equal(AiDraftStatus.ReviewRequired, draft.Status); Assert.Equal(intent, draft.Intent);
         Assert.True(draft.NeedsHuman); Assert.Equal("local-policy", draft.Model);
         Assert.DoesNotContain("أهلاً", draft.Reply);
-        if (question.Contains("الجمعة")) Assert.Contains("مغلق يوم الجمعة", draft.Reply);
         provider.VerifyNoOtherCalls();
         Assert.False(await db.WhatsAppMessages.AnyAsync(m => m.ConversationId == s.Chat && m.Direction == (byte)MessageDirection.Outgoing));
         Assert.False(await db.AiOutboundIntents.AnyAsync(i => i.ConversationId == s.Chat));
@@ -85,15 +81,16 @@ public sealed class ReplyPolicyTests
     [InlineData(0, true, "المكتب مفتوح الخميس، والجمعة مغلق.", false)]
     [InlineData(0, false, "المكتب ليس مغلق يوم الجمعة.", false)]
     [InlineData(0, false, "المكتب يوم الجمعة غير مغلق.", false)]
-    public void Friday_closure_requires_explicit_unexpired_fact_and_otherwise_requests_review(int kind, bool expired, string content, bool supported)
+    public void Friday_closure_requires_explicit_unexpired_fact_and_otherwise_goes_to_the_model(int kind, bool expired, string content, bool supported)
     {
         var fact = new AiContextFact(Guid.NewGuid(), 1, (AiKnowledgeKind)kind, "المكتب", content, DateTime.UtcNow.AddDays(expired ? -1 : 1));
         var context = new AiSalesContext(new(null, null, null, null, null, "", 0),
             [new(Guid.NewGuid(), "customer", "Text", "هجيلكم الجمعة", DateTime.UtcNow)], [fact]);
-        var reply = AiSalesReplyPolicy.Create(context)!;
-        Assert.True(reply.NeedsHuman); Assert.Equal("handoff", reply.Intent);
-        Assert.Equal(supported, reply.Reply.Contains("مغلق يوم الجمعة"));
-        Assert.Equal(supported ? new[] { fact.Id } : [], reply.SourceIds);
+        var reply = AiSalesReplyPolicy.Create(context);
+        if (!supported) { Assert.Null(reply); return; }
+        Assert.False(reply!.NeedsHuman); Assert.Equal("answer", reply.Intent);
+        Assert.Contains("مغلق يوم الجمعة", reply.Reply); Assert.Contains("السبت للخميس", reply.Reply);
+        Assert.Equal(new[] { fact.Id }, reply.SourceIds);
     }
 
     [Fact]
@@ -111,13 +108,8 @@ public sealed class ReplyPolicyTests
     [InlineData("احجزلي بكرة الساعة 3")]
     [InlineData("عايز احجز ميعاد")]
     [InlineData("هاجي بكرة الساعة 10")]
-    public void Booking_requests_go_to_staff_without_claiming_a_booking(string text)
-    {
-        var reply = AiSalesReplyPolicy.Create(Followup(text))!;
-        Assert.Equal("handoff", reply.Intent);
-        Assert.True(reply.NeedsHuman);
-        Assert.False(AiSalesDraftService.ClaimsBooking(reply.Reply));
-    }
+    public void Booking_requests_are_answered_by_the_agent_not_routed_to_staff(string text)
+        => Assert.Null(AiSalesReplyPolicy.Create(Followup(text)));
 
     [Theory]
     [InlineData("الحجز بيبقى إزاي؟")]

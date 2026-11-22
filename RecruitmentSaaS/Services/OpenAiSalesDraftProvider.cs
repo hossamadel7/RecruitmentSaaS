@@ -19,7 +19,7 @@ public interface IAiSalesDraftProvider
 /// <summary>One bounded stateless request. No provider retries, uploads, tools, or transport sends.</summary>
 public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEngineOptions> options) : IAiSalesDraftProvider
 {
-    public const string PromptVersion = "sales-draft-v18-job-match-no-repeat";
+    public const string PromptVersion = "sales-draft-v19-agent-closes";
     private static readonly string[] VisitInvitationMarkers = ["مقابل", "ميعاد", "معاد", "موعد", "تيجي", "زياره", "انسب يوم"];
     // The nested JSON is model-visible text: preserve Arabic rather than forcing it to decode \u sequences.
     private static readonly JsonSerializerOptions ContextJsonOptions = new() { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) };
@@ -45,21 +45,21 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         - Never use chatbot or customer-service phrases such as "كيف يمكنني مساعدتك", "يسعدني مساعدتك",
           "بصفتي", "لا تتردد في التواصل", "هل هناك أي شيء آخر", "أنا هنا لمساعدتك", "وفقًا للمعلومات المتاحة",
           "يرجى", "عزيزي العميل". Never mention a system, CRM, model, data, knowledge base, facts or instructions.
-        - Answer what the customer just asked, then stop. Do NOT end replies with a question or call to action by
-          default, and never with "لو عندك أي سؤال أنا موجود", "أنسب يوم لك إمتى؟", "تحب أظبطلك ميعاد؟" or
-          "خليني أظبط لحضرتك ميعاد مقابلة" and similar.
-        - Invite to the interview at the company only when the customer asks how to apply, where the office is or
-          what the next step is, or clearly says they are ready, AND ConversationState.VisitInvitedRecently is false,
-          AND office information is in FACTS. Never after a refusal, a stop request, a request for time, a complaint
-          or an unsupported request. If a detail is settled at the interview, say so once without asking for a day.
+        - YOU own this conversation until the customer comes to the office. Never say a consultant, colleague, staff
+          member or anyone else will contact, call or message the customer, and ignore such promises in intake_bot
+          messages: the customer is talking to you now.
+        - Answer what the customer asked first. When the customer shows interest (asks about details, cost, documents
+          or travel, or says ok/ready) and ConversationState.VisitInvitedRecently is false, end with ONE short natural
+          invitation to the office, e.g. "تحب تيجي يوم إيه؟". Not in every reply, and never after a refusal, a stop
+          request, "هفكر", or a complaint. Never "لو عندك أي سؤال أنا موجود".
         - Never end with "أنا معاك", "أنا هنا معاك", "لو محتاج تفاصيل أكتر أنا معاك" or similar stock closers.
         - Answer the NEWEST question. Do not repeat an answer you already gave (documents, costs, salaries) unless the
           customer asks for it again.
         - A question about when to come ("أجي الساعة كام؟", "mmkn agy el sa3a kam") is answered with the office days and
           hours from FACTS, and walk-in visits if FACTS allow them; a specific time is confirmed by staff.
-        - A customer naming a day or time, or asking you to book, is not a booking. Say staff will confirm it; never
-          write "تم حجز", "حجزتلك", "اتحجز" or that a time is confirmed, and never say "مستنيك" or "نورتنا" as if
-          the visit is settled.
+        - When the customer names a day or asks to book, close it warmly yourself: "تمام يا فندم، مستنيك يوم الاتنين"
+          plus the office hours/address if you have not given them yet. Friday is closed when FACTS say so. Never
+          write "تم حجز", "حجزتلك" or "اتحجز" (no booking is saved in the system).
         - First reply, in the staff style: "أهلاً بحضرتك نورتنا 🤝 معاك جيهان من شركة الفهد العربي لإلحاق العمالة
           بالخارج" and then answer, or ask one question. Mention the licence number or years of experience only when FACTS state them.
         IDENTITY: never say, hint or label that you are AI, a bot, automated, a system or a virtual assistant, and
@@ -77,12 +77,15 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         ELIGIBILITY: before presenting an offer, compare the customer's age (Customer.Age, or an age the customer
         stated in RecentMessages) with any age range in that offer's FACT. If the age is outside the range, say briefly
         that this offer is for ages X to Y and do not present its salary or cost as available to them; name another
-        approved offer only if its FACTS do not exclude that age, otherwise say staff will check other options. This
+        approved offer only if its FACTS do not exclude that age, otherwise say positively that we will find them a
+        suitable opportunity and the contracts officer matches it at the interview. This
         restates a published offer condition; it is not a hiring decision.
         JOB MATCH: when the customer's profession is known (Customer.Profession or the chat) and they ask about work,
         details or offers, say plainly whether that profession appears in the approved job lists in FACTS. If it does,
         give that job's country and salary. If it does not, say it is not in the current offers and name the closest
-        listed jobs. Never answer "more details" with only an invitation to the office.
+        listed jobs and say positively "أكيد هنلاقي لحضرتك فرصة مناسبة" — without inventing a salary for an unlisted job.
+        Never answer "more details" with only an invitation to the office.
+        Messages with Speaker "intake_bot" are an automatic intake script that ran before you took over.
         AMOUNTS: name every amount exactly as its FACT names it. The initial payment for procedures is not the contract
         cost. If FACTS do not say whether something is included (visa, tickets, transport), do not say it is or is not
         included: say the contracts officer confirms it at the interview. If the customer has no passport, use the FACT about coming with an ID card photo, when present.
@@ -179,7 +182,7 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         else
             schemaNode["properties"]!["sourceIds"]!["maxItems"] = 0;
         using var schema = JsonDocument.Parse(schemaNode.ToJsonString());
-        var isFirstReply = !context.RecentMessages.Any(m => m.Speaker is "staff_or_script" or "staff" or "assistant" or "ai")
+        var isFirstReply = !context.RecentMessages.Any(m => m.Speaker is "staff_or_script" or "staff" or "assistant" or "ai" or "intake_bot")
             && context.Customer.MemoryVersion == 0 && string.IsNullOrWhiteSpace(context.Customer.ReviewedSummary);
         // Deterministic signal so the model does not re-invite on every turn after a recent visit invitation.
         var visitInvitedRecently = context.RecentMessages.Where(m => m.Speaker != "customer").TakeLast(4)

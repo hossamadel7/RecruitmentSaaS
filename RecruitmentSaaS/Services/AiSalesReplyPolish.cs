@@ -22,11 +22,14 @@ public static class AiSalesReplyPolish
     private static readonly Regex Welcome = new(@"(اهلا|نورت|مستني|منتظر|نشوف).{0,30}المكتب|المكتب.{0,30}(قريب|نورت)", RegexOptions.CultureInvariant, Limit);
     private static readonly Regex StockCloser = new(@"^و?\s*لو\s+(محتاج|عايز|حابب|عندك|حبيت|احتجت|في|فيه).{0,60}(انا\s+(هنا\s+)?معاك|انا\s+موجود|تحت\s+امرك)",
         RegexOptions.CultureInvariant, Limit);
-    private static readonly Regex BareCloser = new(@"^(و\s*)?(انا\s+(هنا\s+)?(معاك|موجود|موجوده)|نورت\S*(\s+\S+){0,2}|منور\S*|لا\s*يهمك|ولا\s*يهمك|(احنا\s+)?(مستني|منتظر)\S*(\s+\S+){0,3})(\s+يا\s+فندم)?(\s+ان\s+شاء\s+الله)?\s*$",
+    private static readonly Regex BareCloser = new(@"^(و\s*)?(انا\s+(هنا\s+)?(معاك|موجود|موجوده)|نورت\S*(\s+\S+){0,2}|منور\S*|لا\s*يهمك|ولا\s*يهمك|خليك\s+مطم\S*|(احنا\s+)?(مستنيينكم|مستنيكم|منتظرينكم))(\s+يا\s+فندم)?(\s+ان\s+شاء\s+الله)?\s*$",
         RegexOptions.CultureInvariant, Limit);
     private static readonly Regex InlineWelcome = new(@"[،,]\s*(?:نورت(?:نا|ني|ونا)|مستنيين(?:ك|كم)(?:\s+[إا]ن\s+شاء\s+الله)?)(?=\s*[.!؟?]|\s*$)", RegexOptions.CultureInvariant, Limit);
     // Promises the agent cannot keep: it only answers when the customer writes.
-    private static readonly Regex Promise = new(@"(هبعت|هابعت|هبعتل|هرسل|هتواصل|هكلم|هرجعل|هنبعت|هنتواصل|هنكلم|هنكون مع)", RegexOptions.CultureInvariant, Limit);
+    private static readonly Regex Promise = new(@"(هبعت|هابعت|هبعتل|هرسل|هتواصل|هكلم|هرجعل|هنبعت|هنتواصل|هنكلم|هنكون مع|هيتواصل|هيكلم|هيرجعل|حد من زمايلي|مستشار من فريقنا)",
+        RegexOptions.CultureInvariant, Limit);
+    // Our earlier replies already invited the customer to visit.
+    private static readonly string[] InvitedMarkers = ["تيجي", "تشرفنا", "زياره", "نحدد", "تحدد", "مستني", "تنورنا"];
 
     // Topics the agent tends to repeat in every reply, and the customer wording that asks for each again.
     private static readonly (string[] Said, string[] Asked)[] Topics =
@@ -49,7 +52,7 @@ public static class AiSalesReplyPolish
         if (proposal.Intent == "stop" || context.RecentMessages.Any(m => m.Speaker == "ai") ||
             proposal.Reply.Contains("جيهان") || context.Language is "en") return proposal;
         var reply = Regex.Replace(proposal.Reply.TrimStart(), @"^(?:أهلاً|اهلا|أهلا|اهلاً)(?:\s+(?:بحضرتك|بيك|يا\s+فندم))?\s*[،,!.]?\s*", "", RegexOptions.CultureInvariant, Limit);
-        return proposal with { Reply = "أهلاً يا فندم، معاك جيهان من شركة الفهد العربي.\n" + reply };
+        return proposal with { Reply = "أهلاً يا فندم، معاك جيهان من شركة الفهد العربي، وأنا اللي هكمل مع حضرتك.\n" + reply };
     }
 
     public static AiDraftProposal Apply(AiDraftProposal proposal, AiSalesContext context)
@@ -77,6 +80,9 @@ public static class AiSalesReplyPolish
         text = InlineCloser.Replace(text, "");
         text = InlineWelcome.Replace(text, "");
         var earlier = context.RecentMessages.Where(m => m.Speaker != "customer").TakeLast(3).Select(m => IntakeScript.Normalize(m.Text)).ToArray();
+        var invitedRecently = context.RecentMessages.Where(m => m.Speaker == "ai").TakeLast(2)
+            .Any(m => InvitedMarkers.Any(IntakeScript.Normalize(m.Text).Contains));
+        var holdInvitation = !askedAboutVisit && invitedRecently;
         text = Opener.Replace(text, m => m.Groups[1].Value);
 
         var kept = new List<string>();
@@ -85,8 +91,8 @@ public static class AiSalesReplyPolish
             var norm = IntakeScript.Normalize(sentence).Trim().TrimEnd('.', '!', '؟', '?', '،', ',').Trim();
             if (norm.Length == 0) { kept.Add(sentence); continue; }
             var isQuestion = sentence.TrimEnd().EndsWith('؟') || sentence.TrimEnd().EndsWith('?');
-            if (!askedAboutVisit && isQuestion && InvitationWords.Any(norm.Contains)) continue;
-            if (!askedAboutVisit && Welcome.IsMatch(norm)) continue;
+            if (holdInvitation && isQuestion && InvitationWords.Any(norm.Contains)) continue;
+            if (holdInvitation && Welcome.IsMatch(norm)) continue;
             if (StockCloser.IsMatch(norm) || BareCloser.IsMatch(norm) || Promise.IsMatch(norm)) continue;
             // Address, hours, documents or the initial amount already given are not repeated unless asked again.
             if (Topics.Any(t => t.Said.Any(norm.Contains) && earlier.Any(e => t.Said.Any(e.Contains)) && !t.Asked.Any(customer.Contains))) continue;

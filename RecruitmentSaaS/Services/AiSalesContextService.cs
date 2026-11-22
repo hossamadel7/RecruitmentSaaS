@@ -27,7 +27,7 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
         var messages = await db.WhatsAppMessages.AsNoTracking().Where(m => m.ConversationId == chat.Id &&
             (m.Direction == (byte)MessageDirection.Incoming || m.Status == (byte)MessageStatus.Sent || m.Status == (byte)MessageStatus.Delivered || m.Status == (byte)MessageStatus.Read))
             .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id).Take(20)
-            .Select(m => new { m.Id, m.Direction, m.MessageType, m.TextBody, m.CreatedAt, m.SenderAiSalesAgentId }).ToListAsync(ct);
+            .Select(m => new { m.Id, m.Direction, m.MessageType, m.TextBody, m.CreatedAt, m.SenderAiSalesAgentId, m.MessageSource }).ToListAsync(ct);
         var messageIds = messages.Select(m => m.Id).ToArray();
         var reviewed = await db.AiVoiceParts.AsNoTracking().Where(p => messageIds.Contains(p.MessageId))
             .Join(db.AiVoiceTurns.AsNoTracking().Where(t => t.TenantId == tenant && t.ConversationId == chat.Id && t.Status == AiVoiceStatus.Reviewed),
@@ -46,7 +46,9 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
             }
             else if (m.Direction == (byte)MessageDirection.Incoming && m.MessageType == (byte)WhatsAppMessageType.Audio && !string.IsNullOrWhiteSpace(m.TextBody))
                 entries.Add(new(m.Id, "customer", "TranscribedAudio", Redact(Trim(m.TextBody, 600)), m.CreatedAt)); // automatic voice-note text
-            else entries.Add(new(m.Id, m.Direction == (byte)MessageDirection.Incoming ? "customer" : m.SenderAiSalesAgentId != null ? "ai" : "staff_or_script",
+            else if (m.MessageType == (byte)WhatsAppMessageType.Reaction) continue; // an emoji reaction is not a turn to answer
+            else entries.Add(new(m.Id, m.Direction == (byte)MessageDirection.Incoming ? "customer" : m.SenderAiSalesAgentId != null ? "ai"
+                : m.MessageSource == (byte)MessageSource.System ? "intake_bot" : "staff_or_script",
                 ((WhatsAppMessageType)m.MessageType).ToString(), m.MessageType == (byte)WhatsAppMessageType.Text ? Redact(Trim(m.TextBody, 600)) : "[Media awaits staff review]", m.CreatedAt));
         }
         var history = entries.AsEnumerable().Reverse().ToArray();

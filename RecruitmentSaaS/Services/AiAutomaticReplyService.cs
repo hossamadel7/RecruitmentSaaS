@@ -11,6 +11,9 @@ public sealed class AiAutomaticReplyService(RecruitmentCrmContext db, AiSalesCon
     IOptions<AiSalesDispatchOptions> release, IOptions<AiAdminLearningOptions>? adminOptions = null,
     IOptions<AiVoiceOptions>? voiceOptions = null)
 {
+    /// <summary>Seconds of customer silence before replying, so several quick messages get one answer.</summary>
+    public const int ReplyAfterSilenceSeconds = 15;
+
     public async Task RunConversationAsync(Guid id, CancellationToken ct)
     {
         var settings = engine.Value;
@@ -26,10 +29,10 @@ public sealed class AiAutomaticReplyService(RecruitmentCrmContext db, AiSalesCon
         if (settings.AutoReplyAnyAssignedConversation && !await db.AiLeadAssignments.AnyAsync(a =>
             a.TenantId == controls.Options.TenantId && a.ConversationId == id && a.AgentId == chat.AssignedAiSalesAgentId &&
             a.EndedAt == null && a.StartedAt >= settings.AutoReplySinceUtc, ct)) return;
-        var incoming = await db.WhatsAppMessages.AsNoTracking().Where(m => m.ConversationId == id && m.Direction == 1)
+        var incoming = await db.WhatsAppMessages.AsNoTracking().Where(m => m.ConversationId == id && m.Direction == 1 && m.MessageType != (byte)WhatsAppMessageType.Reaction)
             .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id).FirstOrDefaultAsync(ct);
         var now = DateTime.UtcNow;
-        if (incoming == null || (!settings.AutoReplyAnyAssignedConversation && incoming.CreatedAt < settings.AutoReplySinceUtc) || incoming.CreatedAt > now.AddSeconds(-4) ||
+        if (incoming == null || (!settings.AutoReplyAnyAssignedConversation && incoming.CreatedAt < settings.AutoReplySinceUtc) || incoming.CreatedAt > now.AddSeconds(-ReplyAfterSilenceSeconds) ||
             incoming.WhatsAppTimestamp < now.AddHours(-24).AddMinutes(5)) return;
         // Wait (up to two minutes) for the customer's voice notes to be turned into text, then answer them.
         if (await VoiceTranscriptionService.AnyPendingAsync(db, voiceOptions?.Value, id, ct)) return;
@@ -95,13 +98,13 @@ public sealed class AiAutomaticReplyWorker(IServiceScopeFactory scopes, ILogger<
         var candidates = await db.AiLeadAssignments.AsNoTracking().Where(a => a.TenantId == tenant && a.EndedAt == null &&
                 a.StartedAt >= settings.AutoReplySinceUtc && settings.AutoReplyAgentIds.Contains(a.AgentId) &&
                 db.WhatsAppMessages.Any(m => m.ConversationId == a.ConversationId && m.Direction == 1 &&
-                    m.WhatsAppTimestamp >= windowStart &&
+                    m.MessageType != (byte)WhatsAppMessageType.Reaction && m.WhatsAppTimestamp >= windowStart &&
                     !db.WhatsAppMessages.Any(o => o.ConversationId == a.ConversationId && o.Direction == 2 && o.CreatedAt >= m.CreatedAt)) &&
                 !db.AiOutboundIntents.Any(i => i.ConversationId == a.ConversationId && (i.State == "Sending" || i.State == "Unknown")))
             .OrderBy(a => a.StartedAt)
             .Select(a => new {
                 a.ConversationId,
-                Latest = db.WhatsAppMessages.Where(m => m.ConversationId == a.ConversationId && m.Direction == 1)
+                Latest = db.WhatsAppMessages.Where(m => m.ConversationId == a.ConversationId && m.Direction == 1 && m.MessageType != (byte)WhatsAppMessageType.Reaction)
                     .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id).Select(m => m.Id).FirstOrDefault(),
                 Version = db.ConversationControls.Where(c => c.TenantId == tenant && c.ConversationId == a.ConversationId)
                     .Select(c => (long?)c.OwnershipVersion).FirstOrDefault() })

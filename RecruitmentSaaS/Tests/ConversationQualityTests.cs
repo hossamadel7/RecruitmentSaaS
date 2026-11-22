@@ -29,12 +29,8 @@ public sealed class ConversationQualityTests
         => Assert.Equal(age, IntakeScript.ParseAge(said));
 
     [Fact]
-    public void Arabizi_booking_request_goes_to_staff()
-    {
-        var reply = AiSalesReplyPolicy.Create(Chat("Ya3ni lw hatmashoha 120 ana hagy bokra ahgz", language: "arabizi"))!;
-        Assert.Equal("handoff", reply.Intent); Assert.True(reply.NeedsHuman);
-        Assert.False(AiSalesDraftService.ClaimsBooking(reply.Reply));
-    }
+    public void Arabizi_booking_request_is_closed_by_the_agent_not_routed_to_staff()
+        => Assert.Null(AiSalesReplyPolicy.Create(Chat("Ya3ni lw hatmashoha 120 ana hagy bokra ahgz", language: "arabizi")));
 
     [Theory]
     [InlineData("Khlass mmkn agy yom el etnen el gyy mmkn agy el sa3a kam", "arabizi")]
@@ -43,12 +39,26 @@ public sealed class ConversationQualityTests
         => Assert.Null(AiSalesReplyPolicy.Create(Chat(text, language: language)));
 
     [Fact]
-    public void Visit_question_is_removed_when_the_customer_did_not_ask_about_visiting()
+    public void Visit_question_is_removed_right_after_another_invitation()
     {
-        var polished = AiSalesReplyPolish.Polish("فاهمة يا فندم، المبلغ كبير فعلاً. تكلفة عقود عمان 125 ألف جنيه. تحب نحدد يوم للزيارة؟",
-            Chat("Bas 125 alf dah kteer awyy"));
+        var reply = "فاهمة يا فندم، المبلغ كبير فعلاً. تكلفة عقود عمان 125 ألف جنيه. تحب نحدد يوم للزيارة؟";
+        var polished = AiSalesReplyPolish.Polish(reply, WithAi("Bas 125 alf dah kteer awyy", "تحب تيجي يوم إيه؟"));
         Assert.DoesNotContain("الزيارة", polished);
         Assert.Contains("125 ألف", polished);
+        // One invitation is fine when the agent has not just invited.
+        Assert.Equal(reply, AiSalesReplyPolish.Polish(reply, WithAi("Bas 125 alf dah kteer awyy", "تكلفة العقد 125 ألف.")));
+    }
+
+    [Fact]
+    public void Someone_will_contact_you_never_reaches_the_customer()
+        => Assert.Equal("فيه فرص كتير في عمان يا فندم.",
+            AiSalesReplyPolish.Polish("فيه فرص كتير في عمان يا فندم. هيتواصل مع حضرتك مستشار من فريقنا قريب. خليك مطمئن!", WithAi("متاح عقود", "اهلا")));
+
+    [Fact]
+    public void A_named_visit_day_can_be_confirmed()
+    {
+        var reply = "تمام يا فندم، مستنيك يوم الاتنين إن شاء الله.";
+        Assert.Equal(reply, AiSalesReplyPolish.Polish(reply, WithAi("هاجي يوم الاتنين", "تحب تيجي يوم إيه؟")));
     }
 
     [Fact]
@@ -59,11 +69,11 @@ public sealed class ConversationQualityTests
     }
 
     [Fact]
-    public void Office_welcome_push_is_removed()
+    public void Office_welcome_push_is_removed_right_after_another_invitation()
     {
         var polished = AiSalesReplyPolish.Polish(
             "رواتب صنايعية المعمار في عمان من 312 ل 364 ريال عماني. لو محتاج تفاصيل أكتر، هنتكلم في المقابلة، وأهلاً بيك في المكتب قريب إن شاء الله!",
-            Chat("Oly el tafaseell"));
+            WithAi("Oly el tafaseell", "تحب تيجي يوم إيه؟"));
         Assert.DoesNotContain("المكتب", polished);
         Assert.Contains("312", polished);
     }
@@ -88,7 +98,7 @@ public sealed class ConversationQualityTests
 
     [Fact]
     public void Polish_never_empties_a_reply()
-        => Assert.Equal("تحب نحدد يوم للزيارة؟", AiSalesReplyPolish.Polish("تحب نحدد يوم للزيارة؟", Chat("تمام")));
+        => Assert.Equal("تحب نحدد يوم للزيارة؟", AiSalesReplyPolish.Polish("تحب نحدد يوم للزيارة؟", WithAi("تمام", "تحب تيجي يوم إيه؟")));
 
     [Theory]
     [InlineData("عنوان المكتب والمواعيد والزيارة", "Oly el tafaseell", true)]
@@ -166,7 +176,7 @@ public sealed class ConversationQualityTests
     {
         var proposal = new AiDraftProposal("أهلاً بحضرتك، فيه عقود في عمان.", "answer", "", false, [], "m");
         var first = AiSalesReplyPolish.Introduce(proposal, Chat("متاح عقود عمل", previousReply: "شكراً يا فندم هيتواصل مع حضرتك مستشار"));
-        Assert.Equal("أهلاً يا فندم، معاك جيهان من شركة الفهد العربي.\nفيه عقود في عمان.", first.Reply);
+        Assert.Equal("أهلاً يا فندم، معاك جيهان من شركة الفهد العربي، وأنا اللي هكمل مع حضرتك.\nفيه عقود في عمان.", first.Reply);
         Assert.Same(proposal, AiSalesReplyPolish.Introduce(proposal, WithAi("متاح عقود عمل", "فيه عقود")));
     }
 
