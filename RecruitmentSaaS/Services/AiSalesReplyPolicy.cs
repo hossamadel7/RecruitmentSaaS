@@ -19,7 +19,7 @@ public static class AiSalesReplyPolicy
             return Local(AiSalesLanguage.SafeLocal("handoff", language), "handoff", "Customer requested staff; no further intake required.");
         if (Regex.IsMatch(text.Trim(), @"^(?:i(?:'ll| will) think (?:about it)?|let me think|hafakar|hafakkar|سافكر|سافكر في الامر)[.! ]*$"))
             return new(AiSalesLanguage.SafeLocal("thinking", language), "acknowledgement", "Customer needs time; no pressure.", false, [], "local-policy");
-        if (language == "arabizi" && Booking(text) is { } booking) return booking;
+        if (language == "arabizi" && (Location(text, context) ?? Thanks(text, context) ?? Booking(text)) is { } local) return local;
         return null; // Business replies must be generated in the customer's language from current facts.
     }
     private static AiDraftProposal? CreateEgyptian(AiSalesContext context)
@@ -68,7 +68,7 @@ public static class AiSalesReplyPolicy
                 ? Local("موعد الزيارة محتاج مراجعة من الموظف قبل ما نأكد أي حجز يا فندم.", "handoff", "Friday visit requested without an explicit approved closure fact; review the actual office schedule.")
                 : Local("المكتب مغلق يوم الجمعة يا فندم. نراجع مع الموظف يوم تاني مناسب للزيارة.", "handoff", "Approved Fact states Friday closure; no appointment created.", [fact.Id]);
         }
-        if (Booking(text) is { } booking) return booking;
+        if ((Location(text, context) ?? Thanks(text, context) ?? Booking(text)) is { } local) return local;
         // This is an information handoff, never rejection of the applicant or a hiring decision.
         if (text.Contains("السعوديه") && !context.Knowledge.Any(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow &&
             Has(IntakeScript.Normalize(k.Title + " " + k.Content), "السعوديه", "سعودي", "saudi")))
@@ -99,6 +99,39 @@ public static class AiSalesReplyPolicy
         if (!Has(text, BookWords) && !(Has(text, ComeWords) && timed && !Has(text, QuestionWords))) return null;
         return Local("تمام يا فندم، هبلغ الموظف المسؤول يراجع طلب حضرتك ويأكد معاك الميعاد.", "handoff",
             "Customer asked to book or named a visit day/time; staff must confirm in the CRM. No appointment created.");
+    }
+
+    private static readonly string[] LocationWords = ["لوكيشن", "لوكيسن", "لوكشن", "لوكيشان", "اللوكيشن", "الموقع", "موقع المكتب", "خريطه", "الخريطه",
+        "location", "lokeshn", "lokation", "loc", "map", "maps", "pin"];
+    private static readonly System.Text.RegularExpressions.Regex MapLink = new(@"https://(?:maps\.google\.com|goo\.gl/maps|maps\.app\.goo\.gl)/\S+",
+        RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
+    /// <summary>A location request gets the approved map link, never a model paraphrase.</summary>
+    public static AiDraftProposal? Location(string text, AiSalesContext context)
+    {
+        if (text.Length > 60 || !LocationWords.Any(w => Regex.IsMatch(text, @"(?<!\p{L})" + Regex.Escape(w) + @"(?!\p{L})"))) return null;
+        var fact = context.Knowledge.FirstOrDefault(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow && MapLink.IsMatch(k.Content));
+        if (fact == null) return null;
+        var link = MapLink.Match(fact.Content).Value.TrimEnd('.', '،', ',', ')');
+        return new("اتفضل لوكيشن المكتب يا فندم 📍\n" + link, "answer", "Location request answered with the approved map link.", false, [fact.Id], "local-policy");
+    }
+
+    private static readonly string[] ThanksWords = ["شكرا", "متشكر", "تسلم", "تسلمي", "الله يسلمك", "ربنا يكرمك", "مشكور", "جزاك الله", "shokran", "tslam", "teslam", "thanks", "thank you"];
+    private static readonly string[] OkWords = ["تمام", "ماشي", "اوك", "اوكي", "حاضر", "طيب", "ok", "okay", "tamam", "mashi", "mashy", "تمام شكرا", "تمام ان شاء الله", "ان شاء الله", "ماشي ان شاء الله", "تمام ماشي"];
+
+    /// <summary>A bare thank-you or "ok" gets a short acknowledgement, not a repeat of the offer. Not used when our last
+    /// message asked the customer something, because then "تمام" may be the answer.</summary>
+    public static AiDraftProposal? Thanks(string text, AiSalesContext context)
+    {
+        var plain = Regex.Replace(text, @"[^\p{L}\s]", " ").Trim();
+        plain = Regex.Replace(plain, @"\s+", " ");
+        plain = Regex.Replace(plain, @"\s*(يا فندم|يا استاذه|يا استاذ|يا باشا|وكل الاحترام|ليكي|ليك|جدا|اوي|كتير|خالص)$", "").Trim();
+        var isThanks = ThanksWords.Any(w => plain == w || plain.StartsWith(w + " ") && plain.Split(' ').Length <= 4);
+        var isOk = OkWords.Contains(plain);
+        if (!isThanks && !isOk) return null;
+        var previous = context.RecentMessages.LastOrDefault(m => m.Speaker != "customer")?.Text?.TrimEnd() ?? "";
+        if (isOk && (previous.EndsWith('؟') || previous.EndsWith('?'))) return null;
+        return new(isThanks ? "العفو يا فندم 🙏" : "تمام يا فندم 👍", "acknowledgement", "Short thanks/ok acknowledged without repeating the offer.", false, [], "local-policy");
     }
 
     private static bool Has(string text, params string[] values) => values.Any(text.Contains);

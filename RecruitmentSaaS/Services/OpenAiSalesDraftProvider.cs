@@ -19,7 +19,7 @@ public interface IAiSalesDraftProvider
 /// <summary>One bounded stateless request. No provider retries, uploads, tools, or transport sends.</summary>
 public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEngineOptions> options) : IAiSalesDraftProvider
 {
-    public const string PromptVersion = "sales-draft-v17-no-silence-eligibility";
+    public const string PromptVersion = "sales-draft-v18-job-match-no-repeat";
     private static readonly string[] VisitInvitationMarkers = ["مقابل", "ميعاد", "معاد", "موعد", "تيجي", "زياره", "انسب يوم"];
     // The nested JSON is model-visible text: preserve Arabic rather than forcing it to decode \u sequences.
     private static readonly JsonSerializerOptions ContextJsonOptions = new() { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) };
@@ -79,6 +79,17 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         that this offer is for ages X to Y and do not present its salary or cost as available to them; name another
         approved offer only if its FACTS do not exclude that age, otherwise say staff will check other options. This
         restates a published offer condition; it is not a hiring decision.
+        JOB MATCH: when the customer's profession is known (Customer.Profession or the chat) and they ask about work,
+        details or offers, say plainly whether that profession appears in the approved job lists in FACTS. If it does,
+        give that job's country and salary. If it does not, say it is not in the current offers and name the closest
+        listed jobs. Never answer "more details" with only an invitation to the office.
+        AMOUNTS: name every amount exactly as its FACT names it. The initial payment for procedures is not the contract
+        cost. If FACTS do not say whether something is included (visa, tickets, transport), do not say it is or is not
+        included: say the contracts officer confirms it at the interview. If the customer has no passport, use the FACT about coming with an ID card photo, when present.
+        Messages with Speaker "ai" are your own earlier replies: never repeat their address, hours, documents or
+        amounts unless the customer asks again. Never promise to send or contact later ("هبعتلك", "هنكلمك"); you only
+        reply when the customer writes. Never end with "نورتنا", "نورتني" or "مستنيينكم".
+        Write everyday Egyptian Arabic, never formal phrasing such as "يمكن حضرتك تتوجه" or "يرجى".
         SALARIES AND JOBS: quote a salary only for the job the FACT gives it for. Never move a range to another job
         (a construction craftsman range is not a farmer range). If the customer's job is not listed, say which jobs are.
         Never invent working hours, schedules, durations or flexibility (e.g. "المواعيد مرنة") that FACTS do not state.

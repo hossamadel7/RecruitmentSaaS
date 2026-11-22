@@ -109,6 +109,7 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
         // Automatic mode sends only safe local wording for a handoff; the model's uncertain text stays out of the chat.
         if (actor == null && proposal != null && error == null && proposal.NeedsHuman && proposal.Model != "local-policy")
             proposal = Holding(context, proposal.ReviewNote, proposal);
+        if (proposal != null && error == null) proposal = AiSalesReplyPolish.Introduce(proposal, context);
 
         db.ChangeTracker.Clear();
         await using (var chatGate = await ConversationLock.AcquireAsync(db, "conversation:" + chatId, CancellationToken.None))

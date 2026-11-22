@@ -27,7 +27,7 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
         var messages = await db.WhatsAppMessages.AsNoTracking().Where(m => m.ConversationId == chat.Id &&
             (m.Direction == (byte)MessageDirection.Incoming || m.Status == (byte)MessageStatus.Sent || m.Status == (byte)MessageStatus.Delivered || m.Status == (byte)MessageStatus.Read))
             .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id).Take(20)
-            .Select(m => new { m.Id, m.Direction, m.MessageType, m.TextBody, m.CreatedAt }).ToListAsync(ct);
+            .Select(m => new { m.Id, m.Direction, m.MessageType, m.TextBody, m.CreatedAt, m.SenderAiSalesAgentId }).ToListAsync(ct);
         var messageIds = messages.Select(m => m.Id).ToArray();
         var reviewed = await db.AiVoiceParts.AsNoTracking().Where(p => messageIds.Contains(p.MessageId))
             .Join(db.AiVoiceTurns.AsNoTracking().Where(t => t.TenantId == tenant && t.ConversationId == chat.Id && t.Status == AiVoiceStatus.Reviewed),
@@ -46,7 +46,7 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
             }
             else if (m.Direction == (byte)MessageDirection.Incoming && m.MessageType == (byte)WhatsAppMessageType.Audio && !string.IsNullOrWhiteSpace(m.TextBody))
                 entries.Add(new(m.Id, "customer", "TranscribedAudio", Redact(Trim(m.TextBody, 600)), m.CreatedAt)); // automatic voice-note text
-            else entries.Add(new(m.Id, m.Direction == (byte)MessageDirection.Incoming ? "customer" : "staff_or_script",
+            else entries.Add(new(m.Id, m.Direction == (byte)MessageDirection.Incoming ? "customer" : m.SenderAiSalesAgentId != null ? "ai" : "staff_or_script",
                 ((WhatsAppMessageType)m.MessageType).ToString(), m.MessageType == (byte)WhatsAppMessageType.Text ? Redact(Trim(m.TextBody, 600)) : "[Media awaits staff review]", m.CreatedAt));
         }
         var history = entries.AsEnumerable().Reverse().ToArray();
@@ -64,8 +64,8 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
             .ThenByDescending(k => k.ApprovedAt).ToArray() : (await semantic.RankAsync(tenant, chat.WhatsAppAccountId,
                 AiLearningSourceService.Redact(retrievalQuery, [lead?.FullName, chat.IntakeName]), candidates.ToArray(), ct)).Select(x => x.Knowledge).ToArray();
         var rankedFacts = ranked.Where(k => k.Kind == AiKnowledgeKind.Fact).ToArray();
-        var pinned = rankedFacts.Where(k => Pinned(k.Title, retrievalQuery)).Take(4);
-        var knowledge = rankedFacts.Take(6).Concat(pinned).DistinctBy(k => k.Id).Take(8)
+        var pinned = rankedFacts.Where(k => Pinned(k.Title, retrievalQuery)).Take(6);
+        var knowledge = rankedFacts.Take(6).Concat(pinned).DistinctBy(k => k.Id).Take(10)
             .Concat(ranked.Where(k => k.Kind == AiKnowledgeKind.Playbook).Take(2))
             .Select(k => new AiContextFact(k.Id, k.Version, k.Kind, k.Title, Redact(k.Content), k.ValidUntil)).ToArray();
         if (adminOptions?.Value is { Enabled: true, PrivateRoutingEnabled: true } admin && admin.ApprovedAccountIds.Contains(chat.WhatsAppAccountId))
@@ -88,6 +88,10 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
             AiSalesLanguage.Detect(query), ((LeadStage)chat.LeadStage).ToString());
     }
 
+    // Customer wording asking about work, jobs, offers or travel: every approved job list is made available.
+    private static readonly string[] WorkWords = ["شغل", "وظيف", "تفاصيل", "تفصيل", "عقود", "عقد", "عروض", "فرص", "فرصه", "السفر", "يسافر", "اسافر",
+        "متاح", "مهنه", "صنايعي", "عامل", "shoghl", "sho3'l", "wazifa", "tafaseel", "tafasel", "3o2od", "3akd", "safar", "a3mal", "job", "work"];
+
     // Customer wording (Arabic or Arabizi) objecting to the price or asking for a cheaper option.
     private static readonly string[] PriceWords = ["غالي", "كتير", "كبير", "ارخص", "اقل", "خصم", "المبلغ", "مبلغ", "تكلفه", "تكاليف",
         "ghaly", "ghali", "8aly", "kteer", "kter", "ktir", "arkhas", "ar5as", "a2al", "khasm", "5asm", "mablagh", "taklfa", "takalef", "tkalef"];
@@ -99,6 +103,7 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
         var t = IntakeScript.Normalize(title);
         if (t.Contains("عنوان المكتب") || (t.Contains("المكتب") && t.Contains("مواعيد")) || t.Contains("السن")) return true;
         var said = IntakeScript.Normalize(customerText);
+        if (WorkWords.Any(said.Contains) && (t.Contains("الوظائف") || t.Contains("دليفري"))) return true;
         return PriceWords.Any(said.Contains) && (t.Contains("الرسوم") || t.Contains("تكلفه") || t.Contains("المبلغ"));
     }
 

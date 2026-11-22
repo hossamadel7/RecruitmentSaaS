@@ -108,6 +108,75 @@ public sealed class ConversationQualityTests
     public void Handoff_and_stop_acknowledgements_can_be_sent_automatically(bool needsHuman, string intent, bool sendable)
         => Assert.Equal(sendable, AiSalesDraftService.AutoSendable(new AiSalesDraft { NeedsHuman = needsHuman, Intent = intent }));
 
+    private static AiContextFact Office() => new(Guid.NewGuid(), 1, AiKnowledgeKind.Fact, "عنوان المكتب والمواعيد والزيارة",
+        "عنوان المكتب: 103 مكرر شارع الهرم. الموقع: https://maps.google.com/?q=29.991724,31.154583 . المواعيد من 10 صباحًا إلى 6 مساءً.", DateTime.UtcNow.AddDays(30));
+
+    private static AiSalesContext WithAi(string customer, string aiEarlier, params AiContextFact[] facts) => new(new(null, null, null, null, null, "", 0),
+        [new(Guid.NewGuid(), "customer", "Text", "اهلا", DateTime.UtcNow.AddMinutes(-3)),
+         new(Guid.NewGuid(), "ai", "Text", aiEarlier, DateTime.UtcNow.AddMinutes(-2)),
+         new(Guid.NewGuid(), "customer", "Text", customer, DateTime.UtcNow)], facts, "ar-EG");
+
+    [Theory]
+    [InlineData("ممكن لوكيسن")]
+    [InlineData("ابعتلي اللوكيشن")]
+    [InlineData("location")]
+    public void Location_request_gets_the_approved_map_link(string text)
+    {
+        var office = Office();
+        var reply = AiSalesReplyPolicy.Create(WithAi(text, "المكتب مفتوح من السبت للخميس.", office))!;
+        Assert.Contains("https://maps.google.com/?q=29.991724,31.154583", reply.Reply);
+        Assert.Equal("answer", reply.Intent); Assert.False(reply.NeedsHuman); Assert.Equal([office.Id], reply.SourceIds);
+    }
+
+    [Theory]
+    [InlineData("شكرا. وكل. الاحترام", "العفو يا فندم 🙏")]
+    [InlineData("تسلم", "العفو يا فندم 🙏")]
+    [InlineData("تمام", "تمام يا فندم 👍")]
+    [InlineData("تمام إن شاء الله", "تمام يا فندم 👍")]
+    public void Bare_thanks_or_ok_gets_a_short_acknowledgement(string text, string expected)
+        => Assert.Equal(expected, AiSalesReplyPolicy.Create(WithAi(text, "المكتب مفتوح من السبت للخميس."))!.Reply);
+
+    [Fact]
+    public void Ok_after_our_question_is_left_to_the_model()
+        => Assert.Null(AiSalesReplyPolicy.Create(WithAi("تمام", "ابن عمك عنده جواز سفر؟")));
+
+    [Fact]
+    public void Closers_and_promises_are_removed()
+    {
+        var polished = AiSalesReplyPolish.Polish("فيه عقود في عمان وأرمينيا. هبعتلك التفاصيل قريب. لا يهمك! نورتنا!", WithAi("متاح عقود عمل", "اهلا"));
+        Assert.Equal("فيه عقود في عمان وأرمينيا.", polished);
+    }
+
+    [Fact]
+    public void Visit_welcome_closer_is_removed()
+        => Assert.Equal("مسؤول التعاقدات هيشرحلك كل حاجة بالتفصيل.",
+            AiSalesReplyPolish.Polish("مسؤول التعاقدات هيشرحلك كل حاجة بالتفصيل. نورتنا في الزيارة!", WithAi("ممكن اعرف التفاصيل", "اهلا")));
+
+    [Fact]
+    public void Hours_already_given_are_not_repeated_unless_asked_again()
+    {
+        var earlier = "المكتب مفتوح من السبت للخميس من 10 صباحًا لحد 6 مساءً.";
+        var reply = "مطلوب جواز سفر وصورة شخصية. المكتب مفتوح من السبت للخميس من 10 صباحًا ل6 مساءً.";
+        Assert.Equal("مطلوب جواز سفر وصورة شخصية.", AiSalesReplyPolish.Polish(reply, WithAi("ايه الورق المطلوب", earlier)));
+        Assert.Equal(reply, AiSalesReplyPolish.Polish(reply, WithAi("المكتب مفتوح امتى والورق ايه", earlier)));
+    }
+
+    [Fact]
+    public void Agent_introduces_itself_once_when_taking_over()
+    {
+        var proposal = new AiDraftProposal("أهلاً بحضرتك، فيه عقود في عمان.", "answer", "", false, [], "m");
+        var first = AiSalesReplyPolish.Introduce(proposal, Chat("متاح عقود عمل", previousReply: "شكراً يا فندم هيتواصل مع حضرتك مستشار"));
+        Assert.Equal("أهلاً يا فندم، معاك جيهان من شركة الفهد العربي.\nفيه عقود في عمان.", first.Reply);
+        Assert.Same(proposal, AiSalesReplyPolish.Introduce(proposal, WithAi("متاح عقود عمل", "فيه عقود")));
+    }
+
+    [Theory]
+    [InlineData("تركيا — الوظائف المتاحة والسن والخبرة", "ممكن اعرف تفصيل اكتر بخصوص العمل في الخارج", true)]
+    [InlineData("أرمينيا — الوظائف والرواتب", "متاح عقود عمل", true)]
+    [InlineData("السعودية — دليفري كيتا وهنجرستيشن", "عنوان المكتب", false)]
+    public void Job_lists_are_pinned_when_the_customer_asks_about_work(string title, string customer, bool pinned)
+        => Assert.Equal(pinned, AiSalesContextService.Pinned(title, customer));
+
     [Fact]
     public void Prompt_covers_eligibility_job_salaries_cheaper_offers_and_retry_corrections()
     {
@@ -117,6 +186,8 @@ public sealed class ConversationQualityTests
         Assert.Contains("approved offer with a lower cost", p);
         Assert.Contains("ConversationState.Correction", p);
         Assert.Contains("Never invent working hours", p);
+        Assert.Contains("JOB MATCH", p);
+        Assert.Contains("The initial payment for procedures is not the contract", p);
         Assert.DoesNotContain("لو احتجت توضيح أي نقطة أنا معاك", p);
         Assert.Contains("FACT IDs", AiSalesDraftService.CorrectionFor("MissingEvidence"));
     }
