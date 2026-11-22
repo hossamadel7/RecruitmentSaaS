@@ -105,6 +105,7 @@ builder.Services.AddOptions<AiSalesLearningOptions>().BindConfiguration("AiSales
     .ValidateOnStart();
 if (!isolatedValidation) builder.Services.AddHostedService<AiSalesLearningWorker>();
 builder.Services.AddScoped<AiSalesDispatchService>();
+builder.Services.AddScoped<AiVisitBookingService>();
 builder.Services.AddScoped<AiAutomaticReplyService>();
 builder.Services.AddScoped<AiAutoReplyDiagnostics>();
 if (!isolatedValidation) builder.Services.AddHostedService<AiAutomaticReplyWorker>();

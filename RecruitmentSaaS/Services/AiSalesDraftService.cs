@@ -10,6 +10,9 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
     AiSalesContextService contextReader, IAiSalesDraftProvider provider, IOptions<AiSalesEngineOptions> options,
     AiAdminLearningService? adminLearning = null)
 {
+    /// <summary>The visit day the last automatic draft confirmed (Cairo time), recorded once that reply is sent.</summary>
+    public DateTime? ConfirmedVisit { get; private set; }
+
     public Task<AiSalesDraft> GenerateAsync(Guid chatId, Guid actor, long expectedVersion, string key, CancellationToken ct)
         => GenerateCoreAsync(chatId, actor, expectedVersion, key, ct);
 
@@ -131,6 +134,7 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
                 draft.Status = AiDraftStatus.ReviewRequired; draft.Reply = proposal!.Reply; draft.Intent = proposal.Intent;
                 draft.ReviewNote = proposal.ReviewNote; draft.NeedsHuman = proposal.NeedsHuman;
                 draft.SourceIdsJson = JsonSerializer.Serialize(proposal.SourceIds.Distinct());
+                ConfirmedVisit = actor == null && !proposal.NeedsHuman ? proposal.Visit : null;
             }
             await db.SaveChangesAsync(CancellationToken.None);
         }

@@ -9,7 +9,7 @@ namespace RecruitmentSaaS.Services;
 public sealed class AiAutomaticReplyService(RecruitmentCrmContext db, AiSalesControlService controls,
     AiSalesDraftService drafts, AiSalesDispatchService dispatch, IOptions<AiSalesEngineOptions> engine,
     IOptions<AiSalesDispatchOptions> release, IOptions<AiAdminLearningOptions>? adminOptions = null,
-    IOptions<AiVoiceOptions>? voiceOptions = null)
+    IOptions<AiVoiceOptions>? voiceOptions = null, AiVisitBookingService? visits = null)
 {
     /// <summary>Seconds of customer silence before replying, so several quick messages get one answer.</summary>
     public const int ReplyAfterSilenceSeconds = 15;
@@ -48,6 +48,9 @@ public sealed class AiAutomaticReplyService(RecruitmentCrmContext db, AiSalesCon
         await drafts.ApproveAutomaticallyAsync(draft.Id, ct);
         var intent = await dispatch.QueueAutomaticallyAsync(draft.Id, control.OwnershipVersion, key, ct);
         await dispatch.DispatchAutomaticallyAsync(intent.Id, ct);
+        // The customer committed to a day and Gihan confirmed it: record the booking like a TeleSales "حجز".
+        if (visits != null && drafts.ConfirmedVisit is { } visit)
+            await visits.BookAsync(id, chat.AssignedAiSalesAgentId.Value, visit, ct);
     }
 }
 

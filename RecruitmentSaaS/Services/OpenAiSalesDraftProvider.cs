@@ -10,7 +10,7 @@ using System.Text.Json.Nodes;
 namespace RecruitmentSaaS.Services;
 
 public sealed record AiDraftProposal(string Reply, string Intent, string ReviewNote, bool NeedsHuman, Guid[] SourceIds,
-    string Model, int? InputTokens = null, int? OutputTokens = null);
+    string Model, int? InputTokens = null, int? OutputTokens = null, DateTime? Visit = null);
 public interface IAiSalesDraftProvider
 {
     Task<AiDraftProposal> GenerateAsync(AiSalesContext context, CancellationToken ct);
@@ -19,7 +19,7 @@ public interface IAiSalesDraftProvider
 /// <summary>One bounded stateless request. No provider retries, uploads, tools, or transport sends.</summary>
 public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEngineOptions> options) : IAiSalesDraftProvider
 {
-    public const string PromptVersion = "sales-draft-v19-agent-closes";
+    public const string PromptVersion = "sales-draft-v20-job-country-booking";
     private static readonly string[] VisitInvitationMarkers = ["مقابل", "ميعاد", "معاد", "موعد", "تيجي", "زياره", "انسب يوم"];
     // The nested JSON is model-visible text: preserve Arabic rather than forcing it to decode \u sequences.
     private static readonly JsonSerializerOptions ContextJsonOptions = new() { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) };
@@ -56,10 +56,14 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         - Answer the NEWEST question. Do not repeat an answer you already gave (documents, costs, salaries) unless the
           customer asks for it again.
         - A question about when to come ("أجي الساعة كام؟", "mmkn agy el sa3a kam") is answered with the office days and
-          hours from FACTS, and walk-in visits if FACTS allow them; a specific time is confirmed by staff.
+          hours from FACTS, and walk-in visits if FACTS allow them.
         - When the customer names a day or asks to book, close it warmly yourself: "تمام يا فندم، مستنيك يوم الاتنين"
-          plus the office hours/address if you have not given them yet. Friday is closed when FACTS say so. Never
-          write "تم حجز", "حجزتلك" or "اتحجز" (no booking is saved in the system).
+          plus the office hours/address if you have not given them yet. Friday is closed when FACTS say so; then ask for
+          another day. Never write "تم حجز", "حجزتلك" or "اتحجز".
+        - BOOKING: set visitDate (YYYY-MM-DD, computed from ConversationState.TodayCairo) only when the customer's latest
+          messages commit to coming on a specific day (e.g. "هاجي بكرة", "يوم السبت", "hagy el etnen") and your reply
+          confirms that day. Set visitTime (HH:mm, 24h) only if the customer named an hour. Otherwise both are "".
+          Never set them for "هفكر", a question about hours, a vague "قريب" or a Friday. The server records the visit.
         - First reply, in the staff style: "أهلاً بحضرتك نورتنا 🤝 معاك جيهان من شركة الفهد العربي لإلحاق العمالة
           بالخارج" and then answer, or ask one question. Mention the licence number or years of experience only when FACTS state them.
         IDENTITY: never say, hint or label that you are AI, a bot, automated, a system or a virtual assistant, and
@@ -82,8 +86,11 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         restates a published offer condition; it is not a hiring decision.
         JOB MATCH: when the customer's profession is known (Customer.Profession or the chat) and they ask about work,
         details or offers, say plainly whether that profession appears in the approved job lists in FACTS. If it does,
-        give that job's country and salary. If it does not, say it is not in the current offers and name the closest
-        listed jobs and say positively "أكيد هنلاقي لحضرتك فرصة مناسبة" — without inventing a salary for an unlisted job.
+        give that job's country and salary. If the customer wants it in a country where it is not listed but another
+        country's FACTS list it (e.g. a driver wants Turkey and driving is listed only for Oman or Saudi Arabia), say it
+        is not available in that country but is available in the other one, with that country's salary. Only if the
+        profession is in no approved job list at all, say plainly it is not available right now and offer the listed
+        jobs closest to it as another work opportunity, with their country and salary. Never invent a job or a salary.
         Never answer "more details" with only an invitation to the office.
         Messages with Speaker "intake_bot" are an automatic intake script that ran before you took over.
         AMOUNTS: name every amount exactly as its FACT names it. The initial payment for procedures is not the contract
@@ -145,7 +152,7 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         Ask a clarification question when critical details are uncertain. Unsupported media requires human clarification.
         An office consultation is an open visit, not a guaranteed job or fixed-capacity slot. Offer one only when office
         information is in approved facts. State clearly when no matching vacancy is confirmed.
-        You cannot send messages, book, reschedule, cancel, change lead status, or confirm a CRM action.
+        You cannot send messages, reschedule, cancel or change lead status; a visit day is recorded only through visitDate.
         Never say a booking or change was saved. Intent is a recommendation for the reviewer, not an executed action.
         A customer asking for a person or declining contact requires handoff or stop and needsHuman=true.
         For intent handoff or stop, needsHuman MUST be true. A person request should be acknowledged as a handoff
@@ -166,8 +173,9 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
           "reply":{"type":"string"},
           "intent":{"type":"string","enum":["answer","acknowledgement","qualification","consultation","handoff","stop"]},
           "reviewNote":{"type":"string"},"needsHuman":{"type":"boolean"},
-          "sourceIds":{"type":"array","items":{"type":"string"}}
-        },"required":["reply","intent","reviewNote","needsHuman","sourceIds"],"additionalProperties":false}
+          "sourceIds":{"type":"array","items":{"type":"string"}},
+          "visitDate":{"type":"string"},"visitTime":{"type":"string"}
+        },"required":["reply","intent","reviewNote","needsHuman","sourceIds","visitDate","visitTime"],"additionalProperties":false}
         """;
 
     public async Task<AiDraftProposal> GenerateAsync(AiSalesContext context, CancellationToken ct)
@@ -191,6 +199,7 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
             CustomerLanguage = context.Language ?? AiSalesLanguage.Detect(context.RecentMessages.LastOrDefault(m => m.Speaker == "customer")?.Text ?? ""),
             CrmSalesStage = context.SalesStage,
             ConversationState = new { IsFirstReply = isFirstReply, VisitInvitedRecently = visitInvitedRecently, context.Correction,
+                TodayCairo = EgyptTime.Today.ToString("yyyy-MM-dd dddd", System.Globalization.CultureInfo.InvariantCulture),
                 LatestCustomerMessage = context.RecentMessages.LastOrDefault(m => m.Speaker == "customer")?.Text } };
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/responses");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", o.ApiKey);
@@ -233,8 +242,10 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
             if (usage.TryGetProperty("input_tokens", out var i) && i.TryGetInt32(out var iv) && iv >= 0) input = iv;
             if (usage.TryGetProperty("output_tokens", out var t) && t.TryGetInt32(out var ov) && ov >= 0) output = ov;
         }
+        var visit = AiVisitBookingService.Parse(p.TryGetProperty("visitDate", out var vd) ? vd.GetString() : null,
+            p.TryGetProperty("visitTime", out var vt) ? vt.GetString() : null, EgyptTime.Today);
         return new(p.GetProperty("reply").GetString()!, p.GetProperty("intent").GetString()!,
             p.GetProperty("reviewNote").GetString()!, p.GetProperty("needsHuman").GetBoolean(), ids,
-            root.GetProperty("model").GetString() ?? o.Model, input, output);
+            root.GetProperty("model").GetString() ?? o.Model, input, output, visit);
     }
 }
