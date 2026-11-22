@@ -750,6 +750,8 @@ namespace RecruitmentSaaS.Services
         private static readonly System.Text.RegularExpressions.Regex AgeBeforeUnit = Rx(@"(?<!\d)(\d{1,2})\s*(?:سنه|سنين|سنوات|عاما|عام|سن)(?!\p{L})");
         private static readonly System.Text.RegularExpressions.Regex AgeAfterHave = Rx(@"عندي\s*(\d{1,2})(?!\d)");
         private static readonly System.Text.RegularExpressions.Regex Number = Rx(@"\d+");
+        // One digit glued to a Latin letter is an Arabizi letter (3=ع, 2=ء, 7=ح), never part of the age.
+        private static readonly System.Text.RegularExpressions.Regex ArabiziDigit = Rx(@"(?<=[a-z])\d(?!\d)|(?<!\d)\d(?=[a-z])");
         // "لازم 45؟", "اقل من 45 ينفع": the age we ask for, not theirs
         private static readonly System.Text.RegularExpressions.Regex Requirement = Rx(@"(?:لازم|لزم|شرط|اقل من|اكبر من|اصغر من|اكتر من|اكثر من|فوق|تحت|اقصي|حد)\s*(?:ال)?\s*(?:سن\s*)?(?:ال\s*)?\d{1,2}");
         // "ابني عنده 19 سنه": someone else's age — only believed as the answer to our age question
@@ -767,7 +769,7 @@ namespace RecruitmentSaaS.Services
         /// </summary>
         public static int? ParseAge(string? said, bool askedAge = true, bool bareNumberOk = true)
         {
-            var norm = Phone.Replace(Normalize(said), " ");
+            var norm = ArabiziDigit.Replace(Phone.Replace(Normalize(said), " "), "");
             if (!askedAge && SomeoneElse.IsMatch(norm)) return null;
 
             // "فوق 45" answers our question; unasked it is usually about the age we require

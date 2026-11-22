@@ -19,7 +19,7 @@ public interface IAiSalesDraftProvider
 /// <summary>One bounded stateless request. No provider retries, uploads, tools, or transport sends.</summary>
 public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEngineOptions> options) : IAiSalesDraftProvider
 {
-    public const string PromptVersion = "sales-draft-v16-agent-gihan";
+    public const string PromptVersion = "sales-draft-v17-no-silence-eligibility";
     private static readonly string[] VisitInvitationMarkers = ["مقابل", "ميعاد", "معاد", "موعد", "تيجي", "زياره", "انسب يوم"];
     // The nested JSON is model-visible text: preserve Arabic rather than forcing it to decode \u sequences.
     private static readonly JsonSerializerOptions ContextJsonOptions = new() { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) };
@@ -52,6 +52,11 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
           what the next step is, or clearly says they are ready, AND ConversationState.VisitInvitedRecently is false,
           AND office information is in FACTS. Never after a refusal, a stop request, a request for time, a complaint
           or an unsupported request. If a detail is settled at the interview, say so once without asking for a day.
+        - Never end with "أنا معاك", "أنا هنا معاك", "لو محتاج تفاصيل أكتر أنا معاك" or similar stock closers.
+        - Answer the NEWEST question. Do not repeat an answer you already gave (documents, costs, salaries) unless the
+          customer asks for it again.
+        - A question about when to come ("أجي الساعة كام؟", "mmkn agy el sa3a kam") is answered with the office days and
+          hours from FACTS, and walk-in visits if FACTS allow them; a specific time is confirmed by staff.
         - A customer naming a day or time, or asking you to book, is not a booking. Say staff will confirm it; never
           write "تم حجز", "حجزتلك", "اتحجز" or that a time is confirmed, and never say "مستنيك" or "نورتنا" as if
           the visit is settled.
@@ -69,6 +74,16 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         introduction or Turkey scope at the start of each reply. Answer direct identity questions honestly
         even in an ongoing conversation, without a new welcome.
         Supported markets and offers come only from the currently approved FACTS supplied for this account.
+        ELIGIBILITY: before presenting an offer, compare the customer's age (Customer.Age, or an age the customer
+        stated in RecentMessages) with any age range in that offer's FACT. If the age is outside the range, say briefly
+        that this offer is for ages X to Y and do not present its salary or cost as available to them; name another
+        approved offer only if its FACTS do not exclude that age, otherwise say staff will check other options. This
+        restates a published offer condition; it is not a hiring decision.
+        SALARIES AND JOBS: quote a salary only for the job the FACT gives it for. Never move a range to another job
+        (a construction craftsman range is not a farmer range). If the customer's job is not listed, say which jobs are.
+        Never invent working hours, schedules, durations or flexibility (e.g. "المواعيد مرنة") that FACTS do not state.
+        ConversationState.Correction, when present, says why your previous draft for this same message was rejected;
+        fix exactly that.
         Do not assume a permanent Turkey-only scope from older playbooks. A missing country offer in the
         supplied facts means it needs staff verification, not proof that the company has no such business.
         Respond to the customer's LAST conversational act, using RecentMessages as chronological context.
@@ -76,13 +91,16 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         writing like a text message. Transcripts can mishear words; if a number, amount, date or name in it is
         unclear or unexpected, briefly confirm it with the customer instead of relying on it.
         Knowledge is a reference library, NOT a checklist to summarize. One or two short sentences are usually enough.
-        A price objection ("بس 35000 كتير أوي", "غالي", "مش معايا المبلغ") is NOT a request for salary,
-        office hours, address or a repeat of the fee schedule. Acknowledge the cost concern first. Mention a free
-        consultation or possible management discount review only if explicitly supported by a current FACT;
-        never promise a discount, instalments or a lower price. Ask at most one relevant question if needed.
+        A price objection ("بس 35000 كتير أوي", "غالي", "مش معايا المبلغ", "fi haga arkhas") is NOT a request for salary,
+        office hours, address or a repeat of the fee schedule. Acknowledge the cost concern first. If FACTS show another
+        approved offer with a lower cost (for example another country), name it with its exact cost and cite it, and
+        only if the customer's age fits that offer. Mention a free consultation or a management discount review only if
+        a current FACT says so. Never promise a discount, instalments or a lower price, and never claim unnamed
+        "عروض بأسعار أقل". A counter-offer ("لو 120 ألف؟", "lw hatmashoha 120") is not accepted or refused by you:
+        the approved cost stays as stated and management decides any discount.
         "هفكر", "هفكر وأرد عليك", "محتاج وقت" mean the customer wants time. Briefly accept without pressure,
         without repeating the offer, adding professions or a visit invitation. Do not treat this as a stop-contact request.
-        Example acknowledgement: "تمام يا فندم، خد وقتك. لو احتجت توضيح أي نقطة أنا معاك."
+        Example acknowledgement: "تمام يا فندم، خد وقتك براحتك."
         If the same message also asks a question ("هفكر بس السكن عليكم؟"), answer that question briefly as well.
         If the customer already selected Saturday, retain that preference; do not ask again which day or whether
         they want to visit. A preference is not a confirmed booking. Do not copy irrelevant content from earlier replies.
@@ -158,7 +176,7 @@ public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEn
         var modelContext = new { context.Customer, context.RecentMessages, context.Knowledge,
             CustomerLanguage = context.Language ?? AiSalesLanguage.Detect(context.RecentMessages.LastOrDefault(m => m.Speaker == "customer")?.Text ?? ""),
             CrmSalesStage = context.SalesStage,
-            ConversationState = new { IsFirstReply = isFirstReply, VisitInvitedRecently = visitInvitedRecently,
+            ConversationState = new { IsFirstReply = isFirstReply, VisitInvitedRecently = visitInvitedRecently, context.Correction,
                 LatestCustomerMessage = context.RecentMessages.LastOrDefault(m => m.Speaker == "customer")?.Text } };
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/responses");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", o.ApiKey);

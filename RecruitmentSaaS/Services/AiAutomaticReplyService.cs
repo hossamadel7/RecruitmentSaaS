@@ -40,7 +40,8 @@ public sealed class AiAutomaticReplyService(RecruitmentCrmContext db, AiSalesCon
         if (await db.AiOutboundIntents.AnyAsync(i => i.ConversationId == id && (i.State == "Sending" || i.State == "Unknown"), ct)) return;
         var key = $"auto:{id}:{incoming.Id}:{control.OwnershipVersion}";
         var draft = await drafts.GenerateAutomaticallyAsync(id, control.OwnershipVersion, key, ct);
-        if (draft.NeedsHuman || draft.Status is not (AiDraftStatus.ReviewRequired or AiDraftStatus.AutomaticallyApproved)) return;
+        // Handoff/stop drafts carry safe local wording: send it so the customer is never left without a reply.
+        if (!AiSalesDraftService.AutoSendable(draft) || draft.Status is not (AiDraftStatus.ReviewRequired or AiDraftStatus.AutomaticallyApproved)) return;
         await drafts.ApproveAutomaticallyAsync(draft.Id, ct);
         var intent = await dispatch.QueueAutomaticallyAsync(draft.Id, control.OwnershipVersion, key, ct);
         await dispatch.DispatchAutomaticallyAsync(intent.Id, ct);

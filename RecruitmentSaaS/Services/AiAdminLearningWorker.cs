@@ -68,10 +68,12 @@ public sealed class AiAdminDraftResumer(RecruitmentCrmContext db, AiAdminLearnin
         if (r.State != AiAdminRequestState.Validated) return r;
         var chat = await db.WhatsAppConversations.AsNoTracking().SingleAsync(c => c.Id == r.ConversationId, ct);
         var control = await db.ConversationControls.AsNoTracking().SingleOrDefaultAsync(c => c.ConversationId == r.ConversationId && c.TenantId == r.TenantId, ct);
-        var newest = await db.WhatsAppMessages.AsNoTracking().Where(m => m.ConversationId == r.ConversationId)
-            .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id).Select(m => m.Id).FirstOrDefaultAsync(ct);
+        // Only the automatic holding reply (sent by the AI agent) may follow the customer's question.
+        var asked = await db.WhatsAppMessages.AsNoTracking().Where(m => m.Id == r.CustomerMessageId).Select(m => (DateTime?)m.CreatedAt).SingleOrDefaultAsync(ct);
+        var moved = asked == null || await db.WhatsAppMessages.AsNoTracking().AnyAsync(m => m.ConversationId == r.ConversationId &&
+            m.Id != r.CustomerMessageId && m.CreatedAt >= asked && (m.Direction != 2 || m.SenderAiSalesAgentId == null), ct);
         if (chat.AssignedAiSalesAgentId != r.AgentId || control?.Controller != ConversationControllerMode.Assisted ||
-            control.OwnershipVersion != r.OwnershipVersion || newest != r.CustomerMessageId || r.AnswerValidUntil <= DateTime.UtcNow)
+            control.OwnershipVersion != r.OwnershipVersion || moved || r.AnswerValidUntil <= DateTime.UtcNow)
         {
             admin.Change(r, AiAdminRequestState.Cancelled, null); r.ErrorCode = "CustomerContextChanged"; await db.SaveChangesAsync(ct); return r;
         }

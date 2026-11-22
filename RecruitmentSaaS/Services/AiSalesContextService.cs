@@ -14,7 +14,7 @@ public sealed record AiContextFact(Guid Id, long Version, AiKnowledgeKind Kind, 
 public sealed record AiCustomerContext(string? Name, byte? Age, string? Profession, byte? LeadStatus, DateTime? AppointmentDate,
     string ReviewedSummary, long MemoryVersion, AiCustomerMemoryDetails? ReviewedDetails = null);
 public sealed record AiSalesContext(AiCustomerContext Customer, AiContextMessage[] RecentMessages, AiContextFact[] Knowledge,
-    string? Language = null, string? SalesStage = null);
+    string? Language = null, string? SalesStage = null, string? Correction = null);
 
 /// <summary>Permitted CRM reads are composed by the server; the model cannot choose an arbitrary lead or SQL.</summary>
 public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKnowledgeService? semantic = null,
@@ -63,7 +63,9 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
         var ranked = semantic == null ? candidates.OrderByDescending(k => terms.Count(t => IntakeScript.Normalize(k.Title + " " + k.Content).Contains(t)))
             .ThenByDescending(k => k.ApprovedAt).ToArray() : (await semantic.RankAsync(tenant, chat.WhatsAppAccountId,
                 AiLearningSourceService.Redact(retrievalQuery, [lead?.FullName, chat.IntakeName]), candidates.ToArray(), ct)).Select(x => x.Knowledge).ToArray();
-        var knowledge = ranked.Where(k => k.Kind == AiKnowledgeKind.Fact).Take(6)
+        var rankedFacts = ranked.Where(k => k.Kind == AiKnowledgeKind.Fact).ToArray();
+        var pinned = rankedFacts.Where(k => Pinned(k.Title, retrievalQuery)).Take(4);
+        var knowledge = rankedFacts.Take(6).Concat(pinned).DistinctBy(k => k.Id).Take(8)
             .Concat(ranked.Where(k => k.Kind == AiKnowledgeKind.Playbook).Take(2))
             .Select(k => new AiContextFact(k.Id, k.Version, k.Kind, k.Title, Redact(k.Content), k.ValidUntil)).ToArray();
         if (adminOptions?.Value is { Enabled: true, PrivateRoutingEnabled: true } admin && admin.ApprovedAccountIds.Contains(chat.WhatsAppAccountId))
@@ -84,6 +86,20 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
             Redact(memory?.ReviewedSummary ?? ""), memory?.Version ?? 0,
             memory == null ? null : AiCustomerMemoryDetails.Read(memory.ReviewedDetailsJson).ForModel()), history, knowledge,
             AiSalesLanguage.Detect(query), ((LeadStage)chat.LeadStage).ToString());
+    }
+
+    // Customer wording (Arabic or Arabizi) objecting to the price or asking for a cheaper option.
+    private static readonly string[] PriceWords = ["غالي", "كتير", "كبير", "ارخص", "اقل", "خصم", "المبلغ", "مبلغ", "تكلفه", "تكاليف",
+        "ghaly", "ghali", "8aly", "kteer", "kter", "ktir", "arkhas", "ar5as", "a2al", "khasm", "5asm", "mablagh", "taklfa", "takalef", "tkalef"];
+
+    /// <summary>Office hours/address are always available to answer a visit or timing question, and every approved
+    /// cost fact is available when the customer pushes back on the price, so a cheaper approved offer can be named.</summary>
+    public static bool Pinned(string title, string customerText)
+    {
+        var t = IntakeScript.Normalize(title);
+        if (t.Contains("عنوان المكتب") || (t.Contains("المكتب") && t.Contains("مواعيد")) || t.Contains("السن")) return true;
+        var said = IntakeScript.Normalize(customerText);
+        return PriceWords.Any(said.Contains) && (t.Contains("الرسوم") || t.Contains("تكلفه") || t.Contains("المبلغ"));
     }
 
     public static string Fingerprint(AiSalesContext context) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(context))));

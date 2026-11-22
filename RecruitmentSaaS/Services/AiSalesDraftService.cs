@@ -52,7 +52,9 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
                 a.EndedAt == null && a.StartedAt >= settings.AutoReplySinceUtc, ct))
                 throw new AiSalesValidation("Automatic replies require a new explicit assignment after release.");
             context = await contextReader.ReadAsync(tenant, chat, ct);
-            if (context.RecentMessages.LastOrDefault()?.Speaker != "customer")
+            // An admin-verified answer may follow the automatic holding reply already sent for the same customer turn.
+            if (context.RecentMessages.LastOrDefault()?.Speaker != "customer" &&
+                !(key.StartsWith("admin-answer:") && context.RecentMessages.Any(m => m.Speaker == "customer")))
                 throw new AiSalesValidation("A new customer message is required before drafting.");
             await using var tx = await db.Database.BeginTransactionAsync(ct);
             await ConversationLock.LockTransactionAsync(db, "draft-budget:" + tenant, ct);
@@ -90,15 +92,23 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
             else if (proposal == null)
             {
                 if (!settings.ExternalProcessingApproved) throw new AiSalesProviderException("ExternalProcessingDisabled");
-                proposal = await provider.GenerateAsync(context, ct);
-                ValidateProposal(proposal, context);
+                proposal = await GenerateCheckedAsync(context, ct);
             }
         }
         catch (Exception ex)
         {
             // Persist a bounded code only; never provider bodies, prompts, keys or customer text in errors.
             error = ex is AiSalesProviderException ? ex.Message : ex is OperationCanceledException ? "GenerationCancelled" : ex.GetType().Name;
+            // An automatic turn must never leave the customer without any reply: send a holding line and flag staff.
+            if (actor == null && ex is AiSalesProviderException && error is not ("ExternalProcessingDisabled" or "ProviderNotConfigured"))
+            {
+                proposal = Holding(context, "Automatic fallback after " + error + "; staff should answer this message.", proposal);
+                error = null;
+            }
         }
+        // Automatic mode sends only safe local wording for a handoff; the model's uncertain text stays out of the chat.
+        if (actor == null && proposal != null && error == null && proposal.NeedsHuman && proposal.Model != "local-policy")
+            proposal = Holding(context, proposal.ReviewNote, proposal);
 
         db.ChangeTracker.Clear();
         await using (var chatGate = await ConversationLock.AcquireAsync(db, "conversation:" + chatId, CancellationToken.None))
@@ -159,8 +169,8 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
         if (!options.Value.CanReplyAutomatically(draft.ConversationId, draft.AgentId) || draft.RequestedById != null)
             throw new AiSalesValidation("Automatic replies are not enabled for this assignment.");
         if (draft.Status == AiDraftStatus.AutomaticallyApproved) return draft;
-        if (draft.Status != AiDraftStatus.ReviewRequired || draft.NeedsHuman || !await IsCurrentAsync(draft, ct))
-            throw new AiSalesConflict("Automatic reply requires current context without a handoff.");
+        if (draft.Status != AiDraftStatus.ReviewRequired || !AutoSendable(draft) || !await IsCurrentAsync(draft, ct))
+            throw new AiSalesConflict("Automatic reply requires current context and an automatically sendable intent.");
         draft.Status = AiDraftStatus.AutomaticallyApproved;
         // No human reviewer is attributed to a machine decision.
         db.AiControlAudits.Add(new() { TenantId = draft.TenantId, ConversationId = draft.ConversationId,
@@ -200,6 +210,55 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
             throw new AiSalesValidation("Assigned agent is unavailable.");
         return chat;
     }
+
+    private static readonly string[] RetryableCodes = ["MissingEvidence", "InvalidDraft", "InvalidHandoff", "UnapprovedCitation",
+        "UnverifiedBookingClaim", "SensitiveOutput"];
+
+    /// <summary>One provider call, and one corrected retry when the draft breaks a fixable rule.</summary>
+    private async Task<AiDraftProposal> GenerateCheckedAsync(AiSalesContext context, CancellationToken ct)
+    {
+        var first = await provider.GenerateAsync(context, ct);
+        var code = Check(first, context);
+        if (code == null) return AiSalesReplyPolish.Apply(first, context);
+        if (!RetryableCodes.Contains(code)) throw new AiSalesProviderException(code);
+        var second = await provider.GenerateAsync(context with { Correction = CorrectionFor(code) }, ct);
+        var again = Check(second, context);
+        if (again != null) throw new AiSalesProviderException(again);
+        return AiSalesReplyPolish.Apply(second with { InputTokens = Sum(first.InputTokens, second.InputTokens),
+            OutputTokens = Sum(first.OutputTokens, second.OutputTokens) }, context);
+    }
+
+    private static int? Sum(int? a, int? b) => a == null && b == null ? null : (a ?? 0) + (b ?? 0);
+
+    private static string? Check(AiDraftProposal p, AiSalesContext context)
+    {
+        try { ValidateProposal(p, context); return null; }
+        catch (AiSalesProviderException ex) { return ex.Message; }
+    }
+
+    public static string CorrectionFor(string code) => code switch
+    {
+        "MissingEvidence" => "Your previous draft made business claims without citing FACT IDs. Cite the exact FACT IDs you rely on in sourceIds, " +
+            "or if no FACT answers the question, use intent acknowledgement without business claims, or intent handoff with needsHuman=true.",
+        "UnverifiedBookingClaim" => "Your previous draft claimed an appointment was booked or confirmed. You cannot book. Say staff will confirm the time.",
+        "InvalidHandoff" => "Your previous draft used intent handoff or stop with needsHuman=false. Set needsHuman=true for handoff or stop.",
+        "UnapprovedCitation" => "Your previous draft cited an ID that is not a supplied FACT. Cite only supplied FACT IDs.",
+        "SensitiveOutput" => "Your previous draft contained a phone number, email or identifier. Remove it.",
+        _ => "Your previous draft was invalid. Follow the schema and keep the reply short."
+    };
+
+    private static AiDraftProposal Holding(AiSalesContext context, string? note, AiDraftProposal? usage)
+    {
+        note = string.IsNullOrWhiteSpace(note) ? "Handoff: staff should answer this message." : note;
+        var language = context.Language is null or "arabizi" ? "ar-EG" : context.Language;
+        return new(AiSalesLanguage.SafeLocal("handoff", language), "handoff", note.Length > 500 ? note[..500] : note, true, [],
+            usage?.Model ?? "local-policy", usage?.InputTokens, usage?.OutputTokens);
+    }
+
+    /// <summary>Automatic sending allows ordinary replies, and handoff/stop acknowledgements that flag staff.</summary>
+    public static bool AutoSendable(AiSalesDraft d) => d.NeedsHuman
+        ? d.Intent is "handoff" or "stop"
+        : d.Intent is "answer" or "acknowledgement" or "qualification" or "consultation";
 
     private static void ValidateProposal(AiDraftProposal p, AiSalesContext context)
     {

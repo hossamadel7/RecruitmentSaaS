@@ -19,6 +19,7 @@ public static class AiSalesReplyPolicy
             return Local(AiSalesLanguage.SafeLocal("handoff", language), "handoff", "Customer requested staff; no further intake required.");
         if (Regex.IsMatch(text.Trim(), @"^(?:i(?:'ll| will) think (?:about it)?|let me think|hafakar|hafakkar|سافكر|سافكر في الامر)[.! ]*$"))
             return new(AiSalesLanguage.SafeLocal("thinking", language), "acknowledgement", "Customer needs time; no pressure.", false, [], "local-policy");
+        if (language == "arabizi" && Booking(text) is { } booking) return booking;
         return null; // Business replies must be generated in the customer's language from current facts.
     }
     private static AiDraftProposal? CreateEgyptian(AiSalesContext context)
@@ -49,9 +50,9 @@ public static class AiSalesReplyPolicy
             var discountPolicy = context.Knowledge.FirstOrDefault(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow &&
                 IntakeScript.Normalize(k.Content).Contains(IntakeScript.Normalize("الخصم يمكن طلبه من الإدارة، ولا تؤكد خصمًا قبل اعتماده")));
             return discountPolicy == null
-                ? new("فاهم يا فندم إن المبلغ كبير بالنسبة لحضرتك. لو تحب، نراجع استفسارك عن الرسوم مع المسؤول.",
+                ? new("فاهمة يا فندم إن المبلغ كبير بالنسبة لحضرتك. لو تحب، نراجع استفسارك عن الرسوم مع المسؤول.",
                     "acknowledgement", "Price objection acknowledged; no discount policy established and no action claimed.", false, [], "local-policy")
-                : new("فاهم يا فندم إن المبلغ كبير بالنسبة لحضرتك. ممكن تطلب من الإدارة مراجعة إمكانية خصم، لكن الخصم مش مؤكد قبل موافقتهم.",
+                : new("فاهمة يا فندم إن المبلغ كبير بالنسبة لحضرتك. ممكن تطلب من الإدارة مراجعة إمكانية خصم، لكن الخصم مش مؤكد قبل موافقتهم.",
                     "answer", "Price objection; approved policy allows requesting a discount review, never guarantees one.", false, [discountPolicy.Id], "local-policy");
         }
 
@@ -67,11 +68,7 @@ public static class AiSalesReplyPolicy
                 ? Local("موعد الزيارة محتاج مراجعة من الموظف قبل ما نأكد أي حجز يا فندم.", "handoff", "Friday visit requested without an explicit approved closure fact; review the actual office schedule.")
                 : Local("المكتب مغلق يوم الجمعة يا فندم. نراجع مع الموظف يوم تاني مناسب للزيارة.", "handoff", "Approved Fact states Friday closure; no appointment created.", [fact.Id]);
         }
-        // A request to book, or a specific time, is never booked from chat text: staff confirm it in the CRM.
-        if (Has(text, "احجزلي", "احجز لي", "احجزيلي", "عايز احجز", "عاوز احجز", "ممكن احجز", "احجز ميعاد", "احجز معاد", "احجز موعد") ||
-            (Regex.IsMatch(text, @"الساعه\s*\d") && Has(text, "اجي", "هجي", "جاي", "ميعاد", "معاد", "موعد", "بكره", "النهارده")))
-            return Local("تمام يا فندم، هبلغ الموظف المسؤول يأكد مع حضرتك الميعاد.", "handoff",
-                "Customer asked to book or named a visit time; staff must confirm in the CRM. No appointment created.");
+        if (Booking(text) is { } booking) return booking;
         // This is an information handoff, never rejection of the applicant or a hiring decision.
         if (text.Contains("السعوديه") && !context.Knowledge.Any(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow &&
             Has(IntakeScript.Normalize(k.Title + " " + k.Content), "السعوديه", "سعودي", "saudi")))
@@ -84,6 +81,24 @@ public static class AiSalesReplyPolicy
         if (text.Contains("ينفع") && !Has(text, "اجي", "ازور", "زياره", "المكتب", "معاد", "موعد", "اعرف", "مواعيد", "المرتب", "الراتب", "بدفع"))
             return Local("مناسبة العرض لحضرتك محتاجة مراجعة من مسؤول التعاقدات يا فندم قبل ما نأكد أي فرصة.", "handoff", "Individual matching question routed to staff; no eligibility or hiring decision made.");
         return null;
+    }
+
+    // Arabic and Arabizi wording for booking, coming over, a named day/time, and a question.
+    private static readonly string[] BookWords = ["احجزلي", "احجز لي", "احجزيلي", "عايز احجز", "عاوز احجز", "ممكن احجز", "احجز ميعاد", "احجز معاد",
+        "احجز موعد", "هاجي احجز", "هجي احجز", "اجي احجز", "ahgz", "a7gz", "ahgez", "a7gez", "ahgaz", "e7gezly", "ehgezly", "e7gzly", "ehgzly", "7gzly", "hgzly"];
+    private static readonly string[] ComeWords = ["اجي", "هجي", "هاجي", "جاي", "agy", "aji", "hagy", "hagi", "haagy", "ageelko", "agelko", "gay "];
+    private static readonly string[] DayWords = ["بكره", "النهارده", "السبت", "الحد", "الاحد", "الاتنين", "الاثنين", "التلات", "الثلاثاء", "الاربع", "الخميس",
+        "bokra", "bukra", "boukra", "naharda", "el sabt", "el had", "el etnen", "el itnen", "el tanat", "el talat", "el arba3", "el khamis", "el 5amis"];
+    private static readonly string[] QuestionWords = ["كام", "امتي", "ازاي", "ينفع", "؟", "?", " kam", "emta", "imta", "ezay", "ezzay", "yenfa3"];
+
+    /// <summary>A booking request, or a stated visit day/time, is never booked from chat text: staff confirm it in the CRM.
+    /// A question about timing ("اجي الساعه كام؟") is left to the model so it can answer with the office hours.</summary>
+    public static AiDraftProposal? Booking(string text)
+    {
+        var timed = Regex.IsMatch(text, @"(?:الساعه|sa3a|sa3)\s*\d") || Has(text, DayWords);
+        if (!Has(text, BookWords) && !(Has(text, ComeWords) && timed && !Has(text, QuestionWords))) return null;
+        return Local("تمام يا فندم، هبلغ الموظف المسؤول يراجع طلب حضرتك ويأكد معاك الميعاد.", "handoff",
+            "Customer asked to book or named a visit day/time; staff must confirm in the CRM. No appointment created.");
     }
 
     private static bool Has(string text, params string[] values) => values.Any(text.Contains);

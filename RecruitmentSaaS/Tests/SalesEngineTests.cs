@@ -176,7 +176,7 @@ public sealed partial class FoundationTests
         var replay = await engine.GenerateAsync(s.Chat, s.Admin, 1, "invented", default);
         Assert.Equal(draft.Id, replay.Id); Assert.Equal(AiDraftStatus.Failed, replay.Status);
         await Assert.ThrowsAsync<AiSalesConflict>(() => engine.GenerateAsync(s.Chat, s.Admin, 1, "over-budget", default));
-        p.Verify(x => x.GenerateAsync(It.IsAny<AiSalesContext>(), It.IsAny<CancellationToken>()), Times.Once);
+        p.Verify(x => x.GenerateAsync(It.IsAny<AiSalesContext>(), It.IsAny<CancellationToken>()), Times.Exactly(2)); // one corrected retry
     }
 
     [Fact]
