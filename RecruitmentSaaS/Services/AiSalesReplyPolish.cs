@@ -68,7 +68,8 @@ public static class AiSalesReplyPolish
         var askedAboutVisit = CustomerVisitWords.Any(customer.Contains);
         var previous = context.RecentMessages.LastOrDefault(m => m.Speaker != "customer")?.Text ?? "";
 
-        var text = TitledName.Replace(reply, "يا فندم");
+        // Gihan talks to men: "معاكِ" (addressing a woman) becomes "معاك".
+        var text = TitledName.Replace(reply.Replace("معاكِ", "معاك"), "يا فندم");
         // A name used in the previous reply is not repeated in this one.
         text = Vocative.Replace(text, m =>
         {

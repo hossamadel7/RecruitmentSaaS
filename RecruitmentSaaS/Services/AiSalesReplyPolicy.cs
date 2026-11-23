@@ -19,7 +19,7 @@ public static class AiSalesReplyPolicy
             return Local(AiSalesLanguage.SafeLocal("handoff", language), "handoff", "Customer requested staff; no further intake required.");
         if (Regex.IsMatch(text.Trim(), @"^(?:i(?:'ll| will) think (?:about it)?|let me think|hafakar|hafakkar|سافكر|سافكر في الامر)[.! ]*$"))
             return new(AiSalesLanguage.SafeLocal("thinking", language), "acknowledgement", "Customer needs time; no pressure.", false, [], "local-policy");
-        if (language == "arabizi" && (Location(text, context) ?? Thanks(text, context)) is { } local) return local;
+        if (language == "arabizi" && (Location(text, context) ?? Thanks(text, context) ?? AiSalesGuards.AnyDay(text, context, EgyptTime.Today)) is { } local) return local;
         return null; // Business replies must be generated in the customer's language from current facts.
     }
     private static AiDraftProposal? CreateEgyptian(AiSalesContext context)
@@ -68,7 +68,7 @@ public static class AiSalesReplyPolicy
                 : new("المكتب مغلق يوم الجمعة يا فندم، تقدر تيجي أي يوم من السبت للخميس.", "answer",
                     "Approved Fact states Friday closure; no appointment created.", false, [fact.Id], "local-policy");
         }
-        if ((Location(text, context) ?? Thanks(text, context)) is { } local) return local;
+        if ((Location(text, context) ?? Thanks(text, context) ?? AiSalesGuards.AnyDay(text, context, EgyptTime.Today)) is { } local) return local;
         // This is an information handoff, never rejection of the applicant or a hiring decision.
         if (text.Contains("السعوديه") && !context.Knowledge.Any(k => k.Kind == AiKnowledgeKind.Fact && k.ValidUntil > DateTime.UtcNow &&
             Has(IntakeScript.Normalize(k.Title + " " + k.Content), "السعوديه", "سعودي", "saudi")))

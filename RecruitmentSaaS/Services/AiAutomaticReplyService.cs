@@ -34,6 +34,7 @@ public sealed class AiAutomaticReplyService(RecruitmentCrmContext db, AiSalesCon
         var now = DateTime.UtcNow;
         if (incoming == null || (!settings.AutoReplyAnyAssignedConversation && incoming.CreatedAt < settings.AutoReplySinceUtc) || incoming.CreatedAt > now.AddSeconds(-ReplyAfterSilenceSeconds) ||
             incoming.WhatsAppTimestamp < now.AddHours(-24).AddMinutes(5)) return;
+        if (AiSalesGuards.IsSpam(incoming.TextBody)) return; // scam/bait links are never answered
         // Wait (up to two minutes) for the customer's voice notes to be turned into text, then answer them.
         if (await VoiceTranscriptionService.AnyPendingAsync(db, voiceOptions?.Value, id, ct)) return;
         if (adminOptions?.Value.PrivateRoutingEnabled == true && await db.AiAdminClarifications.AnyAsync(r => r.TenantId == controls.Options.TenantId &&

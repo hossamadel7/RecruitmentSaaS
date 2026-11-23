@@ -217,7 +217,7 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
     }
 
     private static readonly string[] RetryableCodes = ["MissingEvidence", "InvalidDraft", "InvalidHandoff", "UnapprovedCitation",
-        "UnverifiedBookingClaim", "SensitiveOutput"];
+        "UnverifiedBookingClaim", "SensitiveOutput", "UnlistedJob"];
 
     /// <summary>One provider call, and one corrected retry when the draft breaks a fixable rule.</summary>
     private async Task<AiDraftProposal> GenerateCheckedAsync(AiSalesContext context, CancellationToken ct)
@@ -228,6 +228,10 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
         if (!RetryableCodes.Contains(code)) throw new AiSalesProviderException(code);
         var second = await provider.GenerateAsync(context with { Correction = CorrectionFor(code) }, ct);
         var again = Check(second, context);
+        // Still offering a job no fact lists: say plainly it is not available instead of inventing it.
+        if (again == "UnlistedJob" && UnlistedJob(second, context) is { } job)
+            return new(AiSalesGuards.UnlistedJobReply(job), "qualification", "Model offered an unlisted job twice; safe local reply sent.",
+                false, [], second.Model, Sum(first.InputTokens, second.InputTokens), Sum(first.OutputTokens, second.OutputTokens));
         if (again != null) throw new AiSalesProviderException(again);
         return AiSalesReplyPolish.Apply(second with { InputTokens = Sum(first.InputTokens, second.InputTokens),
             OutputTokens = Sum(first.OutputTokens, second.OutputTokens) }, context);
@@ -245,7 +249,10 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
     {
         "MissingEvidence" => "Your previous draft made business claims without citing FACT IDs. Cite the exact FACT IDs you rely on in sourceIds, " +
             "or if no FACT answers the question, use intent acknowledgement without business claims, or intent handoff with needsHuman=true.",
-        "UnverifiedBookingClaim" => "Your previous draft claimed an appointment was booked or confirmed. You cannot book. Say staff will confirm the time.",
+        "UnverifiedBookingClaim" => "Your previous draft said the appointment was booked. Confirm the day warmly instead, e.g. \"تمام يا فندم، مستنيك يوم الاتنين\", without the words حجز or اتحجز.",
+        "UnlistedJob" => "Your previous draft said a job is available that no approved FACT lists, or gave it a salary from another job. " +
+            "Say plainly that this job is not available right now and offer only jobs that appear in FACTS and fit the customer's age, " +
+            "with their exact country and salary; if none fits, say we have other work opportunities without naming a salary.",
         "InvalidHandoff" => "Your previous draft used intent handoff or stop with needsHuman=false. Set needsHuman=true for handoff or stop.",
         "UnapprovedCitation" => "Your previous draft cited an ID that is not a supplied FACT. Cite only supplied FACT IDs.",
         "SensitiveOutput" => "Your previous draft contained a phone number, email or identifier. Remove it.",
@@ -278,7 +285,11 @@ public sealed class AiSalesDraftService(RecruitmentCrmContext db, AiSalesControl
         if (AiSalesContextService.Redact(p.Reply) != p.Reply) throw new AiSalesProviderException("SensitiveOutput");
         // The model cannot book; a reply claiming a saved appointment must never reach the customer.
         if (ClaimsBooking(p.Reply)) throw new AiSalesProviderException("UnverifiedBookingClaim");
+        if (!p.NeedsHuman && UnlistedJob(p, context) != null) throw new AiSalesProviderException("UnlistedJob");
     }
+
+    private static string? UnlistedJob(AiDraftProposal p, AiSalesContext context)
+        => AiSalesGuards.UnlistedJobClaim(p.Reply, context.Knowledge.Where(k => k.Kind == AiKnowledgeKind.Fact).Select(k => k.Title + " " + k.Content));
 
     public static bool ClaimsBooking(string reply)
     {

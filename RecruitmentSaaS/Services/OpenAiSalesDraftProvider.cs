@@ -19,7 +19,7 @@ public interface IAiSalesDraftProvider
 /// <summary>One bounded stateless request. No provider retries, uploads, tools, or transport sends.</summary>
 public sealed class OpenAiSalesDraftProvider(HttpClient http, IOptions<AiSalesEngineOptions> options) : IAiSalesDraftProvider
 {
-    public const string PromptVersion = "sales-draft-v20-job-country-booking";
+    public const string PromptVersion = "sales-draft-v21-no-invented-jobs";
     private static readonly string[] VisitInvitationMarkers = ["مقابل", "ميعاد", "معاد", "موعد", "تيجي", "زياره", "انسب يوم"];
     // The nested JSON is model-visible text: preserve Arabic rather than forcing it to decode \u sequences.
     private static readonly JsonSerializerOptions ContextJsonOptions = new() { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) };

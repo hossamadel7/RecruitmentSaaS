@@ -47,6 +47,7 @@ public sealed class AiSalesContextService(RecruitmentCrmContext db, AiSemanticKn
             else if (m.Direction == (byte)MessageDirection.Incoming && m.MessageType == (byte)WhatsAppMessageType.Audio && !string.IsNullOrWhiteSpace(m.TextBody))
                 entries.Add(new(m.Id, "customer", "TranscribedAudio", Redact(Trim(m.TextBody, 600)), m.CreatedAt)); // automatic voice-note text
             else if (m.MessageType == (byte)WhatsAppMessageType.Reaction) continue; // an emoji reaction is not a turn to answer
+            else if (m.Direction == (byte)MessageDirection.Incoming && AiSalesGuards.IsSpam(m.TextBody)) continue; // scam/bait link
             else entries.Add(new(m.Id, m.Direction == (byte)MessageDirection.Incoming ? "customer" : m.SenderAiSalesAgentId != null ? "ai"
                 : m.MessageSource == (byte)MessageSource.System ? "intake_bot" : "staff_or_script",
                 ((WhatsAppMessageType)m.MessageType).ToString(), m.MessageType == (byte)WhatsAppMessageType.Text ? Redact(Trim(m.TextBody, 600)) : "[Media awaits staff review]", m.CreatedAt));
